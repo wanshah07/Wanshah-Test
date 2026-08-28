@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+# Builds the Vite app and publishes dist/ to GitHub Pages at
+# https://wanshah07.github.io/Wanshah-Test/
+#
+# vite.config.ts sets `base: './'`, so every asset is referenced
+# relatively and the same build works from that sub-path as well as from
+# a domain root — nothing here needs to know the repository name.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one midway: a half-finished
+# deploy would leave the live site in an undefined state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 22, not 20: vite.config.ts uses import.meta.dirname, which lands
+      # in Node 20.11 — the `20` label can still resolve below that.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # Runs `tsc -b` first, so a type error fails the deploy rather than
+      # publishing a build that never type-checked.
+      - run: npm run build
+
+      # enablement: true asks the API to switch Pages on, so a fresh
+      # repository does not need the toggle set by hand in Settings. If
+      # the workflow token is refused, this step fails and the toggle is
+      # still there to set: Settings > Pages > Source: GitHub Actions.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
