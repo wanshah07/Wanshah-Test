@@ -42,14 +42,17 @@ jobs:
       # publishing a build that never type-checked.
       - run: npm run build
 
-      # enablement: true asks the API to switch Pages on, so a fresh
-      # repository does not need the toggle set by hand in Settings. If
-      # the workflow token is refused, this step fails and the toggle is
-      # still there to set: Settings > Pages > Source: GitHub Actions.
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
+      # No actions/configure-pages step here, deliberately. Its only jobs
+      # are to switch Pages on and to hand the build a base path, and
+      # neither applies: creating a Pages site needs admin rights on the
+      # repository, which the workflow's built-in GITHUB_TOKEN does not
+      # carry (tried once, run 1: "Create Pages site failed. Error:
+      # Resource not accessible by integration"), and `base: './'` in
+      # vite.config.ts means the build never needs to know its path.
+      #
+      # So Pages is switched on by hand, once, in Settings > Pages >
+      # Source: GitHub Actions. After that every push to main deploys
+      # with no further clicks.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
