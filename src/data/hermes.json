@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T07:25:51+00:00",
+  "generated_at": "2026-08-29T15:07:57+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -43,6 +43,7 @@
     {
       "day": 1,
       "brand": "wsregulab",
+      "domain": "halal_my",
       "pillar": "urutan",
       "format": "carousel",
       "title": "Urutan proses — PBT → KKM → JAKIM"
@@ -50,6 +51,7 @@
     {
       "day": 2,
       "brand": "wsregulab",
+      "domain": "kosmetik",
       "pillar": "silap",
       "format": "text_image",
       "title": "Silap biasa yang buat permohonan kena reject"
@@ -57,6 +59,7 @@
     {
       "day": 3,
       "brand": "wsregulab",
+      "domain": "halal_my",
       "pillar": "soal_jawab",
       "format": "text_image",
       "title": "Soalan dari DM"
@@ -64,6 +67,7 @@
     {
       "day": 4,
       "brand": "wsregulab",
+      "domain": "makanan",
       "pillar": "dokumen",
       "format": "text_image",
       "title": "Dokumen apa yang perlu disediakan"
@@ -71,6 +75,7 @@
     {
       "day": 5,
       "brand": "wsregulab",
+      "domain": "halal_id",
       "pillar": "mitos",
       "format": "text_image",
       "title": "Mitos vs Fakta"
@@ -78,27 +83,31 @@
     {
       "day": 6,
       "brand": "wsregulab",
+      "domain": "kosmetik",
+      "pillar": "soal_jawab",
+      "format": "text_image",
+      "title": "Soalan dari DM"
+    },
+    {
+      "day": 7,
+      "brand": "wsregulab",
+      "domain": "halal_my",
       "pillar": "kos_tempoh",
       "format": "text_image",
       "title": "Kos sebenar & tempoh sebenar"
     },
     {
-      "day": 7,
-      "brand": "wsregulab",
-      "pillar": "urutan",
-      "format": "text_image",
-      "title": "Urutan proses — PBT → KKM → JAKIM"
-    },
-    {
       "day": 8,
       "brand": "wsregulab",
-      "pillar": "dokumen",
+      "domain": "farmaseutikal",
+      "pillar": "mitos",
       "format": "carousel",
-      "title": "Dokumen apa yang perlu disediakan"
+      "title": "Mitos vs Fakta"
     },
     {
       "day": 9,
       "brand": "wsregulab",
+      "domain": "halal_my",
       "pillar": "silap",
       "format": "text_image",
       "title": "Silap biasa yang buat permohonan kena reject"
@@ -106,13 +115,15 @@
     {
       "day": 10,
       "brand": "wsregulab",
-      "pillar": "soal_jawab",
+      "domain": "kosmetik",
+      "pillar": "dokumen",
       "format": "text_image",
-      "title": "Soalan dari DM"
+      "title": "Dokumen apa yang perlu disediakan"
     },
     {
       "day": 11,
       "brand": "wsregulab",
+      "domain": "makanan",
       "pillar": "mitos",
       "format": "text_image",
       "title": "Mitos vs Fakta"
@@ -120,6 +131,7 @@
     {
       "day": 12,
       "brand": "wsregulab",
+      "domain": "halal_my",
       "pillar": "kemaskini",
       "format": "text_image",
       "title": "Perubahan peraturan terkini"
@@ -127,13 +139,15 @@
     {
       "day": 13,
       "brand": "wsregulab",
-      "pillar": "kos_tempoh",
+      "domain": "farmaseutikal",
+      "pillar": "urutan",
       "format": "text_image",
-      "title": "Kos sebenar & tempoh sebenar"
+      "title": "Urutan proses — PBT → KKM → JAKIM"
     },
     {
       "day": 14,
       "brand": "wsregulab",
+      "domain": "halal_id",
       "pillar": "soal_jawab",
       "format": "text_image",
       "title": "Soalan dari DM"
@@ -283,7 +297,7 @@
     "pillar": "kos_tempoh",
     "angle": "Fi ikut nilai perolehan; sah laku berbeza ikut skim",
     "format": "text_image",
-    "status": "approved",
+    "status": "posted",
     "credits_spent": 0,
     "gates": {
       "claims": "pass — tiada dakwaan produk",
@@ -297,11 +311,50 @@
       "facebook_page": 608,
       "threads": 320
     },
-    "posted_at": null,
+    "posted_at": "2026-08-29T08:24Z",
     "citation": "MPPHM (Domestik) 2020, Prosedur 7(1), 8(1), 15(1), 35(2)",
     "public_urls": [
       "https://wanshah07.github.io/Wanshah-Test/media/2026-08-29/card-1.png"
     ],
+    "hantar": {
+      "saluran": [
+        "threads (gagal)",
+        "facebook_page",
+        "instagram"
+      ],
+      "arahan_pengguna": "approve the 29 august post and post to threads only",
+      "kad_awam": "https://wanshah07.github.io/Wanshah-Test/media/2026-08-29/card-1.png",
+      "cubaan": [
+        {
+          "masa": "2026-08-29T07:28Z",
+          "saluran": "threads",
+          "keputusan": "gagal",
+          "ralat": "user id or long lived token not found in metadata",
+          "nota": "Dua kali cuba, dua-dua sambungan id. Sambungan Threads tidak stale tetapi metadatanya tiada user id / long-lived token. Perlu sambung semula."
+        },
+        {
+          "masa": "2026-08-29T08:24Z",
+          "saluran": "facebook_page",
+          "keputusan": "berjaya",
+          "post_id": "959295067272709_122123344545264570"
+        },
+        {
+          "masa": "2026-08-29T08:24Z",
+          "saluran": "instagram",
+          "keputusan": "berjaya",
+          "post_id": "17892177228417217"
+        }
+      ],
+      "nota_akhir": "Diminta 'threads only' pada mulanya. Threads gagal — token rosak. Pengguna kemudian meluluskan Facebook dan Instagram sebagai ganti."
+    },
+    "posted_to": [
+      "facebook_page",
+      "instagram"
+    ],
+    "post_ids": {
+      "facebook_page": "959295067272709_122123344545264570",
+      "instagram": "17892177228417217"
+    },
     "verify_markers": []
   },
   "ledger": [
@@ -312,10 +365,15 @@
       "pillar": "kos_tempoh",
       "angle": "Fi ikut nilai perolehan; sah laku berbeza ikut skim",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "posted",
       "credits_spent": 0,
       "visual": "rajah/table",
-      "citation": "MPPHM (Domestik) 2020"
+      "citation": "MPPHM (Domestik) 2020",
+      "posted_at": "2026-08-29T08:24Z",
+      "posted_to": [
+        "facebook_page",
+        "instagram"
+      ]
     },
     {
       "date": "2026-08-30",
