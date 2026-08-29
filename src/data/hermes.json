@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T06:34:50+00:00",
+  "generated_at": "2026-08-29T07:22:34+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -161,7 +161,7 @@
     {
       "key": "threads",
       "label": "Threads",
-      "connected": false,
+      "connected": true,
       "enabled": true,
       "limit": 500,
       "target": 400,
