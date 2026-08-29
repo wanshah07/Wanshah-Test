@@ -1,9 +1,11 @@
 {
-  "generated_at": "2026-08-29T03:57:55+00:00",
+  "generated_at": "2026-08-29T04:16:39+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
-    "whatsapp": "60185708401",
+    "wordmark": "WS REGULAB",
+    "tagline": "Trusted · Proven · Clarity",
+    "website": "www.kkmhalalconsultant.com",
     "email": "TODO — emel ws.regulab yang sebenar"
   },
   "schedule": {
@@ -256,11 +258,12 @@
       "facts": "blocked — angka fi & tempoh masih belum_disahkan dalam facts.yml"
     },
     "channels": {
-      "facebook_page": 614,
-      "instagram": 1249,
-      "threads": 290
+      "instagram": 1331,
+      "facebook_page": 646,
+      "threads": 323
     },
     "posted_at": null,
+    "citation": "MPPHM (Domestik) 2020",
     "verify_markers": []
   },
   "ledger": [

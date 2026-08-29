@@ -83,9 +83,13 @@ if (today_dir / "meta.json").is_file():
 out = {
     "generated_at": datetime.datetime.now(datetime.timezone.utc)
                         .isoformat(timespec="seconds"),
+    # No phone number is carried anywhere — the footnote on every design and
+    # the contact line in every caption is the website.
     "brand": {"key": active, "name": brand["name"],
-              "whatsapp": brand["whatsapp"],
-              "email": str(brand["contact_email"])},
+              "wordmark": brand.get("wordmark", brand["name"]),
+              "tagline": brand.get("tagline", ""),
+              "website": brand.get("website", ""),
+              "email": str(brand.get("contact_email", ""))},
     "schedule": {"cron_utc": "45 13 * * *", "local": "9:45 malam",
                  "timezone": brands["meta"]["timezone"]},
     "cycle": {"start": start.isoformat(), "length_days": cycle_len,
