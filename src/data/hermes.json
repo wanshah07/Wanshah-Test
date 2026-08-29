@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T16:14:58+00:00",
+  "generated_at": "2026-08-29T16:27:52+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -346,16 +346,16 @@
       "day_index": 10,
       "domain": "kosmetik",
       "pillar": "dokumen",
-      "angle": "Notifikasi bukan kelulusan — PIF ialah beban bukti yang kekal pada anda",
+      "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
       "format": "text_image",
-      "status": "ready_for_approval",
-      "citation": "Control of Drugs and Cosmetics Regulations 1984; Guidelines for Control of Cosmetic Products in Malaysia (NPRA)",
+      "status": "approved",
+      "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.6, 2.7, 2.10, 3.8, 4.1.8",
       "credits_spent": 0,
       "cards": 1,
       "thumb": "media/preview/2026-09-05/card-1.png",
       "channels": {
-        "instagram": 1325,
-        "facebook_page": 764
+        "instagram": 1537,
+        "facebook_page": 775
       },
       "posted_at": null,
       "posted_to": []
@@ -367,7 +367,7 @@
       "pillar": "silap",
       "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "approved",
       "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
       "credits_spent": 0,
       "cards": 1,
@@ -500,7 +500,7 @@
       "pillar": "silap",
       "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "rajah/compare",
       "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
@@ -512,14 +512,13 @@
       "brand": "wsregulab",
       "domain": "kosmetik",
       "pillar": "dokumen",
-      "angle": "Notifikasi bukan kelulusan — PIF ialah beban bukti yang kekal pada anda",
+      "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "rajah/check",
-      "citation": "CDCR 1984; Guidelines for Control of Cosmetic Products in Malaysia",
-      "bahasa": "campur BM + English",
-      "nota": "Sifar angka — fakta kosmetik belum masuk facts.yml"
+      "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA)",
+      "bahasa": "campur BM + English"
     }
   ]
 }
