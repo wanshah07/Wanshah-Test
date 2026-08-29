@@ -1,9 +1,10 @@
 {
-  "generated_at": "2026-08-29T03:23:06+00:00",
+  "generated_at": "2026-08-29T03:37:49+00:00",
   "brand": {
-    "name": "KKM Halal Consultant",
+    "key": "wsregulab",
+    "name": "ws.regulab",
     "whatsapp": "60185708401",
-    "email": "info@kkmhalalconsultant.com"
+    "email": "TODO — emel ws.regulab yang sebenar"
   },
   "schedule": {
     "cron_utc": "45 13 * * *",
@@ -23,9 +24,10 @@
     "model": "flux-2-klein",
     "spent_this_month": 0,
     "images_this_month": 0,
-    "image_days_per_cycle": 10,
-    "projected_monthly": 210,
-    "headroom": 90,
+    "image_days_per_cycle": 14,
+    "projected_monthly": 0,
+    "visual_default": "rajah",
+    "headroom": 300,
     "halt_below": 30,
     "warn_below": 80
   },
@@ -38,98 +40,98 @@
   "slots": [
     {
       "day": 1,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "urutan",
       "format": "carousel",
       "title": "Urutan proses — PBT → KKM → JAKIM"
     },
     {
       "day": 2,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "silap",
       "format": "text_image",
       "title": "Silap biasa yang buat permohonan kena reject"
     },
     {
       "day": 3,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "soal_jawab",
-      "format": "text_only",
+      "format": "text_image",
       "title": "Soalan dari DM"
     },
     {
       "day": 4,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "dokumen",
       "format": "text_image",
       "title": "Dokumen apa yang perlu disediakan"
     },
     {
       "day": 5,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "mitos",
       "format": "text_image",
       "title": "Mitos vs Fakta"
     },
     {
       "day": 6,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "kos_tempoh",
-      "format": "text_only",
+      "format": "text_image",
       "title": "Kos sebenar & tempoh sebenar"
     },
     {
       "day": 7,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "urutan",
       "format": "text_image",
       "title": "Urutan proses — PBT → KKM → JAKIM"
     },
     {
       "day": 8,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "dokumen",
       "format": "carousel",
       "title": "Dokumen apa yang perlu disediakan"
     },
     {
       "day": 9,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "silap",
       "format": "text_image",
       "title": "Silap biasa yang buat permohonan kena reject"
     },
     {
       "day": 10,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "soal_jawab",
-      "format": "text_only",
+      "format": "text_image",
       "title": "Soalan dari DM"
     },
     {
       "day": 11,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "mitos",
       "format": "text_image",
       "title": "Mitos vs Fakta"
     },
     {
       "day": 12,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "kemaskini",
-      "format": "text_only",
+      "format": "text_image",
       "title": "Perubahan peraturan terkini"
     },
     {
       "day": 13,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "kos_tempoh",
       "format": "text_image",
       "title": "Kos sebenar & tempoh sebenar"
     },
     {
       "day": 14,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "soal_jawab",
       "format": "text_image",
       "title": "Soalan dari DM"
@@ -164,13 +166,86 @@
       "zapier": "Threads"
     }
   ],
+  "facts": [
+    {
+      "section": "yuran",
+      "key": "sijil_halal_mengikut_saiz_syarikat",
+      "status": "belum_disahkan",
+      "source": "Manual Prosedur Pensijilan Halal Malaysia (Domestik) 2020, jadual fi",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "yuran",
+      "key": "oem_syarikat_luar_negara",
+      "status": "belum_disahkan",
+      "source": "MPPHM (Domestik) 2020, jadual fi pengilangan kontrak",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "pemprosesan_rasmi",
+      "status": "belum_disahkan",
+      "source": "MPPHM (Domestik) 2020, piagam pelanggan JAKIM",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "sasaran_dipercepat",
+      "status": "belum_disahkan",
+      "source": "Pengumuman kerajaan, September 2024",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "tempoh_sebenar_dialami",
+      "status": "belum_disahkan",
+      "source": "site/src/App.tsx (FAQ sedia ada) — pengalaman, bukan dokumen rasmi",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "bayaran_selepas_notis",
+      "status": "belum_disahkan",
+      "source": "MPPHM (Domestik) 2020",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "sah_laku_sijil",
+      "status": "belum_disahkan",
+      "source": "MPPHM (Domestik) 2020",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "sistem",
+      "key": "permohonan_dalam_talian",
+      "status": "belum_disahkan",
+      "source": "Portal MYeHALAL",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "sistem",
+      "key": "urutan_kelulusan",
+      "status": "disahkan",
+      "source": "Proses berkanun — PBT, KKM dan JAKIM masing-masing berasingan",
+      "checked": "2026-08-29"
+    }
+  ],
+  "sources": [
+    {
+      "key": "onedrive_40",
+      "label": "OneDrive · folder 40",
+      "status": "belum_disambung",
+      "configured": false
+    }
+  ],
   "today_draft": {
     "date": "2026-08-29",
     "day_index": 6,
-    "brand": "kkm",
+    "brand": "wsregulab",
     "pillar": "kos_tempoh",
-    "angle": "Kos sebenar bukan yuran — ia permohonan kedua",
-    "format": "text_only",
+    "angle": "Fi ikut pusing ganti; kos sebenar ialah permohonan kedua",
+    "format": "text_image",
     "status": "needs_verification",
     "credits_spent": 0,
     "gates": {
@@ -178,29 +253,27 @@
       "halal": "pass — bercakap tentang proses pensijilan, tiada dakwaan produk halal",
       "credibility": "pass — janji kelulusan dinafikan secara eksplisit",
       "tone": "pass",
-      "facts": "blocked — 2 penanda [SAHKAN:] terbuka"
+      "facts": "blocked — angka fi & tempoh masih belum_disahkan dalam facts.yml"
     },
     "channels": {
-      "facebook_page": 615,
-      "instagram": 1168,
-      "threads": 355
+      "facebook_page": 614,
+      "instagram": 1249,
+      "threads": 290
     },
     "posted_at": null,
-    "verify_markers": [
-      "julat yuran ikut kategori produk dan saiz\nsyarikat — rujuk kadar semasa JAKIM",
-      "tempoh pemprosesan semasa JAKIM"
-    ]
+    "verify_markers": []
   },
   "ledger": [
     {
       "date": "2026-08-29",
       "day_index": 6,
-      "brand": "kkm",
+      "brand": "wsregulab",
       "pillar": "kos_tempoh",
-      "angle": "Kos sebenar bukan yuran — ia permohonan kedua",
-      "format": "text_only",
+      "angle": "Fi ikut pusing ganti; kos sebenar ialah permohonan kedua",
+      "format": "text_image",
       "status": "needs_verification",
-      "credits_spent": 0
+      "credits_spent": 0,
+      "visual": "rajah/table"
     }
   ]
 }

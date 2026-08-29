@@ -1,4 +1,4 @@
-# Wanshah-Test — Hermes dashboard
+# Wanshah-Test — Hermes dashboard (ws.regulab)
 
 Vite + React 19 + TypeScript + Tailwind CSS v4 on the **shadcn/ui** project
 structure. `src/App.tsx` renders the **Hermes operations dashboard**: what
@@ -26,6 +26,7 @@ What the bundle does and does not contain:
 | Compliance gate verdicts | Client names, case details |
 | Credit totals and the plan | Anything from `facts.yml` |
 | Which channels are connected | WhatsApp conversations |
+| Fact-verification status | Anything read from OneDrive |
 
 `scripts/sync-hermes.py` copies only those first-column fields. Caption
 bodies stay in the private repo. If you would rather not publish even the
@@ -62,6 +63,7 @@ All of it is in the **`malaysian-regulatory-affairs`** repo, not this one:
 | **Real fees, timelines, circulars, DM questions** | `hermes/config/facts.yml` |
 | Character limits, which channels are live | `hermes/config/channels.yml` |
 | Credit ceiling, image model, video switch | `hermes/config/budget.yml` |
+| Diagram styling for post visuals | `hermes/tools/visual-template.html` |
 
 `facts.yml` is the one that matters most. Hermes never invents a
 regulatory number: if a figure is not in that file, it writes

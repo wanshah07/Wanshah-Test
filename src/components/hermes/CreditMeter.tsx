@@ -20,16 +20,23 @@ export default function CreditMeter() {
   return (
     <Panel
       title="Kredit BudgetPixel"
-      hint={`Pelan ${b.plan} · ${cap} kredit sebulan · ${b.cost_per_image} kredit sekeping imej (${b.model})`}
+      hint={b.visual_default === 'rajah'
+        ? `Pelan ${b.plan} · ${cap} kredit sebulan · visual lalai ialah rajah dirender (0 kredit)`
+        : `Pelan ${b.plan} · ${cap} kredit sebulan · ${b.cost_per_image} kredit sekeping imej (${b.model})`}
     >
       <div className="grid grid-cols-3 gap-4">
         <Stat value={b.spent_this_month} unit={`/ ${cap}`} label="Dibelanja bulan ini"
               note={`${b.images_this_month} imej dijana`} />
         <Stat value={b.projected_monthly} unit="kredit" label="Unjuran kalendar"
-              note={`${b.image_days_per_cycle} hari imej setiap ${hermes.cycle.length_days}`} />
+              tone={b.projected_monthly === 0 ? 'good' : 'default'}
+              note={b.visual_default === 'rajah'
+                ? `${b.image_days_per_cycle} hari visual, semuanya rajah dirender`
+                : `${b.image_days_per_cycle} hari imej setiap ${hermes.cycle.length_days}`} />
         <Stat value={b.headroom} unit="kredit" label="Ruang lebih"
               tone={b.headroom > 0 ? 'good' : 'critical'}
-              note={b.headroom > 0 ? 'kalendar muat' : 'kalendar melebihi had'} />
+              note={b.projected_monthly === 0
+                ? 'kalendar tidak guna kredit langsung'
+                : b.headroom > 0 ? 'kalendar muat' : 'kalendar melebihi had'} />
       </div>
 
       {/* Stacked meter. 2px gaps between segments so adjacent fills never

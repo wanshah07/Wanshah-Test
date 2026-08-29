@@ -29,8 +29,27 @@ brands, calendar, channels, budget = (load(f) for f in
     ("brands.yml", "calendar.yml", "channels.yml", "budget.yml"))
 ledger = json.loads((H / "state" / "ledger.json").read_text())
 
-kkm = brands["brands"]["kkm"]
-pillar_titles = {p["id"]: p["title"] for p in kkm["pillars"]}
+# Read the active brand from the rotation rather than hard-coding a key —
+# the brand was renamed once already and will be again when the second one
+# wakes up.
+active = brands["rotation"]["active_brands"][0]
+brand = brands["brands"][active]
+pillar_titles = {p["id"]: p["title"] for p in brand["pillars"]}
+
+facts = yaml.safe_load((H / "config" / "facts.yml").read_text()) or {}
+
+def fact_rows(facts: dict) -> list[dict]:
+    """Flatten the verifiable entries so the dashboard can show what is
+    still holding drafts back."""
+    rows = []
+    for section in ("yuran", "tempoh", "sistem", "dokumen"):
+        for key, v in (facts.get(section) or {}).items():
+            if isinstance(v, dict) and "status" in v:
+                rows.append({"section": section, "key": key,
+                             "status": v["status"],
+                             "source": v.get("sumber", ""),
+                             "checked": str(v.get("disemak", ""))})
+    return rows
 
 start = datetime.date.fromisoformat(str(calendar["cycle_start"]))
 today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
@@ -40,10 +59,13 @@ today_index = ((today - start).days % cycle_len) + 1
 slots = [{**s, "title": pillar_titles.get(s["pillar"], s["pillar"])}
          for s in calendar["slots"]]
 
-# Credit projection: image-bearing days per cycle, scaled to a 30-day month.
+# Credit projection. Visuals default to rendered diagrams, which cost
+# nothing, so the calendar's projected spend is zero unless the default is
+# switched back to generated photos.
 img_days = sum(1 for s in slots if s["format"] != "text_only")
 per_image = budget["image"]["cost_per_image"]
-projected = round(img_days / cycle_len * 30) * per_image
+visual_default = budget.get("visual", {}).get("default", "foto")
+projected = 0 if visual_default == "rajah" else round(img_days / cycle_len * 30) * per_image
 cap = budget["monthly_credits"]
 
 vid = budget["video"]
@@ -61,8 +83,9 @@ if (today_dir / "meta.json").is_file():
 out = {
     "generated_at": datetime.datetime.now(datetime.timezone.utc)
                         .isoformat(timespec="seconds"),
-    "brand": {"name": kkm["name"], "whatsapp": kkm["whatsapp"],
-              "email": kkm["contact_email"]},
+    "brand": {"key": active, "name": brand["name"],
+              "whatsapp": brand["whatsapp"],
+              "email": str(brand["contact_email"])},
     "schedule": {"cron_utc": "45 13 * * *", "local": "9:45 malam",
                  "timezone": brands["meta"]["timezone"]},
     "cycle": {"start": start.isoformat(), "length_days": cycle_len,
@@ -73,6 +96,7 @@ out = {
         "spent_this_month": ledger["credits"]["spent_this_month"],
         "images_this_month": ledger["credits"]["images_generated_this_month"],
         "image_days_per_cycle": img_days, "projected_monthly": projected,
+        "visual_default": visual_default,
         "headroom": cap - projected,
         "halt_below": budget["guards"]["halt_below_credits"],
         "warn_below": budget["guards"]["warn_below_credits"],
@@ -89,6 +113,14 @@ out = {
          "target": v["caption"]["target"],
          "zapier": v.get("zapier_app_hint", "")}
         for k, v in channels["channels"].items()
+    ],
+    "facts": fact_rows(facts),
+    "sources": [
+        {"key": k, "label": f"OneDrive · folder {v.get('folder', '?')}"
+                            if k.startswith("onedrive") else k,
+         "status": v.get("status", "?"),
+         "configured": not str(v.get("folder_id", "")).startswith("TODO")}
+        for k, v in (facts.get("sumber_kandungan") or {}).items()
     ],
     "today_draft": draft,
     "ledger": ledger["entries"][-30:],

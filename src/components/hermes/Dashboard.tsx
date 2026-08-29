@@ -3,6 +3,7 @@ import CreditMeter from './CreditMeter';
 import RotationStrip from './RotationStrip';
 import TodayDraft from './TodayDraft';
 import Channels from './Channels';
+import Sources from './Sources';
 
 export default function Dashboard() {
   const { brand, schedule, cycle, generated_at } = hermes;
@@ -28,7 +29,10 @@ export default function Dashboard() {
             <CreditMeter />
             <Channels />
           </div>
+          {/* The rotation strip is seven labelled cells per row; at half
+              width the labels collapse, so it keeps the full measure. */}
           <RotationStrip />
+          <Sources />
         </div>
 
         <footer className="mt-10 border-t border-border pt-4">

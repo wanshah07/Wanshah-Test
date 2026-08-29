@@ -23,8 +23,19 @@ export type Draft = {
 /* The JSON import infers `format` as plain `string` and `today_draft` as a
    loose object; Omit those keys before intersecting so the declared unions
    above win instead of being widened back out. */
-export type Hermes = Omit<typeof raw, 'slots' | 'channels' | 'today_draft'> & {
+export type Fact = {
+  section: string; key: string; status: 'disahkan' | 'belum_disahkan';
+  source: string; checked: string;
+};
+
+export type Source = {
+  key: string; label: string; status: string; configured: boolean;
+};
+
+export type Hermes = Omit<typeof raw,
+  'slots' | 'channels' | 'today_draft' | 'facts' | 'sources'> & {
   slots: Slot[]; channels: Channel[]; today_draft: Draft | null;
+  facts: Fact[]; sources: Source[];
 };
 
 export const hermes = raw as unknown as Hermes;
