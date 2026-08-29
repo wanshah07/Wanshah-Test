@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T06:29:50+00:00",
+  "generated_at": "2026-08-29T06:34:50+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -143,7 +143,7 @@
     {
       "key": "facebook_page",
       "label": "Facebook Page",
-      "connected": false,
+      "connected": true,
       "enabled": true,
       "limit": 63206,
       "target": 500,
@@ -321,10 +321,15 @@
       "pillar": "kemaskini",
       "angle": "Bukan ada sijil atau tidak — pensijil diiktiraf atau tidak",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "posted",
       "credits_spent": 0,
       "visual": "rajah/stat+check+rail",
-      "citation": "FHCB JAKIM 21 Ogos 2026"
+      "citation": "FHCB JAKIM 21 Ogos 2026",
+      "posted_at": "2026-08-29T06:33Z",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ]
     }
   ]
 }
