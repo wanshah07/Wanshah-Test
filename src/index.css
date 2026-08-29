@@ -78,3 +78,53 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------------------------------------------------------------
+   Hermes dashboard — data-visualisation tokens.
+
+   Separate from the shadcn UI tokens above: those dress controls,
+   these encode meaning. Both light and dark steps are selected, not
+   flipped, and validated against this project's real surfaces
+   (#ffffff light card, #343434 dark card) — categorical slots pass
+   the lightness band, chroma floor, CVD separation and normal-vision
+   floor in both modes.
+
+   Every cell that carries one of these colours also carries a text
+   label: --viz-3 sits at 2.82:1 on the light card, below the 3:1 bar,
+   so colour never carries meaning on its own here.
+   --------------------------------------------------------------- */
+:root {
+  --viz-surface: #ffffff;
+  --viz-grid: #e1e0d9;
+  --viz-muted: #898781;
+
+  /* categorical — one slot per post format */
+  --viz-1: #2a78d6;   /* carousel   */
+  --viz-2: #eb6834;   /* text_image */
+  --viz-3: #1baf7a;   /* text_only  */
+
+  /* sequential blue, for the credit meter */
+  --viz-seq-500: #256abf;
+  --viz-seq-250: #86b6ef;
+  --viz-seq-100: #cde2fb;
+
+  /* status — fixed, never themed, always shipped with an icon + label */
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-serious: #ec835a;
+  --viz-critical: #d03b3b;
+}
+
+.dark {
+  --viz-surface: #343434;
+  --viz-grid: #2c2c2a;
+  --viz-muted: #898781;
+
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+
+  --viz-seq-500: #3987e5;
+  --viz-seq-250: #1c5cab;
+  --viz-seq-100: #184f95;
+}

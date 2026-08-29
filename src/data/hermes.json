@@ -1,0 +1,216 @@
+{
+  "generated_at": "2026-08-29T03:18:32+00:00",
+  "brand": {
+    "name": "KKM Halal Consultant",
+    "whatsapp": "60185708401",
+    "email": "info@kkmhalalconsultant.com"
+  },
+  "schedule": {
+    "cron_utc": "45 13 * * *",
+    "local": "9:45 malam",
+    "timezone": "Asia/Kuala_Lumpur"
+  },
+  "cycle": {
+    "start": "2026-08-24",
+    "length_days": 14,
+    "today": "2026-08-29",
+    "today_index": 6
+  },
+  "budget": {
+    "plan": "Free",
+    "monthly_credits": 300,
+    "cost_per_image": 10,
+    "model": "flux-2-klein",
+    "spent_this_month": 0,
+    "images_this_month": 0,
+    "image_days_per_cycle": 10,
+    "projected_monthly": 210,
+    "headroom": 90,
+    "halt_below": 30,
+    "warn_below": 80
+  },
+  "video": {
+    "enabled": false,
+    "reason": "Satu klip 480p 5 saat memakan 300 kredit — seluruh kuota bulanan Free. Hidupkan hanya selepas naik taraf pelan BudgetPixel.",
+    "cheapest_clip_credits": 300,
+    "months_per_clip": 1.0
+  },
+  "slots": [
+    {
+      "day": 1,
+      "brand": "kkm",
+      "pillar": "urutan",
+      "format": "carousel",
+      "title": "Urutan proses — PBT → KKM → JAKIM"
+    },
+    {
+      "day": 2,
+      "brand": "kkm",
+      "pillar": "silap",
+      "format": "text_image",
+      "title": "Silap biasa yang buat permohonan kena reject"
+    },
+    {
+      "day": 3,
+      "brand": "kkm",
+      "pillar": "soal_jawab",
+      "format": "text_only",
+      "title": "Soalan dari DM"
+    },
+    {
+      "day": 4,
+      "brand": "kkm",
+      "pillar": "dokumen",
+      "format": "text_image",
+      "title": "Dokumen apa yang perlu disediakan"
+    },
+    {
+      "day": 5,
+      "brand": "kkm",
+      "pillar": "mitos",
+      "format": "text_image",
+      "title": "Mitos vs Fakta"
+    },
+    {
+      "day": 6,
+      "brand": "kkm",
+      "pillar": "kos_tempoh",
+      "format": "text_only",
+      "title": "Kos sebenar & tempoh sebenar"
+    },
+    {
+      "day": 7,
+      "brand": "kkm",
+      "pillar": "urutan",
+      "format": "text_image",
+      "title": "Urutan proses — PBT → KKM → JAKIM"
+    },
+    {
+      "day": 8,
+      "brand": "kkm",
+      "pillar": "dokumen",
+      "format": "carousel",
+      "title": "Dokumen apa yang perlu disediakan"
+    },
+    {
+      "day": 9,
+      "brand": "kkm",
+      "pillar": "silap",
+      "format": "text_image",
+      "title": "Silap biasa yang buat permohonan kena reject"
+    },
+    {
+      "day": 10,
+      "brand": "kkm",
+      "pillar": "soal_jawab",
+      "format": "text_only",
+      "title": "Soalan dari DM"
+    },
+    {
+      "day": 11,
+      "brand": "kkm",
+      "pillar": "mitos",
+      "format": "text_image",
+      "title": "Mitos vs Fakta"
+    },
+    {
+      "day": 12,
+      "brand": "kkm",
+      "pillar": "kemaskini",
+      "format": "text_only",
+      "title": "Perubahan peraturan terkini"
+    },
+    {
+      "day": 13,
+      "brand": "kkm",
+      "pillar": "kos_tempoh",
+      "format": "text_image",
+      "title": "Kos sebenar & tempoh sebenar"
+    },
+    {
+      "day": 14,
+      "brand": "kkm",
+      "pillar": "soal_jawab",
+      "format": "text_image",
+      "title": "Soalan dari DM"
+    }
+  ],
+  "channels": [
+    {
+      "key": "facebook_page",
+      "label": "Facebook Page",
+      "connected": false,
+      "enabled": true,
+      "limit": 63206,
+      "target": 500,
+      "zapier": "Facebook Pages"
+    },
+    {
+      "key": "instagram",
+      "label": "Instagram",
+      "connected": false,
+      "enabled": true,
+      "limit": 2200,
+      "target": 900,
+      "zapier": "Instagram for Business"
+    },
+    {
+      "key": "threads",
+      "label": "Threads",
+      "connected": false,
+      "enabled": true,
+      "limit": 500,
+      "target": 400,
+      "zapier": "Threads"
+    },
+    {
+      "key": "x",
+      "label": "X",
+      "connected": false,
+      "enabled": true,
+      "limit": 280,
+      "target": 240,
+      "zapier": "Twitter"
+    }
+  ],
+  "today_draft": {
+    "date": "2026-08-29",
+    "day_index": 6,
+    "brand": "kkm",
+    "pillar": "kos_tempoh",
+    "angle": "Kos sebenar bukan yuran — ia permohonan kedua",
+    "format": "text_only",
+    "status": "needs_verification",
+    "credits_spent": 0,
+    "gates": {
+      "claims": "pass — tiada dakwaan produk",
+      "halal": "pass — bercakap tentang proses pensijilan, tiada dakwaan produk halal",
+      "credibility": "pass — janji kelulusan dinafikan secara eksplisit",
+      "tone": "pass",
+      "facts": "blocked — 2 penanda [SAHKAN:] terbuka"
+    },
+    "channels": {
+      "facebook_page": 615,
+      "instagram": 1168,
+      "threads": 355,
+      "x": 224
+    },
+    "posted_at": null,
+    "verify_markers": [
+      "julat yuran ikut kategori produk dan saiz\nsyarikat — rujuk kadar semasa JAKIM",
+      "tempoh pemprosesan semasa JAKIM"
+    ]
+  },
+  "ledger": [
+    {
+      "date": "2026-08-29",
+      "day_index": 6,
+      "brand": "kkm",
+      "pillar": "kos_tempoh",
+      "angle": "Kos sebenar bukan yuran — ia permohonan kedua",
+      "format": "text_only",
+      "status": "needs_verification",
+      "credits_spent": 0
+    }
+  ]
+}

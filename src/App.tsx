@@ -1,5 +1,5 @@
-import HologramDemo from '@/components/demo/hologram-demo';
+import Dashboard from '@/components/hermes/Dashboard';
 
 export default function App() {
-  return <HologramDemo />;
+  return <Dashboard />;
 }
