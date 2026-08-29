@@ -1,0 +1,34 @@
+name: Hermes → Threads token refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 1,20 * *"      # 1st & 20th monthly — always inside the 60-day window
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Refresh long-lived token
+        id: tok
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+        run: |
+          NEW=$(python hermes/tools/threads_token.py refresh)
+          echo "::add-mask::$NEW"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+
+      # Writes the refreshed token back into the repo secret.
+      # Needs a fine-grained PAT with "Secrets: write" saved as GH_PAT.
+      - name: Update THREADS_TOKEN secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: gh secret set THREADS_TOKEN --body "${{ steps.tok.outputs.new }}"

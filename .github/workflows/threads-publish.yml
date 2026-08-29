@@ -1,0 +1,37 @@
+name: Hermes → Threads publish
+
+on:
+  workflow_dispatch:            # manual "Run workflow" button
+  push:
+    paths:
+      - "hermes/out/approved/*.json"   # fires when you commit an approved draft
+  schedule:
+    - cron: "0 1 * * *"         # 09:00 MYT daily — posts whatever is in approved/
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Publish approved drafts
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+        run: python hermes/tools/publish_threads.py
+
+      - name: Commit publish log
+        if: always()
+        run: |
+          git config user.name  "hermes-bot"
+          git config user.email "hermes-bot@users.noreply.github.com"
+          git add -A hermes/out
+          git diff --cached --quiet || git commit -m "hermes: threads publish $(date -u +%F)"
+          git push
