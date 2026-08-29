@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T04:16:39+00:00",
+  "generated_at": "2026-08-29T04:27:29+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -171,58 +171,86 @@
   "facts": [
     {
       "section": "yuran",
-      "key": "sijil_halal_mengikut_saiz_syarikat",
-      "status": "belum_disahkan",
-      "source": "Manual Prosedur Pensijilan Halal Malaysia (Domestik) 2020, jadual fi",
+      "key": "fi_pemprosesan",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 7(1)",
       "checked": "2026-08-29"
     },
     {
       "section": "yuran",
-      "key": "oem_syarikat_luar_negara",
-      "status": "belum_disahkan",
-      "source": "MPPHM (Domestik) 2020, jadual fi pengilangan kontrak",
+      "key": "fi_pensijilan_produk",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 8(1), Jadual 1",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "yuran",
+      "key": "fi_oem_syarikat_luar_negara",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 8(2), Jadual 2",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "yuran",
+      "key": "fi_premis_makanan",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 9, Jadual 3 & 4",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "yuran",
+      "key": "fi_lain",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 10, 11, 13, 14",
       "checked": "2026-08-29"
     },
     {
       "section": "tempoh",
-      "key": "pemprosesan_rasmi",
-      "status": "belum_disahkan",
-      "source": "MPPHM (Domestik) 2020, piagam pelanggan JAKIM",
+      "key": "bayaran_selepas_notis",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 15(1) dan 61(14)",
       "checked": "2026-08-29"
     },
     {
       "section": "tempoh",
-      "key": "sasaran_dipercepat",
-      "status": "belum_disahkan",
-      "source": "Pengumuman kerajaan, September 2024",
+      "key": "pengeluaran_sijil",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 34(2)",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "pengesahan_akaun_myehalal",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 61(3)",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "tempoh_semakan_permohonan",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 61(13)",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "tempoh",
+      "key": "sah_laku_sijil",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 35(2) dan 35(3)",
       "checked": "2026-08-29"
     },
     {
       "section": "tempoh",
       "key": "tempoh_sebenar_dialami",
       "status": "belum_disahkan",
-      "source": "site/src/App.tsx (FAQ sedia ada) — pengalaman, bukan dokumen rasmi",
-      "checked": "2026-08-29"
-    },
-    {
-      "section": "tempoh",
-      "key": "bayaran_selepas_notis",
-      "status": "belum_disahkan",
-      "source": "MPPHM (Domestik) 2020",
-      "checked": "2026-08-29"
-    },
-    {
-      "section": "tempoh",
-      "key": "sah_laku_sijil",
-      "status": "belum_disahkan",
-      "source": "MPPHM (Domestik) 2020",
+      "source": "Pengalaman dalaman — BUKAN dokumen rasmi",
       "checked": "2026-08-29"
     },
     {
       "section": "sistem",
       "key": "permohonan_dalam_talian",
-      "status": "belum_disahkan",
-      "source": "Portal MYeHALAL",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 61(4)",
       "checked": "2026-08-29"
     },
     {
@@ -230,6 +258,13 @@
       "key": "urutan_kelulusan",
       "status": "disahkan",
       "source": "Proses berkanun — PBT, KKM dan JAKIM masing-masing berasingan",
+      "checked": "2026-08-29"
+    },
+    {
+      "section": "sistem",
+      "key": "larangan_perkataan_halal",
+      "status": "disahkan",
+      "source": "MPPHM (Domestik) 2020, Prosedur 5(12)",
       "checked": "2026-08-29"
     }
   ],
@@ -246,24 +281,24 @@
     "day_index": 6,
     "brand": "wsregulab",
     "pillar": "kos_tempoh",
-    "angle": "Fi ikut pusing ganti; kos sebenar ialah permohonan kedua",
+    "angle": "Fi ikut nilai perolehan; sah laku berbeza ikut skim",
     "format": "text_image",
-    "status": "needs_verification",
+    "status": "ready_for_approval",
     "credits_spent": 0,
     "gates": {
       "claims": "pass — tiada dakwaan produk",
       "halal": "pass — bercakap tentang proses pensijilan, tiada dakwaan produk halal",
       "credibility": "pass — janji kelulusan dinafikan secara eksplisit",
       "tone": "pass",
-      "facts": "blocked — angka fi & tempoh masih belum_disahkan dalam facts.yml"
+      "facts": "pass — setiap angka disahkan terhadap MPPHM (Domestik) 2020"
     },
     "channels": {
-      "instagram": 1331,
-      "facebook_page": 646,
-      "threads": 323
+      "instagram": 1190,
+      "facebook_page": 608,
+      "threads": 320
     },
     "posted_at": null,
-    "citation": "MPPHM (Domestik) 2020",
+    "citation": "MPPHM (Domestik) 2020, Prosedur 7(1), 8(1), 15(1), 35(2)",
     "verify_markers": []
   },
   "ledger": [
@@ -272,11 +307,12 @@
       "day_index": 6,
       "brand": "wsregulab",
       "pillar": "kos_tempoh",
-      "angle": "Fi ikut pusing ganti; kos sebenar ialah permohonan kedua",
+      "angle": "Fi ikut nilai perolehan; sah laku berbeza ikut skim",
       "format": "text_image",
-      "status": "needs_verification",
+      "status": "ready_for_approval",
       "credits_spent": 0,
-      "visual": "rajah/table"
+      "visual": "rajah/table",
+      "citation": "MPPHM (Domestik) 2020"
     }
   ]
 }
