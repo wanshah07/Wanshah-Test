@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T15:34:41+00:00",
+  "generated_at": "2026-08-29T16:03:39+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -16,8 +16,8 @@
   "cycle": {
     "start": "2026-08-24",
     "length_days": 14,
-    "today": "2026-08-29",
-    "today_index": 6
+    "today": "2026-08-30",
+    "today_index": 7
   },
   "budget": {
     "plan": "Free",
@@ -291,74 +291,52 @@
     }
   ],
   "today_draft": {
-    "date": "2026-08-29",
-    "day_index": 6,
+    "date": "2026-08-30",
+    "day_index": 7,
     "brand": "wsregulab",
-    "pillar": "kos_tempoh",
-    "angle": "Fi ikut nilai perolehan; sah laku berbeza ikut skim",
-    "format": "text_image",
+    "pillar": "kemaskini",
+    "overrides_pillar": "urutan",
+    "angle": "Bukan ada sijil atau tidak — pensijil diiktiraf atau tidak",
+    "format": "carousel",
     "status": "posted",
     "credits_spent": 0,
     "gates": {
-      "claims": "pass — tiada dakwaan produk",
-      "halal": "pass — bercakap tentang proses pensijilan, tiada dakwaan produk halal",
-      "credibility": "pass — janji kelulusan dinafikan secara eksplisit",
+      "claims": "n/a — tiada dakwaan produk",
+      "halal": "pass — menerangkan bila produk boleh diperihalkan halal, tidak mendakwa apa-apa halal",
+      "credibility": "pass",
       "tone": "pass",
-      "facts": "pass — setiap angka disahkan terhadap MPPHM (Domestik) 2020"
+      "facts": "pass — setiap angka dari FHCB 21 Ogos 2026, dibaca terus"
     },
     "channels": {
-      "instagram": 1190,
-      "facebook_page": 608,
-      "threads": 320
+      "instagram": 1559,
+      "facebook_page": 731,
+      "threads": 328
     },
-    "posted_at": "2026-08-29T15:06Z",
-    "citation": "MPPHM (Domestik) 2020, Prosedur 7(1), 8(1), 15(1), 35(2)",
+    "citation": "FHCB JAKIM 21 Ogos 2026; Perintah Perihal Dagangan (Perakuan dan Penandaan Halal) 2011, Perenggan 5(1) & 5(2)",
+    "posted_at": "2026-08-29T06:33Z",
+    "approved_by": "user, in session",
+    "approved_at": "2026-08-29",
     "public_urls": [
-      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-29/card-1.png"
+      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-30/card-1.png",
+      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-30/card-2.png",
+      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-30/card-3.png"
     ],
-    "hantar": {
-      "saluran": [
-        "threads (gagal)",
-        "facebook_page",
-        "instagram"
-      ],
-      "arahan_pengguna": "approve the 29 august post and post to threads only",
-      "kad_awam": "https://wanshah07.github.io/Wanshah-Test/media/2026-08-29/card-1.png",
-      "cubaan": [
-        {
-          "masa": "2026-08-29T07:28Z",
-          "saluran": "threads",
-          "keputusan": "gagal",
-          "ralat": "user id or long lived token not found in metadata",
-          "nota": "Dua kali cuba, dua-dua sambungan id. Sambungan Threads tidak stale tetapi metadatanya tiada user id / long-lived token. Perlu sambung semula."
-        },
-        {
-          "masa": "2026-08-29T15:06Z",
-          "saluran": "facebook_page",
-          "keputusan": "berjaya",
-          "post_id": "959295067272709_122123344545264570"
-        },
-        {
-          "masa": "2026-08-29T15:06Z",
-          "saluran": "instagram",
-          "keputusan": "berjaya",
-          "post_id": "17892177228417217"
-        }
-      ],
-      "nota_akhir": "Diminta 'threads only' pada mulanya. Threads gagal — token rosak. Pengguna kemudian meluluskan Facebook dan Instagram sebagai ganti.",
-      "nota_masa": "Cap masa dibetulkan. Saya tulis 08:24Z pada mulanya berdasarkan andaian; Graph API melaporkan 15:06:44Z (FB) dan 15:07:21Z (IG)."
-    },
-    "posted_to": [
-      "facebook_page",
-      "instagram"
-    ],
-    "post_ids": {
-      "facebook_page": "959295067272709_122123344545264570",
-      "instagram": "17892177228417217"
-    },
-    "permalinks": {
-      "facebook_page": "https://www.facebook.com/122123317401264570/posts/122123344545264570",
-      "instagram": "https://www.instagram.com/p/DcoOK_BICDW/"
+    "posts": {
+      "instagram": {
+        "id": "17966948802154034",
+        "permalink": "https://www.instagram.com/p/DcnTQuvnwBV/",
+        "media_type": "CAROUSEL_ALBUM",
+        "cards": 3
+      },
+      "facebook_page": {
+        "id": "959295067272709_122123317257264570",
+        "permalink": "https://www.facebook.com/122123317401264570/posts/122123317257264570",
+        "type": "album",
+        "cards": 3
+      },
+      "threads": {
+        "status": "tidak dipos — connector pihak ketiga belum diputuskan"
+      }
     },
     "verify_markers": []
   },
@@ -370,7 +348,7 @@
       "pillar": "mitos",
       "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "citation": "DRGD 3rd Edition, 12th Revision, Julai 2026, Seksyen 11.2, 11.3, 18",
       "credits_spent": 0,
       "cards": 5,
@@ -470,7 +448,7 @@
       "pillar": "mitos",
       "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "rajah/stat+compare+table+iconlist+timeline",
       "citation": "DRGD 3rd Ed 12th Rev, Julai 2026",
