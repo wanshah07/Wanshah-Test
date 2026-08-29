@@ -28,14 +28,22 @@ export type Fact = {
   source: string; checked: string;
 };
 
+export type Post = {
+  date: string; day_index: number | null; domain: string; pillar: string;
+  angle: string; format: string; status: string; citation: string;
+  credits_spent: number; cards: number; thumb: string | null;
+  channels: Record<string, number>;
+  posted_at: string | null; posted_to: string[];
+};
+
 export type Source = {
   key: string; label: string; status: string; configured: boolean;
 };
 
 export type Hermes = Omit<typeof raw,
-  'slots' | 'channels' | 'today_draft' | 'facts' | 'sources'> & {
+  'slots' | 'channels' | 'today_draft' | 'facts' | 'sources' | 'posts'> & {
   slots: Slot[]; channels: Channel[]; today_draft: Draft | null;
-  facts: Fact[]; sources: Source[];
+  facts: Fact[]; sources: Source[]; posts: Post[];
 };
 
 export const hermes = raw as unknown as Hermes;

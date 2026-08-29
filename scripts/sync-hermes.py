@@ -80,6 +80,76 @@ if (today_dir / "meta.json").is_file():
     draft["verify_markers"] = sorted(set(
         re.findall(r"\[SAHKAN:\s*([^\]]+)\]", post.read_text()))) if post.is_file() else []
 
+# --- the post gallery ---------------------------------------------------
+#
+# Every draft Hermes has ever written, newest first, with its cover card as
+# a thumbnail so the pipeline is visible at a glance rather than only via
+# the repo.
+#
+# The cover card only. Not the whole carousel: this repo is PUBLIC and it is
+# served on GitHub Pages, so anything copied into public/ is world-readable.
+# Approved and posted cards are public already — they have to be, because
+# Meta fetches them by URL — but a draft still waiting for approval is work
+# nobody has signed off yet. Publishing five cards of it would put an
+# unreviewed carousel on the open web; one cover card is the smallest thing
+# that still makes the list usable.
+#
+# This deliberately does NOT go through publish-cards.py. That tool refuses
+# anything not marked approved, and that guard is what stands between a
+# draft and Meta. Preview thumbnails are a different job with a different
+# risk, so they get a different path — public/media/preview/ — and the two
+# never share a directory.
+
+REPO = pathlib.Path(__file__).resolve().parent.parent
+PREVIEW = REPO / "public" / "media" / "preview"
+
+def collect_posts() -> list[dict]:
+    import shutil
+    posts = []
+    content = H / "content"
+    if not content.is_dir():
+        return posts
+    for folder in sorted(content.iterdir(), reverse=True):
+        meta_f = folder / "meta.json"
+        if not meta_f.is_file():
+            continue
+        m = json.loads(meta_f.read_text())
+        cards = sorted(folder.glob("card-*.png"))
+        thumb = None
+        if cards:
+            out_dir = PREVIEW / folder.name
+            out_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(cards[0], out_dir / "card-1.png")
+            thumb = f"media/preview/{folder.name}/card-1.png"
+        posts.append({
+            "date": m.get("date", folder.name),
+            "day_index": m.get("day_index"),
+            "domain": m.get("domain", ""),
+            "pillar": m.get("pillar", ""),
+            "angle": m.get("angle", ""),
+            "format": m.get("format", ""),
+            "status": m.get("status", "unknown"),
+            "citation": m.get("citation", ""),
+            "credits_spent": m.get("credits_spent", 0),
+            "cards": len(cards),
+            "thumb": thumb,
+            "channels": m.get("channels", {}),
+            "posted_at": m.get("posted_at"),
+            "posted_to": m.get("posted_to", []),
+        })
+    return posts
+
+posts = collect_posts()
+
+# Drop preview folders for posts that no longer exist, so a deleted draft
+# does not leave its cover card sitting on the public site forever.
+if PREVIEW.is_dir():
+    import shutil as _sh
+    live = {p["date"] for p in posts}
+    for stale in PREVIEW.iterdir():
+        if stale.is_dir() and stale.name not in live:
+            _sh.rmtree(stale)
+
 out = {
     "generated_at": datetime.datetime.now(datetime.timezone.utc)
                         .isoformat(timespec="seconds"),
@@ -127,6 +197,7 @@ out = {
         for k, v in (facts.get("sumber_kandungan") or {}).items()
     ],
     "today_draft": draft,
+    "posts": posts,
     "ledger": ledger["entries"][-30:],
 }
 
@@ -136,3 +207,6 @@ dest.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
 print(f"wrote {dest.relative_to(dest.parent.parent.parent)}")
 print(f"  day {today_index}/{cycle_len} · projected {projected}/{cap} credits "
       f"· draft: {draft['status'] if draft else 'none'}")
+from collections import Counter
+tally = Counter(p["status"] for p in posts)
+print(f"  {len(posts)} post · " + " · ".join(f"{k} {v}" for k, v in sorted(tally.items())))

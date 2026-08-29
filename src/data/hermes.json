@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T15:07:57+00:00",
+  "generated_at": "2026-08-29T15:34:41+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -311,7 +311,7 @@
       "facebook_page": 608,
       "threads": 320
     },
-    "posted_at": "2026-08-29T08:24Z",
+    "posted_at": "2026-08-29T15:06Z",
     "citation": "MPPHM (Domestik) 2020, Prosedur 7(1), 8(1), 15(1), 35(2)",
     "public_urls": [
       "https://wanshah07.github.io/Wanshah-Test/media/2026-08-29/card-1.png"
@@ -333,19 +333,20 @@
           "nota": "Dua kali cuba, dua-dua sambungan id. Sambungan Threads tidak stale tetapi metadatanya tiada user id / long-lived token. Perlu sambung semula."
         },
         {
-          "masa": "2026-08-29T08:24Z",
+          "masa": "2026-08-29T15:06Z",
           "saluran": "facebook_page",
           "keputusan": "berjaya",
           "post_id": "959295067272709_122123344545264570"
         },
         {
-          "masa": "2026-08-29T08:24Z",
+          "masa": "2026-08-29T15:06Z",
           "saluran": "instagram",
           "keputusan": "berjaya",
           "post_id": "17892177228417217"
         }
       ],
-      "nota_akhir": "Diminta 'threads only' pada mulanya. Threads gagal — token rosak. Pengguna kemudian meluluskan Facebook dan Instagram sebagai ganti."
+      "nota_akhir": "Diminta 'threads only' pada mulanya. Threads gagal — token rosak. Pengguna kemudian meluluskan Facebook dan Instagram sebagai ganti.",
+      "nota_masa": "Cap masa dibetulkan. Saya tulis 08:24Z pada mulanya berdasarkan andaian; Graph API melaporkan 15:06:44Z (FB) dan 15:07:21Z (IG)."
     },
     "posted_to": [
       "facebook_page",
@@ -355,8 +356,77 @@
       "facebook_page": "959295067272709_122123344545264570",
       "instagram": "17892177228417217"
     },
+    "permalinks": {
+      "facebook_page": "https://www.facebook.com/122123317401264570/posts/122123344545264570",
+      "instagram": "https://www.instagram.com/p/DcoOK_BICDW/"
+    },
     "verify_markers": []
   },
+  "posts": [
+    {
+      "date": "2026-08-31",
+      "day_index": 8,
+      "domain": "farmaseutikal",
+      "pillar": "mitos",
+      "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "citation": "DRGD 3rd Edition, 12th Revision, Julai 2026, Seksyen 11.2, 11.3, 18",
+      "credits_spent": 0,
+      "cards": 5,
+      "thumb": "media/preview/2026-08-31/card-1.png",
+      "channels": {
+        "instagram": 1374,
+        "facebook_page": 636,
+        "threads": 314
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
+      "date": "2026-08-30",
+      "day_index": 7,
+      "domain": "",
+      "pillar": "kemaskini",
+      "angle": "Bukan ada sijil atau tidak — pensijil diiktiraf atau tidak",
+      "format": "carousel",
+      "status": "posted",
+      "citation": "FHCB JAKIM 21 Ogos 2026; Perintah Perihal Dagangan (Perakuan dan Penandaan Halal) 2011, Perenggan 5(1) & 5(2)",
+      "credits_spent": 0,
+      "cards": 3,
+      "thumb": "media/preview/2026-08-30/card-1.png",
+      "channels": {
+        "instagram": 1559,
+        "facebook_page": 731,
+        "threads": 328
+      },
+      "posted_at": "2026-08-29T06:33Z",
+      "posted_to": []
+    },
+    {
+      "date": "2026-08-29",
+      "day_index": 6,
+      "domain": "",
+      "pillar": "kos_tempoh",
+      "angle": "Fi ikut nilai perolehan; sah laku berbeza ikut skim",
+      "format": "text_image",
+      "status": "posted",
+      "citation": "MPPHM (Domestik) 2020, Prosedur 7(1), 8(1), 15(1), 35(2)",
+      "credits_spent": 0,
+      "cards": 1,
+      "thumb": "media/preview/2026-08-29/card-1.png",
+      "channels": {
+        "instagram": 1190,
+        "facebook_page": 608,
+        "threads": 320
+      },
+      "posted_at": "2026-08-29T15:06Z",
+      "posted_to": [
+        "facebook_page",
+        "instagram"
+      ]
+    }
+  ],
   "ledger": [
     {
       "date": "2026-08-29",
@@ -369,7 +439,7 @@
       "credits_spent": 0,
       "visual": "rajah/table",
       "citation": "MPPHM (Domestik) 2020",
-      "posted_at": "2026-08-29T08:24Z",
+      "posted_at": "2026-08-29T15:06Z",
       "posted_to": [
         "facebook_page",
         "instagram"
@@ -391,6 +461,20 @@
         "instagram",
         "facebook_page"
       ]
+    },
+    {
+      "date": "2026-08-31",
+      "day_index": 8,
+      "brand": "wsregulab",
+      "domain": "farmaseutikal",
+      "pillar": "mitos",
+      "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/stat+compare+table+iconlist+timeline",
+      "citation": "DRGD 3rd Ed 12th Rev, Julai 2026",
+      "bahasa": "campur BM + English"
     }
   ]
 }

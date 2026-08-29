@@ -2,6 +2,7 @@ import { hermes } from '@/lib/hermes';
 import CreditMeter from './CreditMeter';
 import RotationStrip from './RotationStrip';
 import TodayDraft from './TodayDraft';
+import PostGallery from './PostGallery';
 import Channels from './Channels';
 import Sources from './Sources';
 
@@ -32,6 +33,7 @@ export default function Dashboard() {
           {/* The rotation strip is seven labelled cells per row; at half
               width the labels collapse, so it keeps the full measure. */}
           <RotationStrip />
+          <PostGallery />
           <Sources />
         </div>
 
