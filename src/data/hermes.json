@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T03:18:32+00:00",
+  "generated_at": "2026-08-29T03:23:06+00:00",
   "brand": {
     "name": "KKM Halal Consultant",
     "whatsapp": "60185708401",
@@ -162,15 +162,6 @@
       "limit": 500,
       "target": 400,
       "zapier": "Threads"
-    },
-    {
-      "key": "x",
-      "label": "X",
-      "connected": false,
-      "enabled": true,
-      "limit": 280,
-      "target": 240,
-      "zapier": "Twitter"
     }
   ],
   "today_draft": {
@@ -192,8 +183,7 @@
     "channels": {
       "facebook_page": 615,
       "instagram": 1168,
-      "threads": 355,
-      "x": 224
+      "threads": 355
     },
     "posted_at": null,
     "verify_markers": [

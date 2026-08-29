@@ -22,7 +22,7 @@ What the bundle does and does not contain:
 | In the bundle | Not in the bundle |
 | --- | --- |
 | Dates, pillar names, post formats | **Caption text — never** |
-| Character counts per channel | Image files |
+| Character counts per channel | Image files and carousel cards |
 | Compliance gate verdicts | Client names, case details |
 | Credit totals and the plan | Anything from `facts.yml` |
 | Which channels are connected | WhatsApp conversations |
@@ -73,6 +73,13 @@ It also holds `soalan_masuk`, a list of real questions from DMs and
 WhatsApp. That feeds the `soal_jawab` pillar, which is both the
 highest-engagement one and the easiest to supply: paste questions as they
 were actually asked.
+
+## Platforms
+
+Instagram, Facebook Page, Threads. **X is not used** — it was removed on
+request, not overlooked. It is gone from `hermes/config/channels.yml`, so
+it disappears from this dashboard automatically; there is nothing to
+change here.
 
 ## The chart layer
 
