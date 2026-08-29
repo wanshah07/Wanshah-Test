@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-08-29T04:27:29+00:00",
+  "generated_at": "2026-08-29T05:29:28+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
     "wordmark": "WS REGULAB",
     "tagline": "Trusted · Proven · Clarity",
     "website": "www.kkmhalalconsultant.com",
-    "email": "TODO — emel ws.regulab yang sebenar"
+    "email": ""
   },
   "schedule": {
     "cron_utc": "45 13 * * *",
@@ -313,6 +313,18 @@
       "credits_spent": 0,
       "visual": "rajah/table",
       "citation": "MPPHM (Domestik) 2020"
+    },
+    {
+      "date": "2026-08-30",
+      "day_index": 7,
+      "brand": "wsregulab",
+      "pillar": "kemaskini",
+      "angle": "Bukan ada sijil atau tidak — pensijil diiktiraf atau tidak",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/stat+check+rail",
+      "citation": "FHCB JAKIM 21 Ogos 2026"
     }
   ]
 }
