@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T05:29:28+00:00",
+  "generated_at": "2026-08-29T06:09:53+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -147,16 +147,16 @@
       "enabled": true,
       "limit": 63206,
       "target": 500,
-      "zapier": "Facebook Pages"
+      "zapier": ""
     },
     {
       "key": "instagram",
       "label": "Instagram",
-      "connected": false,
+      "connected": true,
       "enabled": true,
       "limit": 2200,
       "target": 900,
-      "zapier": "Instagram for Business"
+      "zapier": ""
     },
     {
       "key": "threads",
@@ -165,7 +165,7 @@
       "enabled": true,
       "limit": 500,
       "target": 400,
-      "zapier": "Threads"
+      "zapier": ""
     }
   ],
   "facts": [
