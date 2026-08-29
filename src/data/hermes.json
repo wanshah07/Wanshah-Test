@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T16:03:39+00:00",
+  "generated_at": "2026-08-29T16:14:58+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -175,8 +175,8 @@
     {
       "key": "threads",
       "label": "Threads",
-      "connected": true,
-      "enabled": true,
+      "connected": false,
+      "enabled": false,
       "limit": 500,
       "target": 400,
       "zapier": ""
@@ -342,6 +342,44 @@
   },
   "posts": [
     {
+      "date": "2026-09-05",
+      "day_index": 10,
+      "domain": "kosmetik",
+      "pillar": "dokumen",
+      "angle": "Notifikasi bukan kelulusan — PIF ialah beban bukti yang kekal pada anda",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "citation": "Control of Drugs and Cosmetics Regulations 1984; Guidelines for Control of Cosmetic Products in Malaysia (NPRA)",
+      "credits_spent": 0,
+      "cards": 1,
+      "thumb": "media/preview/2026-09-05/card-1.png",
+      "channels": {
+        "instagram": 1325,
+        "facebook_page": 764
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
+      "date": "2026-09-03",
+      "day_index": 9,
+      "domain": "halal_my",
+      "pillar": "silap",
+      "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
+      "credits_spent": 0,
+      "cards": 1,
+      "thumb": "media/preview/2026-09-03/card-1.png",
+      "channels": {
+        "instagram": 1313,
+        "facebook_page": 698
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
       "date": "2026-08-31",
       "day_index": 8,
       "domain": "farmaseutikal",
@@ -453,6 +491,35 @@
       "visual": "rajah/stat+compare+table+iconlist+timeline",
       "citation": "DRGD 3rd Ed 12th Rev, Julai 2026",
       "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-03",
+      "day_index": 9,
+      "brand": "wsregulab",
+      "domain": "halal_my",
+      "pillar": "silap",
+      "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/compare",
+      "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
+      "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-05",
+      "day_index": 10,
+      "brand": "wsregulab",
+      "domain": "kosmetik",
+      "pillar": "dokumen",
+      "angle": "Notifikasi bukan kelulusan — PIF ialah beban bukti yang kekal pada anda",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/check",
+      "citation": "CDCR 1984; Guidelines for Control of Cosmetic Products in Malaysia",
+      "bahasa": "campur BM + English",
+      "nota": "Sifar angka — fakta kosmetik belum masuk facts.yml"
     }
   ]
 }
