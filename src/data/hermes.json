@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T07:22:34+00:00",
+  "generated_at": "2026-08-29T07:25:51+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -283,7 +283,7 @@
     "pillar": "kos_tempoh",
     "angle": "Fi ikut nilai perolehan; sah laku berbeza ikut skim",
     "format": "text_image",
-    "status": "ready_for_approval",
+    "status": "approved",
     "credits_spent": 0,
     "gates": {
       "claims": "pass — tiada dakwaan produk",
@@ -299,6 +299,9 @@
     },
     "posted_at": null,
     "citation": "MPPHM (Domestik) 2020, Prosedur 7(1), 8(1), 15(1), 35(2)",
+    "public_urls": [
+      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-29/card-1.png"
+    ],
     "verify_markers": []
   },
   "ledger": [
