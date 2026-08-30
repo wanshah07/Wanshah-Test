@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-30T16:56:43+00:00",
+  "generated_at": "2026-08-30T17:06:31+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -283,6 +283,25 @@
   },
   "posts": [
     {
+      "date": "2026-09-05",
+      "day_index": null,
+      "domain": "kajian_kes",
+      "pillar": "kajian_kes",
+      "angle": "Pengharaman TPO, dan mengapa ayat \"TPO-free\" itu bersyarat",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "citation": "Reg (EU) 2025/877, Annex II EC 1223/2009; Delegated Reg (EU) 2024/197; SI 2026/23 dan SI 2026/109. TPO, CAS 75980-60-8.",
+      "credits_spent": 0,
+      "cards": 5,
+      "thumb": "media/preview/2026-09-05/card-1.png",
+      "channels": {
+        "instagram": 1879,
+        "facebook_page": 1313
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
       "date": "2026-09-03",
       "day_index": null,
       "domain": "farmaseutikal",
@@ -457,6 +476,21 @@
       "visual": "rajah/stat+compare+table+iconlist+timeline",
       "citation": "DRGD 3rd Ed 12th Rev, Julai 2026",
       "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-05",
+      "hari": "Sabtu",
+      "brand": "wsregulab",
+      "domain": "kajian_kes",
+      "pillar": "kajian_kes",
+      "angle": "Pengharaman TPO, dan mengapa ayat \"TPO-free\" itu bersyarat",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/timeline+table+flow+iconlist+table",
+      "citation": "Reg (EU) 2025/877; Delegated Reg (EU) 2024/197; SI 2026/23 & 2026/109",
+      "bahasa": "campur BM + English",
+      "matrix_baris": 1
     }
   ]
 }
