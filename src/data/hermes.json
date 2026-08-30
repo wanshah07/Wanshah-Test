@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-30T17:53:44+00:00",
+  "generated_at": "2026-08-30T18:20:11+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -61,7 +61,7 @@
       "folder": "Food",
       "format": "text_image",
       "rehat": false,
-      "amaran": "FOLDER INI BELUM WUJUD dalam OneDrive setakat 2026-08-31. Tanpa dokumen sumber, domain makanan hanya boleh menghasilkan post KONSEP — proses, urutan, salah faham — bukan post berangka. Jangan reka fi atau tempoh untuk mengisi ruang.",
+      "amaran": "Folder Food WUJUD tetapi KOSONG — disemak 2026-08-30 melalui Composio, childCount 0. Tanpa dokumen sumber, domain makanan hanya boleh menghasilkan post KONSEP — proses, urutan, salah faham — bukan post berangka. Jangan reka fi, tempoh, saiz taip atau nombor peraturan untuk mengisi ruang. Contoh yang mematuhi: draf 2026-09-01.",
       "today": false
     },
     {
@@ -308,7 +308,7 @@
       "pillar": "soal_jawab",
       "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "citation": "Muzakarah Jawatankuasa Fatwa Majlis Kebangsaan Bagi Hal Ehwal Ugama Islam Malaysia (MKI) Kali Ke-7, 11–12 April 1984",
       "credits_spent": 0,
       "cards": 4,
@@ -355,6 +355,25 @@
       "channels": {
         "instagram": 1313,
         "facebook_page": 698
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
+      "date": "2026-09-01",
+      "day_index": null,
+      "domain": "makanan",
+      "pillar": "dokumen",
+      "angle": "Apa yang perlu dihantar untuk semakan label, dan kenapa gambar pek bercetak bukan jawapan",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "citation": "Kaedah semakan dalaman ws.regulab, mengikut susunan FoSIM Semakan Pelabelan",
+      "credits_spent": 0,
+      "cards": 5,
+      "thumb": "media/preview/2026-09-01/card-1.png",
+      "channels": {
+        "instagram": 1867,
+        "facebook_page": 1078
       },
       "posted_at": null,
       "posted_to": []
@@ -471,6 +490,28 @@
       "bahasa": "campur BM + English"
     },
     {
+      "date": "2026-09-01",
+      "hari": "Selasa",
+      "brand": "wsregulab",
+      "domain": "makanan",
+      "pillar": "dokumen",
+      "angle": "Apa yang perlu dihantar untuk semakan label, dan kenapa gambar pek bercetak bukan jawapan",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/stat+table+rail+duo+iconlist",
+      "reka_bentuk": [
+        3,
+        4,
+        1,
+        2,
+        6
+      ],
+      "citation": "Kaedah semakan dalaman ws.regulab, susunan FoSIM Semakan Pelabelan",
+      "bahasa": "campur BM + English",
+      "nota": "Post KONSEP. Folder Food dalam OneDrive masih kosong pada 2026-08-30, jadi sifar angka regulatori."
+    },
+    {
       "date": "2026-09-02",
       "brand": "wsregulab",
       "domain": "halal_my",
@@ -504,12 +545,14 @@
       "pillar": "soal_jawab",
       "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "rajah/stat+check+rail+iconlist",
       "citation": "Muzakarah MKI Kali Ke-7, 11–12 April 1984",
       "bahasa": "campur BM + English",
-      "matrix_baris": 1
+      "matrix_baris": 1,
+      "approved_at": "2026-08-30 17:58",
+      "approved_by": "Wan (dashboard)"
     },
     {
       "date": "2026-09-05",
