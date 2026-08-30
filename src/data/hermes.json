@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-30T18:48:01+00:00",
+  "generated_at": "2026-08-30T19:15:24+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -295,8 +295,8 @@
       "cards": 1,
       "thumb": "media/preview/2026-09-07/card-1.png",
       "channels": {
-        "instagram": 1794,
-        "facebook_page": 1145
+        "instagram": 1425,
+        "facebook_page": 857
       },
       "posted_at": null,
       "posted_to": []
@@ -314,8 +314,8 @@
       "cards": 5,
       "thumb": "media/preview/2026-09-05/card-1.png",
       "channels": {
-        "instagram": 1202,
-        "facebook_page": 796
+        "instagram": 1009,
+        "facebook_page": 735
       },
       "posted_at": null,
       "posted_to": []
@@ -327,14 +327,14 @@
       "pillar": "soal_jawab",
       "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
       "format": "carousel",
-      "status": "approved",
+      "status": "ready_for_approval",
       "citation": "Muzakarah Jawatankuasa Fatwa Majlis Kebangsaan Bagi Hal Ehwal Ugama Islam Malaysia (MKI) Kali Ke-7, 11–12 April 1984",
       "credits_spent": 0,
       "cards": 4,
       "thumb": "media/preview/2026-09-04/card-1.png",
       "channels": {
-        "instagram": 1887,
-        "facebook_page": 1116
+        "instagram": 1474,
+        "facebook_page": 956
       },
       "posted_at": null,
       "posted_to": []
@@ -383,7 +383,7 @@
       "day_index": null,
       "domain": "makanan",
       "pillar": "dokumen",
-      "angle": "Apa yang perlu dihantar untuk semakan label, dan kenapa gambar pek bercetak bukan jawapan",
+      "angle": "Kenapa gambar pek tak boleh dijawab, dan apa yang kena hantar ganti",
       "format": "carousel",
       "status": "ready_for_approval",
       "citation": "Kaedah semakan dalaman ws.regulab, mengikut susunan FoSIM Semakan Pelabelan",
@@ -391,8 +391,8 @@
       "cards": 5,
       "thumb": "media/preview/2026-09-01/card-1.png",
       "channels": {
-        "instagram": 1867,
-        "facebook_page": 1078
+        "instagram": 1298,
+        "facebook_page": 886
       },
       "posted_at": null,
       "posted_to": []
@@ -528,7 +528,12 @@
       ],
       "citation": "Kaedah semakan dalaman ws.regulab, susunan FoSIM Semakan Pelabelan",
       "bahasa": "campur BM + English",
-      "nota": "Post KONSEP. Folder Food dalam OneDrive masih kosong pada 2026-08-30, jadi sifar angka regulatori."
+      "nota": "Post KONSEP. Folder Food dalam OneDrive masih kosong pada 2026-08-30, jadi sifar angka regulatori.",
+      "ditolak": {
+        "pada": "2026-08-30 18:25",
+        "sebab": "hanya page 3 je okay"
+      },
+      "ditulis_semula": "2026-08-30"
     },
     {
       "date": "2026-09-02",
@@ -564,14 +569,15 @@
       "pillar": "soal_jawab",
       "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
       "format": "carousel",
-      "status": "approved",
+      "status": "ready_for_approval",
       "credits_spent": 0,
       "visual": "rajah/stat+check+rail+iconlist",
       "citation": "Muzakarah MKI Kali Ke-7, 11–12 April 1984",
       "bahasa": "campur BM + English",
       "matrix_baris": 1,
       "approved_at": "2026-08-30 17:58",
-      "approved_by": "Wan (dashboard)"
+      "approved_by": "Wan (dashboard)",
+      "dikemas_kini": "2026-08-30 — pas bahasa; kelulusan 17:58 terpakai pada teks lama"
     },
     {
       "date": "2026-09-05",
@@ -588,10 +594,17 @@
       "bahasa": "campur BM + English",
       "matrix_baris": 1,
       "ditolak": {
-        "pada": "2026-08-30 18:23",
-        "sebab": "Bunyi macam AI, Terlalu panjang / terlampau teknikal, dan BM agak kaku"
+        "pusingan_1": "2026-08-30 18:23 — bunyi macam AI, terlalu panjang, terlampau teknikal, BM kaku",
+        "pusingan_2": "2026-08-30 18:59 — akan tukar, cedera, TPO Pecah"
       },
-      "ditulis_semula": "2026-08-30"
+      "ditulis_semula": "2026-08-30 (dua pusingan)",
+      "reka_bentuk": [
+        1,
+        4,
+        1,
+        4,
+        6
+      ]
     },
     {
       "date": "2026-09-07",
@@ -608,7 +621,9 @@
         9
       ],
       "citation": "Guidelines for Control of Cosmetic Products in Malaysia 2nd Ed, Seksyen 2.9/3.8/4.1.8",
-      "bahasa": "campur BM + English"
+      "bahasa": "campur BM + English",
+      "dikemas_kini": "2026-08-30 — pas bahasa",
+      "nota_kelulusan": "Wan lulus 2026-08-30 18:53 pada teks LAMA; caption dipendekkan selepas itu, jadi perlu lulus semula"
     }
   ]
 }
