@@ -2,8 +2,9 @@ import raw from '@/data/hermes.json';
 
 /** Shape of the snapshot written by `scripts/sync-hermes.py`. */
 export type Slot = {
-  day: number; brand: string; pillar: string; title: string;
-  format: 'carousel' | 'text_image' | 'text_only';
+  dow: number; hari: string; domain: string; folder: string;
+  format: 'carousel' | 'text_image' | 'text_only' | '';
+  rehat: boolean; amaran: string; today: boolean;
 };
 
 export type Channel = {
@@ -50,13 +51,13 @@ export const hermes = raw as unknown as Hermes;
 
 /** Colour slot per post format. Fixed assignment — never cycled, so a
  *  format keeps its colour no matter how the calendar is reordered. */
-export const FORMAT_COLOR: Record<Slot['format'], string> = {
+export const FORMAT_COLOR: Record<string, string> = {
   carousel: 'var(--viz-1)',
   text_image: 'var(--viz-2)',
   text_only: 'var(--viz-3)',
 };
 
-export const FORMAT_LABEL: Record<Slot['format'], string> = {
+export const FORMAT_LABEL: Record<string, string> = {
   carousel: 'Carousel',
   text_image: 'Teks + imej',
   text_only: 'Teks sahaja',

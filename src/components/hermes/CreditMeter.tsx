@@ -31,7 +31,7 @@ export default function CreditMeter() {
               tone={b.projected_monthly === 0 ? 'good' : 'default'}
               note={b.visual_default === 'rajah'
                 ? `${b.image_days_per_cycle} hari visual, semuanya rajah dirender`
-                : `${b.image_days_per_cycle} hari imej setiap ${hermes.cycle.length_days}`} />
+                : `${b.image_days_per_cycle} hari imej setiap minggu`} />
         <Stat value={b.headroom} unit="kredit" label="Ruang lebih"
               tone={b.headroom > 0 ? 'good' : 'critical'}
               note={b.projected_monthly === 0

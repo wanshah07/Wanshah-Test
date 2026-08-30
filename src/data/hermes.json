@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-29T16:27:52+00:00",
+  "generated_at": "2026-08-30T16:56:43+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -9,15 +9,19 @@
     "email": ""
   },
   "schedule": {
-    "cron_utc": "45 13 * * *",
+    "cron_utc": "45 13 * * 1-6",
     "local": "9:45 malam",
+    "kadens": "harian",
+    "rehat": [
+      "Ahad"
+    ],
     "timezone": "Asia/Kuala_Lumpur"
   },
   "cycle": {
-    "start": "2026-08-24",
-    "length_days": 14,
-    "today": "2026-08-30",
-    "today_index": 7
+    "today": "2026-08-31",
+    "hari": "Isnin",
+    "domain": "kosmetik",
+    "rehat": false
   },
   "budget": {
     "plan": "Free",
@@ -26,7 +30,7 @@
     "model": "flux-2-klein",
     "spent_this_month": 0,
     "images_this_month": 0,
-    "image_days_per_cycle": 14,
+    "image_days_per_cycle": 6,
     "projected_monthly": 0,
     "visual_default": "rajah",
     "headroom": 300,
@@ -41,116 +45,74 @@
   },
   "slots": [
     {
-      "day": 1,
-      "brand": "wsregulab",
-      "domain": "halal_my",
-      "pillar": "urutan",
-      "format": "carousel",
-      "title": "Urutan proses — PBT → KKM → JAKIM"
-    },
-    {
-      "day": 2,
-      "brand": "wsregulab",
+      "dow": 1,
+      "hari": "Isnin",
       "domain": "kosmetik",
-      "pillar": "silap",
+      "folder": "Cosmetic",
       "format": "text_image",
-      "title": "Silap biasa yang buat permohonan kena reject"
+      "rehat": false,
+      "amaran": "",
+      "today": true
     },
     {
-      "day": 3,
-      "brand": "wsregulab",
-      "domain": "halal_my",
-      "pillar": "soal_jawab",
-      "format": "text_image",
-      "title": "Soalan dari DM"
-    },
-    {
-      "day": 4,
-      "brand": "wsregulab",
+      "dow": 2,
+      "hari": "Selasa",
       "domain": "makanan",
-      "pillar": "dokumen",
+      "folder": "Food",
       "format": "text_image",
-      "title": "Dokumen apa yang perlu disediakan"
+      "rehat": false,
+      "amaran": "FOLDER INI BELUM WUJUD dalam OneDrive setakat 2026-08-31. Tanpa dokumen sumber, domain makanan hanya boleh menghasilkan post KONSEP — proses, urutan, salah faham — bukan post berangka. Jangan reka fi atau tempoh untuk mengisi ruang.",
+      "today": false
     },
     {
-      "day": 5,
-      "brand": "wsregulab",
-      "domain": "halal_id",
-      "pillar": "mitos",
-      "format": "text_image",
-      "title": "Mitos vs Fakta"
-    },
-    {
-      "day": 6,
-      "brand": "wsregulab",
-      "domain": "kosmetik",
-      "pillar": "soal_jawab",
-      "format": "text_image",
-      "title": "Soalan dari DM"
-    },
-    {
-      "day": 7,
-      "brand": "wsregulab",
+      "dow": 3,
+      "hari": "Rabu",
       "domain": "halal_my",
-      "pillar": "kos_tempoh",
+      "folder": "Halal",
       "format": "text_image",
-      "title": "Kos sebenar & tempoh sebenar"
+      "rehat": false,
+      "amaran": "",
+      "today": false
     },
     {
-      "day": 8,
-      "brand": "wsregulab",
+      "dow": 4,
+      "hari": "Khamis",
       "domain": "farmaseutikal",
-      "pillar": "mitos",
+      "folder": "Farmaseutikal",
+      "format": "text_image",
+      "rehat": false,
+      "amaran": "",
+      "today": false
+    },
+    {
+      "dow": 5,
+      "hari": "Jumaat",
+      "domain": "fatwa",
+      "folder": "Fatwa",
+      "format": "text_image",
+      "rehat": false,
+      "amaran": "FOLDER WUJUD TETAPI KOSONG setakat 2026-08-31. Fatwa ialah domain yang paling sensitif dalam keseluruhan kalendar — ia bercakap tentang hukum, bukan prosedur. TANPA dokumen sumber, JANGAN tulis apa-apa post fatwa. Jatuh ke `fallback_pillar` dan katakan dengan jelas dalam draf mengapa. Mereka kandungan fatwa adalah kesilapan yang tidak boleh ditarik balik.",
+      "today": false
+    },
+    {
+      "dow": 6,
+      "hari": "Sabtu",
+      "domain": "kajian_kes",
+      "folder": "Cosmetic Case Studies",
       "format": "carousel",
-      "title": "Mitos vs Fakta"
+      "rehat": false,
+      "amaran": "",
+      "today": false
     },
     {
-      "day": 9,
-      "brand": "wsregulab",
-      "domain": "halal_my",
-      "pillar": "silap",
-      "format": "text_image",
-      "title": "Silap biasa yang buat permohonan kena reject"
-    },
-    {
-      "day": 10,
-      "brand": "wsregulab",
-      "domain": "kosmetik",
-      "pillar": "dokumen",
-      "format": "text_image",
-      "title": "Dokumen apa yang perlu disediakan"
-    },
-    {
-      "day": 11,
-      "brand": "wsregulab",
-      "domain": "makanan",
-      "pillar": "mitos",
-      "format": "text_image",
-      "title": "Mitos vs Fakta"
-    },
-    {
-      "day": 12,
-      "brand": "wsregulab",
-      "domain": "halal_my",
-      "pillar": "kemaskini",
-      "format": "text_image",
-      "title": "Perubahan peraturan terkini"
-    },
-    {
-      "day": 13,
-      "brand": "wsregulab",
-      "domain": "farmaseutikal",
-      "pillar": "urutan",
-      "format": "text_image",
-      "title": "Urutan proses — PBT → KKM → JAKIM"
-    },
-    {
-      "day": 14,
-      "brand": "wsregulab",
-      "domain": "halal_id",
-      "pillar": "soal_jawab",
-      "format": "text_image",
-      "title": "Soalan dari DM"
+      "dow": 0,
+      "hari": "Ahad",
+      "domain": "",
+      "folder": "",
+      "format": "",
+      "rehat": true,
+      "amaran": "",
+      "today": false
     }
   ],
   "channels": [
@@ -291,78 +253,58 @@
     }
   ],
   "today_draft": {
-    "date": "2026-08-30",
-    "day_index": 7,
+    "date": "2026-08-31",
     "brand": "wsregulab",
-    "pillar": "kemaskini",
-    "overrides_pillar": "urutan",
-    "angle": "Bukan ada sijil atau tidak — pensijil diiktiraf atau tidak",
-    "format": "carousel",
-    "status": "posted",
+    "domain": "kosmetik",
+    "pillar": "dokumen",
+    "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
+    "format": "text_image",
+    "status": "approved",
     "credits_spent": 0,
+    "bahasa": "campur BM + English",
     "gates": {
-      "claims": "n/a — tiada dakwaan produk",
-      "halal": "pass — menerangkan bila produk boleh diperihalkan halal, tidak mendakwa apa-apa halal",
-      "credibility": "pass",
-      "tone": "pass",
-      "facts": "pass — setiap angka dari FHCB 21 Ogos 2026, dibaca terus"
+      "claims": "pass — tidak berkenaan, bukan salinan iklan, tiada produk atau dakwaan kesan",
+      "halal": "pass — domain kosmetik",
+      "credibility": "pass — tiada janji kelulusan, tiada bayangan hubungan NPRA",
+      "tone": "pass dengan nota — disemak terus, skill stop-slop tidak dipanggil",
+      "facts": "pass — setiap angka dari facts.yml/kosmetik, sumber garis panduan NPRA 2nd Ed"
     },
     "channels": {
-      "instagram": 1559,
-      "facebook_page": 731,
-      "threads": 328
+      "instagram": 1537,
+      "facebook_page": 775
     },
-    "citation": "FHCB JAKIM 21 Ogos 2026; Perintah Perihal Dagangan (Perakuan dan Penandaan Halal) 2011, Perenggan 5(1) & 5(2)",
-    "posted_at": "2026-08-29T06:33Z",
-    "approved_by": "user, in session",
-    "approved_at": "2026-08-29",
-    "public_urls": [
-      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-30/card-1.png",
-      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-30/card-2.png",
-      "https://wanshah07.github.io/Wanshah-Test/media/2026-08-30/card-3.png"
-    ],
-    "posts": {
-      "instagram": {
-        "id": "17966948802154034",
-        "permalink": "https://www.instagram.com/p/DcnTQuvnwBV/",
-        "media_type": "CAROUSEL_ALBUM",
-        "cards": 3
-      },
-      "facebook_page": {
-        "id": "959295067272709_122123317257264570",
-        "permalink": "https://www.facebook.com/122123317401264570/posts/122123317257264570",
-        "type": "album",
-        "cards": 3
-      },
-      "threads": {
-        "status": "tidak dipos — connector pihak ketiga belum diputuskan"
-      }
-    },
+    "posted_at": null,
+    "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.6, 2.7, 2.10, 3.8, 4.1.8",
+    "nota_threads": "Saluran dimatikan 2026-08-29 — varian Threads tidak dijana.",
+    "varian_ganti": 1,
+    "hari": "Isnin",
+    "dipindah": "2026-09-05 -> 2026-08-31; jadual bertukar kepada hari-dalam-minggu 2026-08-31",
     "verify_markers": []
   },
   "posts": [
     {
-      "date": "2026-09-05",
-      "day_index": 10,
-      "domain": "kosmetik",
-      "pillar": "dokumen",
-      "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
-      "format": "text_image",
+      "date": "2026-09-03",
+      "day_index": null,
+      "domain": "farmaseutikal",
+      "pillar": "mitos",
+      "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
+      "format": "carousel",
       "status": "approved",
-      "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.6, 2.7, 2.10, 3.8, 4.1.8",
+      "citation": "DRGD 3rd Edition, 12th Revision, Julai 2026, Seksyen 11.2, 11.3, 18",
       "credits_spent": 0,
-      "cards": 1,
-      "thumb": "media/preview/2026-09-05/card-1.png",
+      "cards": 5,
+      "thumb": "media/preview/2026-09-03/card-1.png",
       "channels": {
-        "instagram": 1537,
-        "facebook_page": 775
+        "instagram": 1374,
+        "facebook_page": 636,
+        "threads": 314
       },
       "posted_at": null,
       "posted_to": []
     },
     {
-      "date": "2026-09-03",
-      "day_index": 9,
+      "date": "2026-09-02",
+      "day_index": null,
       "domain": "halal_my",
       "pillar": "silap",
       "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
@@ -371,7 +313,7 @@
       "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
       "credits_spent": 0,
       "cards": 1,
-      "thumb": "media/preview/2026-09-03/card-1.png",
+      "thumb": "media/preview/2026-09-02/card-1.png",
       "channels": {
         "instagram": 1313,
         "facebook_page": 698
@@ -381,20 +323,19 @@
     },
     {
       "date": "2026-08-31",
-      "day_index": 8,
-      "domain": "farmaseutikal",
-      "pillar": "mitos",
-      "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
-      "format": "carousel",
+      "day_index": null,
+      "domain": "kosmetik",
+      "pillar": "dokumen",
+      "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
+      "format": "text_image",
       "status": "approved",
-      "citation": "DRGD 3rd Edition, 12th Revision, Julai 2026, Seksyen 11.2, 11.3, 18",
+      "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.6, 2.7, 2.10, 3.8, 4.1.8",
       "credits_spent": 0,
-      "cards": 5,
+      "cards": 1,
       "thumb": "media/preview/2026-08-31/card-1.png",
       "channels": {
-        "instagram": 1374,
-        "facebook_page": 636,
-        "threads": 314
+        "instagram": 1537,
+        "facebook_page": 775
       },
       "posted_at": null,
       "posted_to": []
@@ -480,21 +421,19 @@
     },
     {
       "date": "2026-08-31",
-      "day_index": 8,
       "brand": "wsregulab",
-      "domain": "farmaseutikal",
-      "pillar": "mitos",
-      "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
-      "format": "carousel",
+      "domain": "kosmetik",
+      "pillar": "dokumen",
+      "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
+      "format": "text_image",
       "status": "approved",
       "credits_spent": 0,
-      "visual": "rajah/stat+compare+table+iconlist+timeline",
-      "citation": "DRGD 3rd Ed 12th Rev, Julai 2026",
+      "visual": "rajah/check",
+      "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA)",
       "bahasa": "campur BM + English"
     },
     {
-      "date": "2026-09-03",
-      "day_index": 9,
+      "date": "2026-09-02",
       "brand": "wsregulab",
       "domain": "halal_my",
       "pillar": "silap",
@@ -507,17 +446,16 @@
       "bahasa": "campur BM + English"
     },
     {
-      "date": "2026-09-05",
-      "day_index": 10,
+      "date": "2026-09-03",
       "brand": "wsregulab",
-      "domain": "kosmetik",
-      "pillar": "dokumen",
-      "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
-      "format": "text_image",
+      "domain": "farmaseutikal",
+      "pillar": "mitos",
+      "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
+      "format": "carousel",
       "status": "approved",
       "credits_spent": 0,
-      "visual": "rajah/check",
-      "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA)",
+      "visual": "rajah/stat+compare+table+iconlist+timeline",
+      "citation": "DRGD 3rd Ed 12th Rev, Julai 2026",
       "bahasa": "campur BM + English"
     }
   ]

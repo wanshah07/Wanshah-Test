@@ -40,7 +40,7 @@ export default function Dashboard() {
         <footer className="mt-10 border-t border-border pt-4">
           <p className="text-xs text-muted-foreground">
             Petikan keadaan dijana {new Date(generated_at).toLocaleString('ms-MY')} ·
-            kitaran bermula {cycle.start} · jalankan{' '}
+            {cycle.hari} · {cycle.rehat ? 'rehat' : cycle.domain} · jalankan{' '}
             <code className="rounded bg-muted px-1 py-0.5">
               python3 scripts/sync-hermes.py ../malaysian-regulatory-affairs
             </code>{' '}

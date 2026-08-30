@@ -51,21 +51,36 @@ def fact_rows(facts: dict) -> list[dict]:
                              "checked": str(v.get("disemak", ""))})
     return rows
 
-start = datetime.date.fromisoformat(str(calendar["cycle_start"]))
 today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-cycle_len = calendar["cycle_length_days"]
-today_index = ((today - start).days % cycle_len) + 1
 
-slots = [{**s, "title": pillar_titles.get(s["pillar"], s["pillar"])}
-         for s in calendar["slots"]]
+# The calendar moved from a 14-slot rotation to a fixed weekday schedule on
+# 2026-08-31, so there is no cycle to sit inside any more. Python's weekday()
+# is Mon=0; the config keys it Mon=1..Sat=6, Sun=0, matching cron.
+dow = (today.weekday() + 1) % 7
+sched = calendar["jadual"]
+today_slot = sched.get(dow) or sched.get(str(dow)) or {}
+
+slots = []
+for key in [1, 2, 3, 4, 5, 6, 0]:
+    v = sched.get(key) or sched.get(str(key)) or {}
+    slots.append({
+        "dow": key,
+        "hari": v.get("hari", ""),
+        "domain": v.get("domain", ""),
+        "folder": v.get("folder", ""),
+        "format": v.get("format", ""),
+        "rehat": bool(v.get("rehat")),
+        "amaran": " ".join(str(v.get("amaran", "")).split()),
+        "today": key == dow,
+    })
 
 # Credit projection. Visuals default to rendered diagrams, which cost
 # nothing, so the calendar's projected spend is zero unless the default is
 # switched back to generated photos.
-img_days = sum(1 for s in slots if s["format"] != "text_only")
+img_days = sum(1 for s in slots if s["format"] and s["format"] != "text_only")
 per_image = budget["image"]["cost_per_image"]
 visual_default = budget.get("visual", {}).get("default", "foto")
-projected = 0 if visual_default == "rajah" else round(img_days / cycle_len * 30) * per_image
+projected = 0 if visual_default == "rajah" else round(img_days / 7 * 30) * per_image
 cap = budget["monthly_credits"]
 
 vid = budget["video"]
@@ -160,10 +175,14 @@ out = {
               "tagline": brand.get("tagline", ""),
               "website": brand.get("website", ""),
               "email": str(brand.get("contact_email", ""))},
-    "schedule": {"cron_utc": "45 13 * * *", "local": "9:45 malam",
+    "schedule": {"cron_utc": calendar.get("cron_utc", "45 13 * * 1-6"),
+                 "local": calendar.get("waktu", "9:45 malam"),
+                 "kadens": calendar.get("kadens", "harian"),
+                 "rehat": calendar.get("hari_rehat", ["Ahad"]),
                  "timezone": brands["meta"]["timezone"]},
-    "cycle": {"start": start.isoformat(), "length_days": cycle_len,
-              "today": today.isoformat(), "today_index": today_index},
+    "cycle": {"today": today.isoformat(), "hari": today_slot.get("hari", ""),
+              "domain": today_slot.get("domain", ""),
+              "rehat": bool(today_slot.get("rehat"))},
     "budget": {
         "plan": budget["plan_assumed"], "monthly_credits": cap,
         "cost_per_image": per_image, "model": budget["image"]["model"],
@@ -205,7 +224,9 @@ dest = pathlib.Path(__file__).resolve().parent.parent / "src" / "data" / "hermes
 dest.parent.mkdir(parents=True, exist_ok=True)
 dest.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
 print(f"wrote {dest.relative_to(dest.parent.parent.parent)}")
-print(f"  day {today_index}/{cycle_len} · projected {projected}/{cap} credits "
+label = today_slot.get("hari", "?") + " · " + (
+    "REHAT" if today_slot.get("rehat") else today_slot.get("domain", "?"))
+print(f"  {label} · projected {projected}/{cap} credits "
       f"· draft: {draft['status'] if draft else 'none'}")
 from collections import Counter
 tally = Counter(p["status"] for p in posts)

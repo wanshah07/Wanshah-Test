@@ -2,78 +2,99 @@ import { hermes, FORMAT_COLOR, FORMAT_LABEL, type Slot } from '@/lib/hermes';
 import { Panel } from './primitives';
 
 /**
- * The 14-day rotation, laid out as it actually repeats — two rows of
- * seven, so the fortnight's shape is visible rather than implied by a
- * scrolling list.
+ * The weekly schedule, laid out as one row of seven so the week reads as a
+ * week. Replaced the 14-day rotation on 2026-08-31: each weekday now owns a
+ * domain and its own OneDrive folder, so the day is the whole answer to
+ * "what gets written and what gets read".
  *
- * Colour encodes format, and every cell also names its format in text.
- * That text is load-bearing: the text-only slot colour measures 2.82:1
- * against the light card, under the 3:1 bar, so the label is what makes
- * the cell readable rather than a nicety.
+ * Colour encodes format, and every cell also names its format in text. That
+ * text is load-bearing rather than decorative — the palette alone does not
+ * clear the 3:1 contrast bar on the light card.
+ *
+ * A day whose source folder is missing or empty carries its warning here,
+ * because a schedule that looks complete while two of its days have nothing
+ * to write from is the kind of thing that stays unnoticed until a thin post
+ * goes out.
  */
 export default function RotationStrip() {
   const { slots, cycle } = hermes;
-  const rows = [slots.slice(0, 7), slots.slice(7, 14)];
-  const formats = ['carousel', 'text_image', 'text_only'] as const;
+  const formats = ['carousel', 'text_image'] as const;
+  const gaps = slots.filter((s) => s.amaran);
 
   return (
     <Panel
-      title="Putaran 14 hari"
-      hint={`Kitaran bermula ${cycle.start} · hari ini ialah hari ${cycle.today_index}`}
+      title="Jadual mingguan"
+      hint={`Harian kecuali Ahad · hari ini ${cycle.hari}${
+        cycle.rehat ? ' — rehat' : ` · ${cycle.domain}`}`}
     >
-      <div className="space-y-2">
-        {rows.map((row, i) => (
-          <div key={i} className="grid grid-cols-7 gap-2">
-            {row.map((s: Slot) => {
-              const isToday = s.day === cycle.today_index;
-              return (
-                <div
-                  key={s.day}
-                  className="relative rounded-lg border p-2.5 transition-colors"
-                  style={{
-                    borderColor: isToday ? 'var(--foreground)' : 'var(--border)',
-                    borderWidth: isToday ? 2 : 1,
-                  }}
-                  title={`Hari ${s.day} — ${s.title}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium text-muted-foreground">
-                      {s.day}
-                    </span>
-                    <span aria-hidden className="size-2 rounded-full"
-                          style={{ background: FORMAT_COLOR[s.format] }} />
-                  </div>
-                  <p className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-tight">
-                    {s.title}
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {FORMAT_LABEL[s.format]}
-                  </p>
-                  {isToday && (
-                    <span className="absolute -top-2 left-2 rounded bg-foreground px-1.5
-                                     py-0.5 text-[9px] font-semibold text-background">
-                      HARI INI
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        {slots.map((s: Slot) => (
+          <div
+            key={s.dow}
+            className="relative rounded-lg border p-2.5"
+            style={{
+              borderColor: s.today ? 'var(--foreground)' : 'var(--border)',
+              borderWidth: s.today ? 2 : 1,
+              opacity: s.rehat ? 0.6 : 1,
+            }}
+            title={s.amaran || `${s.hari} — ${s.domain || 'rehat'}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-medium text-muted-foreground">
+                {s.hari}
+              </span>
+              {!s.rehat && (
+                <span aria-hidden className="size-2 rounded-full"
+                      style={{ background: FORMAT_COLOR[s.format] ?? 'var(--viz-3)' }} />
+              )}
+            </div>
+
+            <p className="mt-1.5 text-[11px] font-medium leading-tight">
+              {s.rehat ? 'Rehat' : s.domain}
+            </p>
+
+            {!s.rehat && (
+              <>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                  {FORMAT_LABEL[s.format] ?? s.format}
+                </p>
+                <p className="mt-1 truncate text-[10px] text-muted-foreground"
+                   title={s.folder}>
+                  {s.folder}
+                </p>
+              </>
+            )}
+
+            {s.amaran && (
+              <span
+                aria-label="folder sumber belum sedia"
+                className="absolute right-1.5 top-1.5 size-1.5 rounded-full"
+                style={{ background: 'var(--viz-warning)' }}
+              />
+            )}
           </div>
         ))}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border pt-3">
+      <div className="mt-3 flex flex-wrap gap-4">
         {formats.map((f) => (
-          <span key={f} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div key={f} className="flex items-center gap-1.5">
             <span aria-hidden className="size-2 rounded-full"
                   style={{ background: FORMAT_COLOR[f] }} />
-            {FORMAT_LABEL[f]}
-            <span className="text-[10px]">
-              ({slots.filter((s: Slot) => s.format === f).length})
-            </span>
-          </span>
+            <span className="text-xs">{FORMAT_LABEL[f]}</span>
+          </div>
         ))}
       </div>
+
+      {gaps.length > 0 && (
+        <div className="mt-4 space-y-2 border-t border-border pt-3">
+          {gaps.map((s) => (
+            <p key={s.dow} className="text-[11px] leading-snug text-muted-foreground">
+              <strong>{s.hari}</strong> — {s.amaran}
+            </p>
+          ))}
+        </div>
+      )}
     </Panel>
   );
 }
