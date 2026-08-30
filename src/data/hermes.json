@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-30T18:20:11+00:00",
+  "generated_at": "2026-08-30T18:38:26+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -282,6 +282,25 @@
     "verify_markers": []
   },
   "posts": [
+    {
+      "date": "2026-09-07",
+      "day_index": null,
+      "domain": "kosmetik",
+      "pillar": "soal_jawab",
+      "angle": "Jenis 1 lawan Jenis 2, dan kenapa Annex I part 5 kena dibuka sebelum cetak packaging",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.9, 3.8, 4.1.8",
+      "credits_spent": 0,
+      "cards": 1,
+      "thumb": "media/preview/2026-09-07/card-1.png",
+      "channels": {
+        "instagram": 1794,
+        "facebook_page": 1145
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
     {
       "date": "2026-09-05",
       "day_index": null,
@@ -568,6 +587,23 @@
       "citation": "Reg (EU) 2025/877; Delegated Reg (EU) 2024/197; SI 2026/23 & 2026/109",
       "bahasa": "campur BM + English",
       "matrix_baris": 1
+    },
+    {
+      "date": "2026-09-07",
+      "hari": "Isnin",
+      "brand": "wsregulab",
+      "domain": "kosmetik",
+      "pillar": "soal_jawab",
+      "angle": "Jenis 1 lawan Jenis 2, dan kenapa Annex I part 5 kena dibuka sebelum cetak packaging",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "poster D9 Q&A 101",
+      "reka_bentuk": [
+        9
+      ],
+      "citation": "Guidelines for Control of Cosmetic Products in Malaysia 2nd Ed, Seksyen 2.9/3.8/4.1.8",
+      "bahasa": "campur BM + English"
     }
   ]
 }
