@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-30T18:38:26+00:00",
+  "generated_at": "2026-08-30T18:48:01+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -314,8 +314,8 @@
       "cards": 5,
       "thumb": "media/preview/2026-09-05/card-1.png",
       "channels": {
-        "instagram": 1879,
-        "facebook_page": 1313
+        "instagram": 1202,
+        "facebook_page": 796
       },
       "posted_at": null,
       "posted_to": []
@@ -586,7 +586,12 @@
       "visual": "rajah/timeline+table+flow+iconlist+table",
       "citation": "Reg (EU) 2025/877; Delegated Reg (EU) 2024/197; SI 2026/23 & 2026/109",
       "bahasa": "campur BM + English",
-      "matrix_baris": 1
+      "matrix_baris": 1,
+      "ditolak": {
+        "pada": "2026-08-30 18:23",
+        "sebab": "Bunyi macam AI, Terlalu panjang / terlampau teknikal, dan BM agak kaku"
+      },
+      "ditulis_semula": "2026-08-30"
     },
     {
       "date": "2026-09-07",
