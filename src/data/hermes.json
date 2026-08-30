@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-30T17:06:31+00:00",
+  "generated_at": "2026-08-30T17:24:54+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -89,9 +89,9 @@
       "hari": "Jumaat",
       "domain": "fatwa",
       "folder": "Fatwa",
-      "format": "text_image",
+      "format": "carousel",
       "rehat": false,
-      "amaran": "FOLDER WUJUD TETAPI KOSONG setakat 2026-08-31. Fatwa ialah domain yang paling sensitif dalam keseluruhan kalendar — ia bercakap tentang hukum, bukan prosedur. TANPA dokumen sumber, JANGAN tulis apa-apa post fatwa. Jatuh ke `fallback_pillar` dan katakan dengan jelas dalam draf mengapa. Mereka kandungan fatwa adalah kesilapan yang tidak boleh ditarik balik.",
+      "amaran": "",
       "today": false
     },
     {
@@ -302,6 +302,25 @@
       "posted_to": []
     },
     {
+      "date": "2026-09-04",
+      "day_index": null,
+      "domain": "fatwa",
+      "pillar": "soal_jawab",
+      "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "citation": "Muzakarah Jawatankuasa Fatwa Majlis Kebangsaan Bagi Hal Ehwal Ugama Islam Malaysia (MKI) Kali Ke-7, 11–12 April 1984",
+      "credits_spent": 0,
+      "cards": 4,
+      "thumb": "media/preview/2026-09-04/card-1.png",
+      "channels": {
+        "instagram": 1887,
+        "facebook_page": 1116
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
       "date": "2026-09-03",
       "day_index": null,
       "domain": "farmaseutikal",
@@ -476,6 +495,21 @@
       "visual": "rajah/stat+compare+table+iconlist+timeline",
       "citation": "DRGD 3rd Ed 12th Rev, Julai 2026",
       "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-04",
+      "hari": "Jumaat",
+      "brand": "wsregulab",
+      "domain": "fatwa",
+      "pillar": "soal_jawab",
+      "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/stat+check+rail+iconlist",
+      "citation": "Muzakarah MKI Kali Ke-7, 11–12 April 1984",
+      "bahasa": "campur BM + English",
+      "matrix_baris": 1
     },
     {
       "date": "2026-09-05",
