@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31T11:36:13+00:00",
+  "generated_at": "2026-08-31T12:56:51+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -61,7 +61,7 @@
       "folder": "Food",
       "format": "text_image",
       "rehat": false,
-      "amaran": "Folder Food WUJUD tetapi KOSONG — disemak 2026-08-30 melalui Composio, childCount 0. Tanpa dokumen sumber, domain makanan hanya boleh menghasilkan post KONSEP — proses, urutan, salah faham — bukan post berangka. Jangan reka fi, tempoh, saiz taip atau nombor peraturan untuk mengisi ruang. Contoh yang mematuhi: draf 2026-09-01.",
+      "amaran": "Folder Food ADA 9 PDF setakat 2026-08-31 — Akta Makanan 1983, pindaan A1702, Peraturan Makanan 1985 (kemas kini Nov 2024), jadual-jadualnya, dan Garis Panduan Pelabelan 2023 (BM + BI). Dokumen itu BELUM DIBACA. Sehingga ia dibaca terus dan ditarik ke facts.yml, peraturan lama masih terpakai: post KONSEP sahaja, sifar nombor peraturan dan saiz taip. Larian Selasa berikutnya patut mula dengan membaca Peraturan Makanan 1985 BM (2.5 MB, paling kecil dan paling padat) sebelum menulis.",
       "today": false
     },
     {
