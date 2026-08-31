@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31T12:56:51+00:00",
+  "generated_at": "2026-08-31T13:17:49+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -61,7 +61,7 @@
       "folder": "Food",
       "format": "text_image",
       "rehat": false,
-      "amaran": "Folder Food ADA 9 PDF setakat 2026-08-31 — Akta Makanan 1983, pindaan A1702, Peraturan Makanan 1985 (kemas kini Nov 2024), jadual-jadualnya, dan Garis Panduan Pelabelan 2023 (BM + BI). Dokumen itu BELUM DIBACA. Sehingga ia dibaca terus dan ditarik ke facts.yml, peraturan lama masih terpakai: post KONSEP sahaja, sifar nombor peraturan dan saiz taip. Larian Selasa berikutnya patut mula dengan membaca Peraturan Makanan 1985 BM (2.5 MB, paling kecil dan paling padat) sebelum menulis.",
+      "amaran": "",
       "today": false
     },
     {
@@ -283,6 +283,25 @@
   },
   "posts": [
     {
+      "date": "2026-09-08",
+      "day_index": null,
+      "domain": "makanan",
+      "pillar": "mitos",
+      "angle": "10 poin ialah lalai, bukan peraturan tunggal — dan saiz poin diukur pada huruf kecil",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "citation": "Peraturan-Peraturan Makanan 1985 (BM), kemas kini November 2024",
+      "credits_spent": 0,
+      "cards": 1,
+      "thumb": "media/preview/2026-09-08/card-1.png",
+      "channels": {
+        "instagram": 1124,
+        "facebook_page": 788
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
       "date": "2026-09-07",
       "day_index": null,
       "domain": "kosmetik",
@@ -383,16 +402,16 @@
       "day_index": null,
       "domain": "makanan",
       "pillar": "dokumen",
-      "angle": "Kenapa gambar pek tak boleh dijawab, dan apa yang kena hantar ganti",
-      "format": "carousel",
+      "angle": "Lima perkara yang kena ditetapkan sebelum satu item pun boleh dijawab",
+      "format": "text_image",
       "status": "ready_for_approval",
       "citation": "Kaedah semakan dalaman ws.regulab, mengikut susunan FoSIM Semakan Pelabelan",
       "credits_spent": 0,
-      "cards": 5,
+      "cards": 1,
       "thumb": "media/preview/2026-09-01/card-1.png",
       "channels": {
-        "instagram": 774,
-        "facebook_page": 562
+        "instagram": 764,
+        "facebook_page": 523
       },
       "posted_at": null,
       "posted_to": []
@@ -515,25 +534,22 @@
       "domain": "makanan",
       "pillar": "dokumen",
       "angle": "Apa yang perlu dihantar untuk semakan label, dan kenapa gambar pek bercetak bukan jawapan",
-      "format": "carousel",
+      "format": "text_image",
       "status": "ready_for_approval",
       "credits_spent": 0,
       "visual": "rajah/stat+table+rail+duo+iconlist",
       "reka_bentuk": [
-        3,
-        4,
-        1,
-        2,
-        6
+        1
       ],
       "citation": "Kaedah semakan dalaman ws.regulab, susunan FoSIM Semakan Pelabelan",
       "bahasa": "campur BM + English",
       "nota": "Post KONSEP. Folder Food dalam OneDrive masih kosong pada 2026-08-30, jadi sifar angka regulatori.",
       "ditolak": {
         "pusingan_1": "2026-08-30 18:25 — hanya page 3 je okay",
-        "pusingan_2": "2026-08-30 19:26 — bunyi macam AI, terlalu panjang"
+        "pusingan_2": "2026-08-30 19:26 — bunyi macam AI, terlalu panjang",
+        "pusingan_3": "2026-08-31 12:59 — use only page 3, rid off other pages"
       },
-      "ditulis_semula": "2026-08-30 (dua pusingan)"
+      "ditulis_semula": "2026-08-31 (tiga pusingan)"
     },
     {
       "date": "2026-09-02",
@@ -627,6 +643,24 @@
       "dikemas_kini": "2026-08-30 — pas bahasa",
       "approved_at": "2026-08-30 19:23",
       "approved_by": "Wan (dashboard)"
+    },
+    {
+      "date": "2026-09-08",
+      "hari": "Selasa",
+      "brand": "wsregulab",
+      "domain": "makanan",
+      "pillar": "mitos",
+      "angle": "10 poin ialah lalai, bukan peraturan tunggal — dan saiz poin diukur pada huruf kecil",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "rajah/table, D2",
+      "reka_bentuk": [
+        2
+      ],
+      "citation": "Peraturan-Peraturan Makanan 1985 (BM), kemas kini Nov 2024, Per. 10-13",
+      "bahasa": "campur BM + English",
+      "nota": "Post makanan PERTAMA dengan nombor peraturan. Dokumen dibaca terus."
     }
   ]
 }
