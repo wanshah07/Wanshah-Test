@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-30T19:15:24+00:00",
+  "generated_at": "2026-08-31T11:36:13+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -289,7 +289,7 @@
       "pillar": "soal_jawab",
       "angle": "Jenis 1 lawan Jenis 2, dan kenapa Annex I part 5 kena dibuka sebelum cetak packaging",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "approved",
       "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.9, 3.8, 4.1.8",
       "credits_spent": 0,
       "cards": 1,
@@ -308,7 +308,7 @@
       "pillar": "kajian_kes",
       "angle": "Pengharaman TPO, dan mengapa ayat \"TPO-free\" itu bersyarat",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "citation": "Reg (EU) 2025/877, Annex II EC 1223/2009; Delegated Reg (EU) 2024/197; SI 2026/23 dan SI 2026/109. TPO, CAS 75980-60-8.",
       "credits_spent": 0,
       "cards": 5,
@@ -327,7 +327,7 @@
       "pillar": "soal_jawab",
       "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "citation": "Muzakarah Jawatankuasa Fatwa Majlis Kebangsaan Bagi Hal Ehwal Ugama Islam Malaysia (MKI) Kali Ke-7, 11–12 April 1984",
       "credits_spent": 0,
       "cards": 4,
@@ -391,8 +391,8 @@
       "cards": 5,
       "thumb": "media/preview/2026-09-01/card-1.png",
       "channels": {
-        "instagram": 1298,
-        "facebook_page": 886
+        "instagram": 774,
+        "facebook_page": 562
       },
       "posted_at": null,
       "posted_to": []
@@ -530,10 +530,10 @@
       "bahasa": "campur BM + English",
       "nota": "Post KONSEP. Folder Food dalam OneDrive masih kosong pada 2026-08-30, jadi sifar angka regulatori.",
       "ditolak": {
-        "pada": "2026-08-30 18:25",
-        "sebab": "hanya page 3 je okay"
+        "pusingan_1": "2026-08-30 18:25 — hanya page 3 je okay",
+        "pusingan_2": "2026-08-30 19:26 — bunyi macam AI, terlalu panjang"
       },
-      "ditulis_semula": "2026-08-30"
+      "ditulis_semula": "2026-08-30 (dua pusingan)"
     },
     {
       "date": "2026-09-02",
@@ -569,13 +569,13 @@
       "pillar": "soal_jawab",
       "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "rajah/stat+check+rail+iconlist",
       "citation": "Muzakarah MKI Kali Ke-7, 11–12 April 1984",
       "bahasa": "campur BM + English",
       "matrix_baris": 1,
-      "approved_at": "2026-08-30 17:58",
+      "approved_at": "2026-08-30 19:26",
       "approved_by": "Wan (dashboard)",
       "dikemas_kini": "2026-08-30 — pas bahasa; kelulusan 17:58 terpakai pada teks lama"
     },
@@ -587,7 +587,7 @@
       "pillar": "kajian_kes",
       "angle": "Pengharaman TPO, dan mengapa ayat \"TPO-free\" itu bersyarat",
       "format": "carousel",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "rajah/timeline+table+flow+iconlist+table",
       "citation": "Reg (EU) 2025/877; Delegated Reg (EU) 2024/197; SI 2026/23 & 2026/109",
@@ -604,7 +604,9 @@
         1,
         4,
         6
-      ]
+      ],
+      "approved_at": "2026-08-30 19:25",
+      "approved_by": "Wan (dashboard)"
     },
     {
       "date": "2026-09-07",
@@ -614,7 +616,7 @@
       "pillar": "soal_jawab",
       "angle": "Jenis 1 lawan Jenis 2, dan kenapa Annex I part 5 kena dibuka sebelum cetak packaging",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "poster D9 Q&A 101",
       "reka_bentuk": [
@@ -623,7 +625,8 @@
       "citation": "Guidelines for Control of Cosmetic Products in Malaysia 2nd Ed, Seksyen 2.9/3.8/4.1.8",
       "bahasa": "campur BM + English",
       "dikemas_kini": "2026-08-30 — pas bahasa",
-      "nota_kelulusan": "Wan lulus 2026-08-30 18:53 pada teks LAMA; caption dipendekkan selepas itu, jadi perlu lulus semula"
+      "approved_at": "2026-08-30 19:23",
+      "approved_by": "Wan (dashboard)"
     }
   ]
 }
