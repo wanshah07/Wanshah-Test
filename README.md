@@ -14,15 +14,17 @@ dashboard — see the bottom of this file.
 publishes to **<https://wanshah07.github.io/Wanshah-Test/>**, which is a
 **public URL**. Anyone with the link can read it.
 
-The dashboard is therefore built on a branch, not on `main`. Merging is
-what makes it live — treat that merge as a publishing decision.
+The dashboard **bundle** is therefore built on a branch, not on `main`.
+Merging is what makes it live — treat that merge as a publishing decision.
+Card images under `public/media/` are the one exception and go straight to
+`main`; see [Card hosting](#card-hosting-publicmedia) below for why.
 
 What the bundle does and does not contain:
 
 | In the bundle | Not in the bundle |
 | --- | --- |
 | Dates, pillar names, post formats | **Caption text — never** |
-| Character counts per channel | Image files and carousel cards |
+| Character counts per channel | Unapproved draft cards |
 | Compliance gate verdicts | Client names, case details |
 | Credit totals and the plan | Anything from `facts.yml` |
 | Which channels are connected | WhatsApp conversations |
@@ -32,6 +34,45 @@ What the bundle does and does not contain:
 bodies stay in the private repo. If you would rather not publish even the
 operational state, keep this on a branch and run `npm run dev` locally —
 the dashboard works exactly the same.
+
+## Card hosting (`public/media/`)
+
+**Approved post cards live in this repo, deliberately.** An earlier version
+of this README listed "image files and carousel cards" as never present.
+That was wrong from 2026-08-29 onward, and it stayed wrong long enough to
+cost real time — a later session read that line, believed there was no image
+host, and went looking for one that already existed here.
+
+Instagram's `publish_media_v2` and Facebook's `page_photo` both take a file
+upload *or* a publicly reachable URL. Hermes runs against a **private** repo,
+so it has no URL to hand them. This repo is public, so it does.
+
+    public/media/<date>/card-1.png
+
+Vite copies `public/*` into `dist/` verbatim and the Pages workflow serves
+`dist/`, so each card is reachable two ways:
+
+| URL | When it works |
+| --- | --- |
+| `raw.githubusercontent.com/wanshah07/Wanshah-Test/main/public/media/<date>/card-1.png` | The moment the push lands. **Use this one.** |
+| `wanshah07.github.io/Wanshah-Test/media/<date>/card-1.png` | Only after the Pages deploy finishes |
+
+Post with the raw URL. Calling Meta during a Pages deploy makes it fetch a
+URL that does not exist yet, and the resulting error says nothing useful.
+
+**The approval gate.** `hermes/tools/publish-cards.py` refuses to copy
+anything whose `meta.json` status is not `approved`. That is the whole point
+of the draft-first design: an approved card is about to be public anyway, so
+nothing is exposed early — but an unapproved draft never leaves the private
+repo. `ready_for_approval` is **not** approved; a human has to say so.
+
+That script also pushes here and then fetches each URL back and compares
+SHA256 against the local file. A URL it cannot verify is never recorded, and
+it exits with an error rather than let a broken image reach a live account.
+
+Cards are pushed to `main` rather than a branch because the URL has to exist
+before the post goes out — there is no review window to wait for. The
+approval gate above is what makes that safe.
 
 ## How the data gets in
 
@@ -67,9 +108,13 @@ All of it is in the **`malaysian-regulatory-affairs`** repo, not this one:
 
 `facts.yml` is the one that matters most. Hermes never invents a
 regulatory number: if a figure is not in that file, it writes
-`[SAHKAN: ...]` and holds the draft. Today's draft is held on exactly
-that — two JAKIM figures with nowhere to look them up. Fill the file in
-once and the markers stop appearing.
+`[SAHKAN: ...]` and holds the draft as `needs_verification`. A figure that
+is present but still carries `status: belum_disahkan` may go on a card but
+never into a caption. Fill the file in and the markers stop appearing.
+
+(This README used to name the specific figures a draft was waiting on. That
+kind of line goes stale within a day — check the dashboard's amber "Perlu
+disahkan sebelum lulus" panel instead, which reads the live state.)
 
 It also holds `soalan_masuk`, a list of real questions from DMs and
 WhatsApp. That feeds the `soal_jawab` pillar, which is both the
