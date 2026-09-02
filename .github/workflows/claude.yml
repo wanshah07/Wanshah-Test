@@ -1,0 +1,82 @@
+name: Claude Code
+
+# Claude responds to "@claude" in issues, PR comments and PR reviews.
+#
+# PUBLISHING GUARDRAIL — read before changing anything here.
+# .github/workflows/deploy-pages.yml fires on push to `main` and publishes
+# to https://wanshah07.github.io/Wanshah-Test/ , a PUBLIC URL. This job is
+# therefore scoped so Claude works on branches and opens pull requests; the
+# merge to `main` stays a human publishing decision, exactly as README.md
+# describes it. Do not add a `push:` trigger to this file.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+# Two comments arriving together should not race each other into the same
+# branch. Queue per issue/PR instead.
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    # Only run when someone actually mentions @claude. Without this guard the
+    # job spins up on every comment in the repository.
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write        # create branches and commits
+      pull-requests: write   # open and comment on PRs
+      issues: write          # reply in issues
+      id-token: write        # OIDC, required by the action
+      actions: read          # let Claude read CI results on a PR
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Max/Pro subscription auth. Token generated with `claude setup-token`
+          # on a machine where Claude Code is installed and logged in as Wan.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Consolidate Claude's replies into one comment per thread instead
+          # of a new comment on every turn.
+          use_sticky_comment: true
+
+          claude_args: |
+            --max-turns 15
+            --allowedTools "Bash(npm ci),Bash(npm install),Bash(npm run build),Bash(npm run dev),Bash(npx tsc --noEmit),Bash(git status),Bash(git diff),Bash(git log)"
+            --system-prompt "This repository is the public Hermes dashboard for ws.regulab (Vite + React 19 + TypeScript + Tailwind v4, shadcn/ui layout).
+
+            PUBLISHING RULE — this is the most important instruction in this repository.
+            Every push to `main` deploys to https://wanshah07.github.io/Wanshah-Test/ , which anyone with the link can read. NEVER commit or push to `main`. Work on a branch and open a pull request. Merging is Wan's decision, not yours. Say so plainly if asked to push to main.
+
+            WHAT MAY APPEAR IN THE BUNDLE.
+            Permitted: dates, pillar names, post formats, per-channel character counts, compliance gate verdicts, credit totals and the plan, which channels are connected.
+            Forbidden, without exception: caption text, unapproved draft cards, client names, case details, anything sourced from facts.yml, WhatsApp conversation content. If a change would place any of these into the built bundle, stop and say why instead of making it.
+
+            REPOSITORY BOUNDARY.
+            The Hermes source of truth lives in the separate private repository malaysian-regulatory-affairs. It is not checked out here and you cannot read it. src/data/hermes.json is a build-time snapshot produced by scripts/sync-hermes.py, which is run manually against a local checkout of that repo. Do not hand-edit src/data/hermes.json to fake state, and do not invent Hermes data you cannot see.
+
+            HOUSE RULES.
+            Verify a build with 'npx tsc --noEmit' then 'npm run build' before claiming a change compiles. Keep the existing shadcn/ui component structure and Tailwind v4 conventions. Card images under public/media/ are the one category that goes straight to main by existing convention — leave that workflow alone. Be concise in PR descriptions; state what changed and what it means for the published site."
