@@ -5,44 +5,57 @@
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.247 0.022 232.4);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.247 0.022 232.4);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.247 0.022 232.4);
+  --primary: oklch(0.549 0.080 215.7);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.963 0.007 208.8);
+  --secondary-foreground: oklch(0.247 0.022 232.4);
+  --muted: oklch(0.974 0.003 197.1);
+  --muted-foreground: oklch(0.529 0.026 225.2);
+  --accent: oklch(0.963 0.007 208.8);
+  --accent-foreground: oklch(0.247 0.022 232.4);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.912 0.010 204.9);
+  --input: oklch(0.912 0.010 204.9);
+  --ring: oklch(0.549 0.080 215.7);
+
+  /* Cangkerang Command Centre — panel sisi dan latar aksen lembut.
+     Warna semantik TIDAK ditakrifkan semula di sini: --viz-good,
+     --viz-warning dan --viz-critical di bawah sudah disahkan terhadap
+     permukaan sebenar projek ini untuk jalur kecerahan, lantai kroma
+     dan pemisahan CVD. Mencipta set kedua bermakna dua palet status
+     yang hampir sama dan tiada siapa tahu yang mana betul. */
+  --sidebar: oklch(0.983 0.003 197.1);
+  --sidebar-border: oklch(0.912 0.010 204.9);
+  --brand-soft: oklch(0.942 0.012 215.8);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.201 0.017 224.7);
+  --foreground: oklch(0.944 0.009 214.3);
+  --card: oklch(0.250 0.022 226.6);
+  --card-foreground: oklch(0.944 0.009 214.3);
+  --popover: oklch(0.250 0.022 226.6);
+  --popover-foreground: oklch(0.944 0.009 214.3);
+  --primary: oklch(0.730 0.073 214.1);
+  --primary-foreground: oklch(0.201 0.017 224.7);
+  --secondary: oklch(0.281 0.026 225.7);
+  --secondary-foreground: oklch(0.944 0.009 214.3);
+  --muted: oklch(0.234 0.020 224.0);
+  --muted-foreground: oklch(0.718 0.026 222.7);
+  --accent: oklch(0.281 0.026 225.7);
+  --accent-foreground: oklch(0.944 0.009 214.3);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(0.332 0.026 220.5);
+  --input: oklch(0.332 0.026 220.5);
+  --ring: oklch(0.730 0.073 214.1);
+  --sidebar: oklch(0.222 0.020 225.9);
+  --sidebar-border: oklch(0.332 0.026 220.5);
+  --brand-soft: oklch(0.299 0.030 221.1);
 }
 
 @theme inline {
@@ -68,6 +81,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-brand-soft: var(--brand-soft);
+  --color-good: var(--viz-good);
+  --color-warn: var(--viz-warning);
+  --color-crit: var(--viz-critical);
 }
 
 @layer base {

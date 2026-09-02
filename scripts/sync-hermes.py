@@ -118,6 +118,66 @@ if (today_dir / "meta.json").is_file():
 REPO = pathlib.Path(__file__).resolve().parent.parent
 PREVIEW = REPO / "public" / "media" / "preview"
 
+
+# --- post permalinks, allowlisted ---------------------------------------
+#
+# Added 2026-09-02 so the public site can LINK OUT to what ws.regulab has
+# already published. CLAUDE.md says not to add fields to this bundle
+# without checking what they expose, so: this exposes public post URLs on
+# Instagram, Facebook and Threads, for posts already live on those
+# platforms. Nothing else.
+#
+# The check matters here more than usual. `penghantaran` in the private
+# meta.json also carries media ids, account ids, card SHA-256 digests and
+# a `kaedah` string that names the Zapier connection_id used to deliver.
+# Spreading that block into a public bundle would put delivery-path
+# internals on a public URL. So this reads ONE key per channel and builds
+# a two-field record. Never spread `penghantaran`.
+#
+# Caption text is NOT here and must not be. It is on the never-publishable
+# list in CLAUDE.md, and that list holds even though the captions
+# themselves are already public on Meta: this repo does not become a
+# second copy of them.
+
+_CH = {"instagram": "Instagram", "facebook_page": "Facebook Page",
+       "threads": "Threads"}
+
+
+def _fb_url(post_id: str) -> str:
+    """Facebook returns `<page>_<post>`, never a URL. Build it."""
+    if post_id and "_" in post_id:
+        page, post = post_id.split("_", 1)
+        return f"https://www.facebook.com/{page}/posts/{post}"
+    return ""
+
+
+def post_links(m: dict) -> list[dict]:
+    """Public permalinks only, for posts that actually went out.
+
+    Three shapes exist because three sessions each designed their own
+    field. All three are read; a fourth would go missing in silence.
+    """
+    if m.get("status") != "posted":
+        return []
+    out, seen = [], set()
+
+    def add(key, url):
+        label = _CH.get(key)
+        if label and url and url.startswith("http") and label not in seen:
+            seen.add(label)
+            out.append({"channel": label, "url": url})
+
+    for key, v in (m.get("penghantaran") or {}).items():
+        if key == "imej" or not isinstance(v, dict):
+            continue
+        add(key, v.get("permalink") or _fb_url(v.get("post_id", "")))
+    for key, v in (m.get("posts") or {}).items():
+        if isinstance(v, dict):
+            add(key, v.get("permalink") or _fb_url(v.get("id", "")))
+    for key, url in (m.get("permalinks") or {}).items():
+        add(key, url if isinstance(url, str) else "")
+    return out
+
 def collect_posts() -> list[dict]:
     import shutil
     posts = []
@@ -151,6 +211,7 @@ def collect_posts() -> list[dict]:
             "channels": m.get("channels", {}),
             "posted_at": m.get("posted_at"),
             "posted_to": m.get("posted_to", []),
+            "links": post_links(m),
         })
     return posts
 
