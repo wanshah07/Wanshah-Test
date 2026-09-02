@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31T13:17:49+00:00",
+  "generated_at": "2026-09-02T09:03:35+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -18,9 +18,9 @@
     "timezone": "Asia/Kuala_Lumpur"
   },
   "cycle": {
-    "today": "2026-08-31",
-    "hari": "Isnin",
-    "domain": "kosmetik",
+    "today": "2026-09-02",
+    "hari": "Rabu",
+    "domain": "halal_my",
     "rehat": false
   },
   "budget": {
@@ -52,7 +52,7 @@
       "format": "text_image",
       "rehat": false,
       "amaran": "",
-      "today": true
+      "today": false
     },
     {
       "dow": 2,
@@ -72,7 +72,7 @@
       "format": "text_image",
       "rehat": false,
       "amaran": "",
-      "today": false
+      "today": true
     },
     {
       "dow": 4,
@@ -137,8 +137,8 @@
     {
       "key": "threads",
       "label": "Threads",
-      "connected": false,
-      "enabled": false,
+      "connected": true,
+      "enabled": true,
       "limit": 500,
       "target": 400,
       "zapier": ""
@@ -253,50 +253,118 @@
     }
   ],
   "today_draft": {
-    "date": "2026-08-31",
+    "date": "2026-09-02",
     "brand": "wsregulab",
-    "domain": "kosmetik",
-    "pillar": "dokumen",
-    "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
+    "domain": "halal_my",
+    "pillar": "silap",
+    "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
     "format": "text_image",
     "status": "approved",
     "credits_spent": 0,
     "bahasa": "campur BM + English",
     "gates": {
-      "claims": "pass — tidak berkenaan, bukan salinan iklan, tiada produk atau dakwaan kesan",
-      "halal": "pass — domain kosmetik",
-      "credibility": "pass — tiada janji kelulusan, tiada bayangan hubungan NPRA",
+      "claims": "pass — tidak berkenaan, contoh nama adalah rekaan generik",
+      "halal": "pass — bercakap tentang LARANGAN perkataan halal, bukan membuat dakwaan",
+      "credibility": "pass — tiada janji kelulusan, tiada bayangan hubungan JAKIM",
       "tone": "pass dengan nota — disemak terus, skill stop-slop tidak dipanggil",
-      "facts": "pass — setiap angka dari facts.yml/kosmetik, sumber garis panduan NPRA 2nd Ed"
+      "facts": "pass — Prosedur 5(12) dan urutan_kelulusan dari facts.yml, tiada angka"
     },
     "channels": {
-      "instagram": 1537,
-      "facebook_page": 775
+      "instagram": 1313,
+      "facebook_page": 698
     },
     "posted_at": null,
-    "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.6, 2.7, 2.10, 3.8, 4.1.8",
+    "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
     "nota_threads": "Saluran dimatikan 2026-08-29 — varian Threads tidak dijana.",
     "varian_ganti": 1,
-    "hari": "Isnin",
-    "dipindah": "2026-09-05 -> 2026-08-31; jadual bertukar kepada hari-dalam-minggu 2026-08-31",
+    "hari": "Rabu",
+    "dipindah": "2026-09-03 -> 2026-09-02; jadual bertukar kepada hari-dalam-minggu 2026-08-31",
+    "public_urls": [
+      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/main/public/media/2026-09-02/card-1.png"
+    ],
+    "public_urls_pages": [
+      "https://wanshah07.github.io/Wanshah-Test/media/2026-09-02/card-1.png"
+    ],
+    "public_urls_sha256": {
+      "card-1.png": "8d006280a48cd9684d5da2ea0ec0aa97f8d564797074a13f4a3d553ca2c568e9"
+    },
+    "approved_at": "2026-09-01 23:37",
     "verify_markers": []
   },
   "posts": [
+    {
+      "date": "2026-09-11",
+      "day_index": null,
+      "domain": "fatwa",
+      "pillar": "mitos",
+      "angle": "Pewarna daripada serangga diharuskan Muzakarah MKI — tetapi Brunei memutuskan sebaliknya, dan Annex IV disaring berasingan",
+      "format": "carousel",
+      "status": "approved",
+      "citation": "Muzakarah Jawatankuasa Fatwa Majlis Kebangsaan Bagi Hal Ehwal Ugama Islam Malaysia (MKI) Kali Ke-100, 4–6 Julai 2012",
+      "credits_spent": 0,
+      "cards": 4,
+      "thumb": "media/preview/2026-09-11/card-1.png",
+      "channels": {
+        "instagram": 1549,
+        "facebook_page": 988,
+        "threads": 490
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
+      "date": "2026-09-10",
+      "day_index": null,
+      "domain": "farmaseutikal",
+      "pillar": "urutan",
+      "angle": "Health supplement sama boleh jatuh 100 hari atau 245 hari — claim pada label yang tentukan, bukan bahan dalam botol",
+      "format": "text_image",
+      "status": "approved",
+      "citation": "DRGD 3rd Ed, 12th Rev (Julai 2026), Seksyen 10.3",
+      "credits_spent": 0,
+      "cards": 1,
+      "thumb": "media/preview/2026-09-10/card-1.png",
+      "channels": {
+        "instagram": 1163,
+        "facebook_page": 699
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
+    {
+      "date": "2026-09-09",
+      "day_index": null,
+      "domain": "halal_my",
+      "pillar": "kos_tempoh",
+      "angle": "Sah laku sijil berbeza ikut skim; bukan 2 tahun untuk semua",
+      "format": "text_image",
+      "status": "approved",
+      "citation": "MPPHM (Domestik) 2020, Prosedur 35(2) dan 35(3)",
+      "credits_spent": 0,
+      "cards": 1,
+      "thumb": "media/preview/2026-09-09/card-1.png",
+      "channels": {
+        "instagram": 927,
+        "facebook_page": 667
+      },
+      "posted_at": null,
+      "posted_to": []
+    },
     {
       "date": "2026-09-08",
       "day_index": null,
       "domain": "makanan",
       "pillar": "mitos",
-      "angle": "10 poin ialah lalai, bukan peraturan tunggal — dan saiz poin diukur pada huruf kecil",
+      "angle": "\"Adakah semua saiz teks kena 10 poin?\" — tidak, dan poin itu sendiri diukur pada huruf kecil",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "approved",
       "citation": "Peraturan-Peraturan Makanan 1985 (BM), kemas kini November 2024",
       "credits_spent": 0,
       "cards": 1,
       "thumb": "media/preview/2026-09-08/card-1.png",
       "channels": {
-        "instagram": 1124,
-        "facebook_page": 788
+        "instagram": 1140,
+        "facebook_page": 894
       },
       "posted_at": null,
       "posted_to": []
@@ -404,7 +472,7 @@
       "pillar": "dokumen",
       "angle": "Lima perkara yang kena ditetapkan sebelum satu item pun boleh dijawab",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "posted",
       "citation": "Kaedah semakan dalaman ws.regulab, mengikut susunan FoSIM Semakan Pelabelan",
       "credits_spent": 0,
       "cards": 1,
@@ -413,8 +481,11 @@
         "instagram": 764,
         "facebook_page": 523
       },
-      "posted_at": null,
-      "posted_to": []
+      "posted_at": "2026-09-01 09:12 MYT",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ]
     },
     {
       "date": "2026-08-31",
@@ -423,7 +494,7 @@
       "pillar": "dokumen",
       "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
       "format": "text_image",
-      "status": "approved",
+      "status": "posted",
       "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA), Seksyen 2.6, 2.7, 2.10, 3.8, 4.1.8",
       "credits_spent": 0,
       "cards": 1,
@@ -432,8 +503,11 @@
         "instagram": 1537,
         "facebook_page": 775
       },
-      "posted_at": null,
-      "posted_to": []
+      "posted_at": "2026-09-01 23:41 MYT",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ]
     },
     {
       "date": "2026-08-30",
@@ -521,7 +595,7 @@
       "pillar": "dokumen",
       "angle": "Notifikasi bukan kelulusan — RM50, 2 tahun, dan PIF yang boleh diaudit",
       "format": "text_image",
-      "status": "approved",
+      "status": "posted",
       "credits_spent": 0,
       "visual": "rajah/check",
       "citation": "Guidelines for Control of Cosmetic Products in Malaysia, 2nd Ed (NPRA)",
@@ -535,7 +609,7 @@
       "pillar": "dokumen",
       "angle": "Apa yang perlu dihantar untuk semakan label, dan kenapa gambar pek bercetak bukan jawapan",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "posted",
       "credits_spent": 0,
       "visual": "rajah/stat+table+rail+duo+iconlist",
       "reka_bentuk": [
@@ -543,13 +617,19 @@
       ],
       "citation": "Kaedah semakan dalaman ws.regulab, susunan FoSIM Semakan Pelabelan",
       "bahasa": "campur BM + English",
-      "nota": "Post KONSEP. Folder Food dalam OneDrive masih kosong pada 2026-08-30, jadi sifar angka regulatori.",
       "ditolak": {
         "pusingan_1": "2026-08-30 18:25 — hanya page 3 je okay",
         "pusingan_2": "2026-08-30 19:26 — bunyi macam AI, terlalu panjang",
         "pusingan_3": "2026-08-31 12:59 — use only page 3, rid off other pages"
       },
-      "ditulis_semula": "2026-08-31 (tiga pusingan)"
+      "ditulis_semula": "2026-08-31 (tiga pusingan)",
+      "posted_at": "2026-09-01 09:12 MYT",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ],
+      "permalink_ig": "https://www.instagram.com/p/Dcuc_42DFQi/",
+      "fb_post_id": "959295067272709_122123514003264570"
     },
     {
       "date": "2026-09-02",
@@ -592,7 +672,6 @@
       "bahasa": "campur BM + English",
       "matrix_baris": 1,
       "approved_at": "2026-08-30 19:26",
-      "approved_by": "Wan (dashboard)",
       "dikemas_kini": "2026-08-30 — pas bahasa; kelulusan 17:58 terpakai pada teks lama"
     },
     {
@@ -621,8 +700,7 @@
         4,
         6
       ],
-      "approved_at": "2026-08-30 19:25",
-      "approved_by": "Wan (dashboard)"
+      "approved_at": "2026-08-30 19:25"
     },
     {
       "date": "2026-09-07",
@@ -641,8 +719,7 @@
       "citation": "Guidelines for Control of Cosmetic Products in Malaysia 2nd Ed, Seksyen 2.9/3.8/4.1.8",
       "bahasa": "campur BM + English",
       "dikemas_kini": "2026-08-30 — pas bahasa",
-      "approved_at": "2026-08-30 19:23",
-      "approved_by": "Wan (dashboard)"
+      "approved_at": "2026-08-30 19:23"
     },
     {
       "date": "2026-09-08",
@@ -650,17 +727,73 @@
       "brand": "wsregulab",
       "domain": "makanan",
       "pillar": "mitos",
-      "angle": "10 poin ialah lalai, bukan peraturan tunggal — dan saiz poin diukur pada huruf kecil",
+      "angle": "\"Adakah semua saiz teks kena 10 poin?\" — tidak, dan poin itu sendiri diukur pada huruf kecil",
       "format": "text_image",
-      "status": "ready_for_approval",
+      "status": "approved",
       "credits_spent": 0,
       "visual": "rajah/table, D2",
       "reka_bentuk": [
         2
       ],
       "citation": "Peraturan-Peraturan Makanan 1985 (BM), kemas kini Nov 2024, Per. 10-13",
-      "bahasa": "campur BM + English",
-      "nota": "Post makanan PERTAMA dengan nombor peraturan. Dokumen dibaca terus."
+      "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-09",
+      "hari": "Rabu",
+      "brand": "wsregulab",
+      "domain": "halal_my",
+      "pillar": "kos_tempoh",
+      "angle": "Sah laku sijil berbeza ikut skim; bukan 2 tahun untuk semua",
+      "format": "text_image",
+      "status": "approved",
+      "credits_spent": 0,
+      "visual": "D7 split — foto gudang-01.jpg + jadual",
+      "citation": "MPPHM (Domestik) 2020, Prosedur 35(2) dan 35(3)",
+      "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-10",
+      "hari": "Khamis",
+      "brand": "wsregulab",
+      "domain": "farmaseutikal",
+      "pillar": "urutan",
+      "angle": "Health supplement sama boleh jatuh 100 hari atau 245 hari — claim pada label yang tentukan",
+      "format": "text_image",
+      "status": "approved",
+      "credits_spent": 0,
+      "visual": "D8 photofull — makmal-01.jpg",
+      "citation": "DRGD 3rd Ed, 12th Rev (Julai 2026), Seksyen 10.3",
+      "bahasa": "campur BM + English, nada kasual",
+      "approved_at": "2026-09-01 08:25"
+    },
+    {
+      "date": "2026-09-11",
+      "hari": "Jumaat",
+      "brand": "wsregulab",
+      "domain": "fatwa",
+      "pillar": "mitos",
+      "angle": "Pewarna daripada serangga diharuskan Muzakarah MKI — tetapi Brunei memutuskan sebaliknya, dan Annex IV disaring berasingan",
+      "format": "carousel",
+      "status": "approved",
+      "credits_spent": 0,
+      "visual": "D1 solid + D2 light x3 — 4 kad (pilihan reka bentuk Wan)",
+      "citation": "Muzakarah Jawatankuasa Fatwa MKI Kali Ke-100, 4–6 Julai 2012",
+      "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-14",
+      "hari": "Isnin",
+      "brand": "wsregulab",
+      "domain": "kosmetik",
+      "pillar": "mitos",
+      "angle": "DIBUANG — sudut songsang: hidrokuinon didakwa tidak dilarang terus, sebenarnya dilarang",
+      "format": "text_image",
+      "status": "dibuang",
+      "credits_spent": 0,
+      "visual": "D11 dyk — Did You Know",
+      "citation": "",
+      "bahasa": "campur BM + English"
     }
   ]
 }
