@@ -271,30 +271,70 @@ const Hero = React.memo(() => {
         </Button>
       </div>
 
+      {/* Kedua-dua imej hero asal dihoskan di i.postimg.cc, hos pihak
+          ketiga yang bukan milik kita dan akan reput satu hari. Ia
+          diganti, bukan dimuat turun:
+
+          GLOW ialah kecerunan — kini CSS tulen. Tiada permintaan
+          rangkaian, skala pada mana-mana saiz skrin, dan tiada fail
+          untuk hilang.
+
+          PRATONTON APP ialah placeholder yang JELAS placeholder, bukan
+          tangkapan skrin. Dashboard sebenar dipertimbangkan dan
+          ditolak: repo ini AWAM dan kekal, jadi satu bingkai raster
+          keadaan operasi hidup akan membeku ke dalam sejarah git tanpa
+          melalui redaction dalam sync-hermes.py — dan angka di dalamnya
+          menjadi basi pada larian berikutnya.
+
+          Bila Wan mahu tangkapan produk sebenar: letak fail di
+          public/media/landing/hero.png dan tukar blok ini kepada satu
+          <img src="./media/landing/hero.png" />. */}
       <div className="w-full max-w-5xl relative pb-20">
         <div
-          className="absolute left-1/2 w-[90%] pointer-events-none z-0"
+          className="absolute left-1/2 top-[-23%] w-[90%] aspect-[2/1] pointer-events-none z-0 -translate-x-1/2"
+          aria-hidden="true"
           style={{
-            top: "-23%",
-            transform: "translateX(-50%)"
+            background:
+              "radial-gradient(ellipse 50% 50% at 50% 50%, rgba(120,150,255,0.28), rgba(120,150,255,0.10) 45%, transparent 70%)",
+            filter: "blur(40px)"
           }}
+        />
+
+        <div
+          className="relative z-10 rounded-lg border border-gray-800 bg-gray-900/60 shadow-2xl overflow-hidden"
           aria-hidden="true"
         >
-          <img
-            src="https://i.postimg.cc/Ss6yShGy/glows.png"
-            alt=""
-            className="w-full h-auto"
-            loading="eager"
-          />
-        </div>
-
-        <div className="relative z-10">
-          <img
-            src="https://i.postimg.cc/SKcdVTr1/Dashboard2.png"
-            alt="Dashboard preview showing analytics and metrics interface"
-            className="w-full h-auto rounded-lg shadow-2xl"
-            loading="eager"
-          />
+          <div className="flex items-center gap-1.5 border-b border-gray-800 px-4 py-3">
+            <span className="h-2.5 w-2.5 rounded-full bg-gray-700" />
+            <span className="h-2.5 w-2.5 rounded-full bg-gray-700" />
+            <span className="h-2.5 w-2.5 rounded-full bg-gray-700" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[180px_1fr]">
+            <div className="hidden flex-col gap-2 md:flex">
+              {[64, 48, 56, 40, 52].map((w, i) => (
+                <div key={i} className="h-3 rounded bg-gray-800"
+                  style={{ width: `${w}%` }} />
+              ))}
+            </div>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="rounded-md border border-gray-800 bg-gray-900 p-3">
+                    <div className="h-2 w-2/3 rounded bg-gray-800" />
+                    <div className="mt-3 h-5 w-1/2 rounded bg-gray-700" />
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-md border border-gray-800 bg-gray-900 p-4">
+                <div className="flex h-32 items-end gap-2">
+                  {[38, 62, 45, 78, 55, 88, 47, 70, 60, 92, 51, 66].map((h, i) => (
+                    <div key={i} className="flex-1 rounded-t bg-gray-700"
+                      style={{ height: `${h}%` }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
