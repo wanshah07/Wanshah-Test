@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-02T09:03:35+00:00",
+  "generated_at": "2026-09-02T13:53:39+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -259,7 +259,7 @@
     "pillar": "silap",
     "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
     "format": "text_image",
-    "status": "approved",
+    "status": "posted",
     "credits_spent": 0,
     "bahasa": "campur BM + English",
     "gates": {
@@ -273,7 +273,38 @@
       "instagram": 1313,
       "facebook_page": 698
     },
-    "posted_at": null,
+    "posted_at": "2026-09-02 21:56 MYT",
+    "posted_to": [
+      "instagram",
+      "facebook_page"
+    ],
+    "penghantaran": {
+      "instagram": {
+        "status": "BERJAYA",
+        "media_id": "18099838043360443",
+        "akaun": "17841480154585579 (ws.regulab)",
+        "url_kad": "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/main/public/media/2026-09-02/card-1.png",
+        "sha256_kad_disahkan": "8d006280a48cd9684d5da2ea0ec0aa97f8d564797074a13f4a3d553ca2c568e9",
+        "aksara_caption": 1313,
+        "dihantar_pada": "2026-09-02 21:55 MYT",
+        "kaedah": "Zapier InstagramBusinessCLIAPI / publish_media_v2, connection_id 65847586"
+      },
+      "facebook_page": {
+        "status": "BERJAYA",
+        "photo_id": "122123617275264570",
+        "post_id": "959295067272709_122123617293264570",
+        "page": "959295067272709 (ws.regulab)",
+        "connection_id": 65847575,
+        "permalink": "https://www.facebook.com/959295067272709/posts/122123617293264570",
+        "aksara_caption": 698,
+        "dihantar_pada": "2026-09-02 21:56 MYT",
+        "kaedah": "Zapier FacebookV2CLIAPI / page_photo"
+      },
+      "threads": {
+        "status": "TIDAK DIHANTAR DALAM FASA A",
+        "sebab": "Post ini tiada varian Threads. Ia ditulis 2026-08-29 semasa saluran Threads dimatikan (lihat nota_threads), jadi kelulusan Wan tidak merangkumi teks Threads. Mengarang satu dalam Fasa A dilarang. Varian ditulis dalam Fasa A2 sebagai slot post_harian dan masuk giliran Buffer di sana."
+      }
+    },
     "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
     "nota_threads": "Saluran dimatikan 2026-08-29 — varian Threads tidak dijana.",
     "varian_ganti": 1,
@@ -453,7 +484,7 @@
       "pillar": "silap",
       "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
       "format": "text_image",
-      "status": "approved",
+      "status": "posted",
       "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
       "credits_spent": 0,
       "cards": 1,
@@ -462,8 +493,11 @@
         "instagram": 1313,
         "facebook_page": 698
       },
-      "posted_at": null,
-      "posted_to": []
+      "posted_at": "2026-09-02 21:56 MYT",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ]
     },
     {
       "date": "2026-09-01",
@@ -638,11 +672,19 @@
       "pillar": "silap",
       "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
       "format": "text_image",
-      "status": "approved",
+      "status": "posted",
       "credits_spent": 0,
       "visual": "rajah/compare",
       "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
-      "bahasa": "campur BM + English"
+      "bahasa": "campur BM + English",
+      "approved_at": "2026-09-01 23:37",
+      "posted_at": "2026-09-02 21:56 MYT",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ],
+      "ig_media_id": "18099838043360443",
+      "fb_post_id": "959295067272709_122123617293264570"
     },
     {
       "date": "2026-09-03",
