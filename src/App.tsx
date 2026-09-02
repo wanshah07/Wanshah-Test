@@ -1,4 +1,4 @@
-import Dashboard from '@/components/hermes/Dashboard';
+import Shell from '@/components/hermes/Shell';
 import SaasTemplate from '@/components/ui/saa-s-template';
 
 /* Dua paparan, dipilih oleh ?view=.
@@ -16,6 +16,6 @@ import SaasTemplate from '@/components/ui/saa-s-template';
 const view = new URLSearchParams(location.search).get('view');
 
 export default function App() {
-  if (view === 'dashboard') return <Dashboard />;
+  if (view === 'dashboard') return <Shell />;
   return <SaasTemplate />;
 }

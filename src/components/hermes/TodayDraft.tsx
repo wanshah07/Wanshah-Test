@@ -14,6 +14,20 @@ const GATE_TONE = {
   skipped: { tone: 'var(--viz-muted)', glyph: '–', word: 'Tak berkenaan' },
 } as const;
 
+/* `day_index` datang dari kalendar 14-slot lama dan tiada lagi dalam
+   meta.json sejak jadual bertukar kepada hari tetap pada 2026-08-31.
+   Templat rentetan mencetaknya sebagai "hari undefined" pada skrin dan
+   terus melukis, jadi tiada apa yang mengadu — ia hanya kelihatan rosak.
+   Nama hari kini dikira daripada tarikh, yang sentiasa ada. */
+const HARI = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
+
+/** Nama hari daripada tarikh ISO, dibaca sebagai UTC supaya zon waktu
+ *  pelayar tidak menggesernya sehari. */
+function namaHari(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? '' : HARI[d.getUTCDay()];
+}
+
 export default function TodayDraft() {
   const d = hermes.today_draft;
 
@@ -34,7 +48,8 @@ export default function TodayDraft() {
   const channels = hermes.channels.filter((c) => d.channels[c.key] !== undefined);
 
   return (
-    <Panel title="Draf hari ini" hint={`${d.date} · hari ${d.day_index} · ${d.pillar}`}>
+    <Panel title="Draf hari ini" hint={[d.date, namaHari(d.date), d.pillar]
+      .filter(Boolean).join(' · ')}>
       <div className="flex flex-wrap items-center gap-3">
         <span className="inline-flex items-center gap-1.5 rounded-full border
                          border-border px-2.5 py-1 text-xs font-medium">
