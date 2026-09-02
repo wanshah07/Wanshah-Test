@@ -1,0 +1,32 @@
+# Line endings.
+#
+# Both clones of this project were made on Windows without core.autocrlf set,
+# so every text file arrived with CRLF while the repository stores LF. Git read
+# that as a full rewrite of every file — 109 files and 24,784 lines in one repo,
+# 27 in the other, with zero real change. A commit made from that state would
+# have buried the actual edit and destroyed git blame.
+#
+# Local config fixes it for one clone on one machine. This file fixes it for
+# every clone, every machine, and the CI runner, because it travels with the
+# repository.
+#
+# text=auto: normalise to LF inside the repository, check out native line
+# endings in the working tree (CRLF on Windows). Nothing on disk changes for
+# anyone working today.
+* text=auto
+
+# Binaries: never transform. Git's auto-detection already catches these, but
+# card images and fonts are the files that would be silently corrupted if it
+# ever guessed wrong, so state it.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.mp4  binary
