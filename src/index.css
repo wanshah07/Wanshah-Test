@@ -128,3 +128,68 @@
   --viz-seq-250: #1c5cab;
   --viz-seq-100: #184f95;
 }
+
+/* ---------------------------------------------------------------
+   Animated gradient border (BorderRotate).
+
+   The component ships only inline styles; these four class names and
+   the rotation machinery have to live here.
+
+   @property is the load-bearing part. A custom property is an untyped
+   string by default, so CSS cannot interpolate --gradient-angle and
+   the keyframes below would do nothing. Registering it as <angle>
+   makes it animatable — this is why the border renders but never
+   moves in projects that paste the keyframes alone.
+
+   Not added: `@import "tw-animate-css"`. That package is not a
+   dependency of this project and this component does not use it; the
+   import would fail the build.
+   --------------------------------------------------------------- */
+@property --gradient-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes gradient-rotate {
+  from {
+    --gradient-angle: 0deg;
+  }
+  to {
+    --gradient-angle: 360deg;
+  }
+}
+
+.gradient-border-component {
+  /* The conic gradient paints into the border box, so the element needs a
+     border box to paint into. Colours, radius and width arrive inline. */
+  position: relative;
+  isolation: isolate;
+}
+
+/* Every mode runs the same animation; only the play state differs, so
+   hovering pauses or resumes mid-rotation instead of snapping to 0deg. */
+.gradient-border-auto,
+.gradient-border-hover,
+.gradient-border-stop-hover {
+  animation: gradient-rotate var(--animation-duration, 5s) linear infinite;
+}
+
+.gradient-border-hover {
+  animation-play-state: paused;
+}
+.gradient-border-hover:hover {
+  animation-play-state: running;
+}
+
+.gradient-border-stop-hover:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-border-auto,
+  .gradient-border-hover,
+  .gradient-border-stop-hover {
+    animation: none;
+  }
+}
