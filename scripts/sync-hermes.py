@@ -165,6 +165,31 @@ if PREVIEW.is_dir():
         if stale.is_dir() and stale.name not in live:
             _sh.rmtree(stale)
 
+# --- public-bundle redaction -------------------------------------------
+#
+# This repo is PUBLIC and served on GitHub Pages, so everything that
+# reaches src/data/hermes.json is world-readable the moment it is merged.
+# The Hermes ledger and draft metadata carry internal operating notes —
+# approval-withdrawal audit trails, tooling commit SHAs, approver identity
+# and content fingerprints — which document how the pipeline is run, not
+# what it published. Strip them here rather than in a dashboard component:
+# a component that declines to render a field does not make that field
+# private, it only makes it unrendered.
+PRIVATE_FIELDS = {
+    "nota",                  # internal operating commentary
+    "approved_by",           # approver identity
+    "approved_fingerprint",  # content fingerprints
+    "kelulusan_dipulihkan",  # approval-withdrawal audit trail
+}
+
+def redact(o):
+    """Drop PRIVATE_FIELDS anywhere they appear, at any depth."""
+    if isinstance(o, dict):
+        return {k: redact(v) for k, v in o.items() if k not in PRIVATE_FIELDS}
+    if isinstance(o, list):
+        return [redact(v) for v in o]
+    return o
+
 out = {
     "generated_at": datetime.datetime.now(datetime.timezone.utc)
                         .isoformat(timespec="seconds"),
@@ -215,9 +240,9 @@ out = {
          "configured": not str(v.get("folder_id", "")).startswith("TODO")}
         for k, v in (facts.get("sumber_kandungan") or {}).items()
     ],
-    "today_draft": draft,
+    "today_draft": redact(draft),
     "posts": posts,
-    "ledger": ledger["entries"][-30:],
+    "ledger": redact(ledger["entries"][-30:]),
 }
 
 dest = pathlib.Path(__file__).resolve().parent.parent / "src" / "data" / "hermes.json"
