@@ -9,6 +9,7 @@
  * the component as published.
  */
 import React from "react";
+import NotaRegulatori from "@/components/ui/nota-regulatori";
 
 // Inline Button Component
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -118,7 +119,7 @@ const Navigation = React.memo(() => {
             <a href="https://www.kkmhalalconsultant.com" target="_blank" rel="noopener noreferrer" className="text-sm text-white/60 hover:text-white transition-colors">
               Servis
             </a>
-            <a href="#semakan-fail" className="text-sm text-white/60 hover:text-white transition-colors">
+            <a href="https://www.kkmhalalconsultant.com" target="_blank" rel="noopener noreferrer" className="text-sm text-white/60 hover:text-white transition-colors">
               Semakan fail
             </a>
             <a href="#nota" className="text-sm text-white/60 hover:text-white transition-colors">
@@ -167,7 +168,9 @@ const Navigation = React.memo(() => {
               Servis
             </a>
             <a
-              href="#semakan-fail"
+              href="https://www.kkmhalalconsultant.com"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm text-white/60 hover:text-white transition-colors py-2"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -363,6 +366,7 @@ export default function Component() {
     <main className="saas-template min-h-screen bg-black text-white">
       <Navigation />
       <Hero />
+      <NotaRegulatori />
     </main>
   );
 }
