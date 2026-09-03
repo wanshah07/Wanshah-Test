@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-02T09:03:35+00:00",
+  "generated_at": "2026-09-02T16:30:35+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -18,14 +18,14 @@
     "timezone": "Asia/Kuala_Lumpur"
   },
   "cycle": {
-    "today": "2026-09-02",
-    "hari": "Rabu",
-    "domain": "halal_my",
+    "today": "2026-09-03",
+    "hari": "Khamis",
+    "domain": "farmaseutikal",
     "rehat": false
   },
   "budget": {
-    "plan": "Free",
-    "monthly_credits": 300,
+    "plan": "Starter",
+    "monthly_credits": 5000,
     "cost_per_image": 10,
     "model": "flux-2-klein",
     "spent_this_month": 0,
@@ -33,15 +33,15 @@
     "image_days_per_cycle": 6,
     "projected_monthly": 0,
     "visual_default": "rajah",
-    "headroom": 300,
-    "halt_below": 30,
-    "warn_below": 80
+    "headroom": 5000,
+    "halt_below": 300,
+    "warn_below": 800
   },
   "video": {
     "enabled": false,
-    "reason": "Satu klip 480p 5 saat memakan 300 kredit — seluruh kuota bulanan Free. Hidupkan hanya selepas naik taraf pelan BudgetPixel.",
+    "reason": "Kos bukan lagi penghalang — 300 kredit ialah 6% daripada bulan 5000 Starter, iaitu enam belas klip. Yang menahannya: tiada apa dalam talian ini yang menghasilkan video, dan tiada saluran Hermes yang memerlukannya. TikTok memerlukannya dan TikTok tiada laluan.",
     "cheapest_clip_credits": 300,
-    "months_per_clip": 1.0
+    "months_per_clip": 0.06
   },
   "slots": [
     {
@@ -72,7 +72,7 @@
       "format": "text_image",
       "rehat": false,
       "amaran": "",
-      "today": true
+      "today": false
     },
     {
       "dow": 4,
@@ -82,7 +82,7 @@
       "format": "text_image",
       "rehat": false,
       "amaran": "",
-      "today": false
+      "today": true
     },
     {
       "dow": 5,
@@ -253,42 +253,59 @@
     }
   ],
   "today_draft": {
-    "date": "2026-09-02",
+    "date": "2026-09-03",
     "brand": "wsregulab",
-    "domain": "halal_my",
-    "pillar": "silap",
-    "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
-    "format": "text_image",
+    "domain": "farmaseutikal",
+    "pillar": "mitos",
+    "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
+    "format": "carousel",
     "status": "approved",
     "credits_spent": 0,
     "bahasa": "campur BM + English",
     "gates": {
-      "claims": "pass — tidak berkenaan, contoh nama adalah rekaan generik",
-      "halal": "pass — bercakap tentang LARANGAN perkataan halal, bukan membuat dakwaan",
-      "credibility": "pass — tiada janji kelulusan, tiada bayangan hubungan JAKIM",
-      "tone": "pass dengan nota — disemak terus, skill stop-slop tidak dipanggil",
-      "facts": "pass — Prosedur 5(12) dan urutan_kelulusan dari facts.yml, tiada angka"
+      "claims": "pass — tidak berkenaan, bukan salinan iklan kosmetik, tiada produk atau dakwaan disebut",
+      "halal": "pass — tiada dakwaan halal, domain farmaseutikal",
+      "credibility": "pass — tiada janji kelulusan, tiada bayangan hubungan NPRA",
+      "tone": "pass dengan nota — disemak terhadap corak AI secara terus, skill stop-slop tidak dipanggil",
+      "facts": "pass — setiap angka dari facts.yml/farmaseutikal, sumber DRGD Julai 2026"
     },
     "channels": {
-      "instagram": 1313,
-      "facebook_page": 698
+      "instagram": 1374,
+      "facebook_page": 636,
+      "threads": 314
     },
     "posted_at": null,
-    "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
-    "nota_threads": "Saluran dimatikan 2026-08-29 — varian Threads tidak dijana.",
-    "varian_ganti": 1,
-    "hari": "Rabu",
-    "dipindah": "2026-09-03 -> 2026-09-02; jadual bertukar kepada hari-dalam-minggu 2026-08-31",
-    "public_urls": [
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/main/public/media/2026-09-02/card-1.png"
-    ],
-    "public_urls_pages": [
-      "https://wanshah07.github.io/Wanshah-Test/media/2026-09-02/card-1.png"
-    ],
-    "public_urls_sha256": {
-      "card-1.png": "8d006280a48cd9684d5da2ea0ec0aa97f8d564797074a13f4a3d553ca2c568e9"
+    "citation": "DRGD 3rd Edition, 12th Revision, Julai 2026, Seksyen 11.2, 11.3, 18",
+    "nota_threads": "Threads dimatikan 2026-08-29. Post ini keluar ke Facebook dan Instagram sahaja pada 31 Ogos.",
+    "diluluskan_pada": "2026-08-29T15:45Z",
+    "nota_giliran": "Diluluskan awal dan disimpan. Routine 31 Ogos 9.45 malam akan menghantarnya.",
+    "hantar": {
+      "ujian_threads_2026_08_29T16:06Z": {
+        "keputusan": "gagal",
+        "sambungan": "65851493 — dicipta 15:58Z dari URL bersih tanpa connectionId",
+        "ralat": "user id or long lived token not found in metadata"
+      }
     },
-    "approved_at": "2026-09-01 23:37",
+    "varian_ganti": 1,
+    "hari": "Khamis",
+    "dipindah": "2026-08-31 -> 2026-09-03; jadual bertukar kepada hari-dalam-minggu 2026-08-31",
+    "approved_at": "2026-09-01 23:26",
+    "public_urls_dibuang": {
+      "pada": "2026-09-01 23:41 MYT",
+      "yang_dibuang": [
+        "https://wanshah07.github.io/Wanshah-Test/media/2026-08-31/card-1.png",
+        "https://wanshah07.github.io/Wanshah-Test/media/2026-08-31/card-2.png",
+        "https://wanshah07.github.io/Wanshah-Test/media/2026-08-31/card-3.png",
+        "https://wanshah07.github.io/Wanshah-Test/media/2026-08-31/card-4.png",
+        "https://wanshah07.github.io/Wanshah-Test/media/2026-08-31/card-5.png"
+      ],
+      "sebab": [
+        "URL itu menunjuk ke folder 2026-08-31, bukan 2026-09-03. Lima kad daripada carousel 29 Ogos yang sudah diganti — dan empat daripadanya sudah dibuang dari repo hos hari ini sebagai kad yatim.",
+        "Ia juga bentuk Pages (wanshah07.github.io), yang SKILL.md larang untuk menyiarkan: ia perlukan workflow deploy selesai dahulu.",
+        "Menyiarkan dengannya bermakna post 3 Sep keluar dengan gambar post lain, atau dengan 404."
+      ],
+      "tindakan": "publish-cards.py akan menjananya semula dan mengesahkannya sebelum penyiaran, seperti setiap post lain."
+    },
     "verify_markers": []
   },
   "posts": [
@@ -310,7 +327,8 @@
         "threads": 490
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-10",
@@ -329,7 +347,8 @@
         "facebook_page": 699
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-09",
@@ -348,7 +367,8 @@
         "facebook_page": 667
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-08",
@@ -367,7 +387,8 @@
         "facebook_page": 894
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-07",
@@ -386,7 +407,8 @@
         "facebook_page": 857
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-05",
@@ -405,7 +427,8 @@
         "facebook_page": 735
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-04",
@@ -424,7 +447,8 @@
         "facebook_page": 956
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-03",
@@ -444,7 +468,8 @@
         "threads": 314
       },
       "posted_at": null,
-      "posted_to": []
+      "posted_to": [],
+      "links": []
     },
     {
       "date": "2026-09-02",
@@ -453,7 +478,7 @@
       "pillar": "silap",
       "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
       "format": "text_image",
-      "status": "approved",
+      "status": "posted",
       "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
       "credits_spent": 0,
       "cards": 1,
@@ -462,8 +487,21 @@
         "instagram": 1313,
         "facebook_page": 698
       },
-      "posted_at": null,
-      "posted_to": []
+      "posted_at": "2026-09-02 21:52 MYT",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ],
+      "links": [
+        {
+          "channel": "Instagram",
+          "url": "https://www.instagram.com/p/DcyYhdIES6r/"
+        },
+        {
+          "channel": "Facebook Page",
+          "url": "https://www.facebook.com/959295067272709/posts/122123617293264570"
+        }
+      ]
     },
     {
       "date": "2026-09-01",
@@ -485,6 +523,16 @@
       "posted_to": [
         "instagram",
         "facebook_page"
+      ],
+      "links": [
+        {
+          "channel": "Instagram",
+          "url": "https://www.instagram.com/p/Dcuc_42DFQi/"
+        },
+        {
+          "channel": "Facebook Page",
+          "url": "https://www.facebook.com/959295067272709/posts/122123514003264570"
+        }
       ]
     },
     {
@@ -507,6 +555,16 @@
       "posted_to": [
         "instagram",
         "facebook_page"
+      ],
+      "links": [
+        {
+          "channel": "Instagram",
+          "url": "https://www.instagram.com/p/DcwAapXlO2K/"
+        },
+        {
+          "channel": "Facebook Page",
+          "url": "https://www.facebook.com/959295067272709/posts/122123552253264570"
+        }
       ]
     },
     {
@@ -527,7 +585,17 @@
         "threads": 328
       },
       "posted_at": "2026-08-29T06:33Z",
-      "posted_to": []
+      "posted_to": [],
+      "links": [
+        {
+          "channel": "Instagram",
+          "url": "https://www.instagram.com/p/DcnTQuvnwBV/"
+        },
+        {
+          "channel": "Facebook Page",
+          "url": "https://www.facebook.com/122123317401264570/posts/122123317257264570"
+        }
+      ]
     },
     {
       "date": "2026-08-29",
@@ -550,6 +618,16 @@
       "posted_to": [
         "facebook_page",
         "instagram"
+      ],
+      "links": [
+        {
+          "channel": "Facebook Page",
+          "url": "https://www.facebook.com/122123317401264570/posts/122123344545264570"
+        },
+        {
+          "channel": "Instagram",
+          "url": "https://www.instagram.com/p/DcoOK_BICDW/"
+        }
       ]
     }
   ],
@@ -638,11 +716,19 @@
       "pillar": "silap",
       "angle": "Perkataan 'halal' dalam nama yang dimohon menyekat permohonan itu sendiri",
       "format": "text_image",
-      "status": "approved",
+      "status": "posted",
       "credits_spent": 0,
       "visual": "rajah/compare",
       "citation": "MPPHM (Domestik) 2020, Prosedur 5(12)",
-      "bahasa": "campur BM + English"
+      "bahasa": "campur BM + English",
+      "approved_at": "2026-09-01 23:37",
+      "posted_at": "2026-09-02 21:52 MYT",
+      "posted_to": [
+        "instagram",
+        "facebook_page"
+      ],
+      "ig_media_id": "18099838043360443",
+      "fb_post_id": "959295067272709_122123617293264570"
     },
     {
       "date": "2026-09-03",

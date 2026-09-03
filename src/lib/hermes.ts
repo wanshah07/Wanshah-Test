@@ -35,6 +35,10 @@ export type Post = {
   credits_spent: number; cards: number; thumb: string | null;
   channels: Record<string, number>;
   posted_at: string | null; posted_to: string[];
+  /* Pautan awam kepada post yang sudah keluar, ditambah 2026-09-02 untuk
+     seksyen Nota regulatori. Dua medan sahaja, senarai putih dalam
+     scripts/sync-hermes.py — bukan blok `penghantaran` yang disebar. */
+  links: { channel: string; url: string }[];
 };
 
 export type Source = {
