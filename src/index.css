@@ -1,4 +1,9 @@
 @import "tailwindcss";
+/* Utiliti `animate-in fade-in zoom-in-95` yang dipakai oleh menu
+   workspace dan palet arahan. Tanpa import ini kelas-kelas itu bukan
+   ralat — ia sekadar TIADA, jadi menu muncul serta-merta tanpa animasi
+   dan tiada apa dalam binaan yang memberitahu. */
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
