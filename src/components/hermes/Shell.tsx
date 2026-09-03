@@ -21,7 +21,12 @@
  * nama kelas berbeza ialah cara paling pasti memecahkan sesuatu tanpa
  * mendapat apa-apa.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  LayoutDashboard, Activity, Send, Images, CalendarDays, Share2, FileText,
+  Linkedin,
+} from 'lucide-react';
+import { SidebarNav, type NavGroupData } from '@/components/ui/dashboard-sidebar';
 import { hermes } from '@/lib/hermes';
 import { cn } from '@/lib/utils';
 import { Panel } from './primitives';
@@ -58,25 +63,46 @@ function applyTheme(t: Theme) {
 
 /* --------------------------------------------------------------- laluan */
 type PageId = 'overview' | 'timeline' | 'published' | 'media'
-  | 'schedule' | 'channels' | 'sources';
+  | 'schedule' | 'channels' | 'sources' | 'linkedin';
 
-const PAGES: { id: PageId; t: string; group: string; blurb: string }[] = [
-  { id: 'overview', t: 'Ikhtisar', group: 'Keadaan',
+/* Dua ejen, dua kumpulan berasingan dalam nav.
+ *
+ * Hermes memegang Instagram, Facebook Page dan Threads. Argus memegang
+ * LinkedIn. Ia bukan satu talian dengan empat saluran — ia dua ejen
+ * dengan dua suara, dan menggabungkan keduanya dalam satu senarai
+ * menjadikan "apa yang Argus terbitkan" soalan yang perlu dicari.
+ *
+ * `agent` di sini menamakan pemiliknya supaya tajuk halaman menunjukkan
+ * ejen yang betul; sebelum ini setiap halaman berkata "Hermes". */
+const PAGES: { id: PageId; t: string; group: string; agent: string;
+               blurb: string }[] = [
+  { id: 'overview', t: 'Ikhtisar', group: 'Keadaan', agent: 'Hermes',
     blurb: 'Apa yang menunggu, apa yang beratur, dan apa yang keluar malam ini.' },
-  { id: 'timeline', t: 'Garis masa', group: 'Keadaan',
+  { id: 'timeline', t: 'Garis masa', group: 'Keadaan', agent: 'Hermes',
     blurb: 'Setiap larian, terbaharu dahulu.' },
-  { id: 'published', t: 'Diterbitkan', group: 'Keadaan',
+  { id: 'published', t: 'Diterbitkan', group: 'Keadaan', agent: 'Hermes',
     blurb: 'Apa yang sudah keluar, bila, dan pautan kepada setiap satu.' },
-  { id: 'media', t: 'Kad', group: 'Kandungan',
+  { id: 'media', t: 'Kad', group: 'Kandungan', agent: 'Hermes',
     blurb: 'Setiap kad yang dirender, sifar kredit setiap satu.' },
-  { id: 'schedule', t: 'Jadual mingguan', group: 'Kandungan',
+  { id: 'schedule', t: 'Jadual mingguan', group: 'Kandungan', agent: 'Hermes',
     blurb: 'Satu domain sehari, dan folder yang dibaca setiap hari.' },
-  { id: 'channels', t: 'Saluran', group: 'Penghantaran',
+  { id: 'channels', t: 'Saluran', group: 'Penghantaran', agent: 'Hermes',
     blurb: 'Ke mana post pergi, dan had caption setiap platform.' },
-  { id: 'sources', t: 'Sumber', group: 'Penghantaran',
+  { id: 'sources', t: 'Sumber', group: 'Penghantaran', agent: 'Hermes',
     blurb: 'Dokumen rasmi di sebalik setiap nombor.' },
+  { id: 'linkedin', t: 'LinkedIn', group: 'Argus', agent: 'Argus',
+    blurb: 'Pemerhatian regulatori yang sudah keluar ke LinkedIn.' },
 ];
-const GROUPS = ['Keadaan', 'Kandungan', 'Penghantaran'];
+const GROUPS = ['Keadaan', 'Kandungan', 'Penghantaran', 'Argus'];
+
+/* Ikon per halaman, dipetakan sekali di sini. Ia hidup bersebelahan
+   PAGES supaya menambah halaman tanpa ikon gagal pada masa jenis, bukan
+   dengan meninggalkan ruang kosong dalam nav. */
+const ICON: Record<PageId, React.ElementType> = {
+  overview: LayoutDashboard, timeline: Activity, published: Send,
+  media: Images, schedule: CalendarDays, channels: Share2,
+  sources: FileText, linkedin: Linkedin,
+};
 
 const PAGE_KEY = 'ws.regulab.page';
 
@@ -92,6 +118,103 @@ function counts() {
   const c: Record<string, number> = {};
   hermes.posts.forEach((p) => { c[p.status] = (c[p.status] ?? 0) + 1; });
   return c;
+}
+
+/* Blok Argus dalam bundle, dengan lalai bila ia tiada.
+ *
+ * scripts/sync-hermes.py menulis `argus` hanya bila repo argus dijumpai
+ * di sebelah dua yang lain. Ia repo KETIGA dan tidak semestinya ada,
+ * jadi setiap pembacaan di sini melalui bentuk yang sama — muka surat
+ * LinkedIn mengatakan ia tiada, ia tidak menghempas halaman. */
+type ArgusBlok = {
+  available: boolean;
+  posted: { date: string; posted_at: string | null; url: string }[];
+  pending: number; approved: number;
+  channel: { label: string; connected: boolean };
+};
+const argus: ArgusBlok = ((hermes as unknown as { argus?: ArgusBlok }).argus) ?? {
+  available: false, posted: [], pending: 0, approved: 0,
+  channel: { label: 'LinkedIn', connected: false },
+};
+
+/* Saluran Hermes ditambah saluran Argus. LinkedIn tiada dalam
+   channels.yml kerana ia bukan saluran Hermes — ia milik ejen yang lain,
+   dan strip status ini ialah satu-satunya tempat kedua-duanya berjumpa. */
+function chStatus() {
+  const rows = hermes.channels.map((ch) => ({
+    label: ch.label, connected: ch.connected,
+  }));
+  if (argus.available) rows.push(argus.channel);
+  return rows;
+}
+
+/* -------------------------------------------------------------- LinkedIn */
+/* Halaman Argus pada tapak AWAM.
+ *
+ * BARIS UNTUK YANG SUDAH KELUAR, KIRAAN SAHAJA UNTUK YANG BELUM — dan itu
+ * bukan kemalasan. Post yang sudah keluar sudah awam: permalink LinkedIn
+ * itu boleh dibuka sesiapa. Draf yang menunggu kelulusan ialah kerja yang
+ * belum ditandatangani, dan "unapproved drafts" ada dalam senarai
+ * never-publishable dalam CLAUDE.md. Jadi bilangannya keluar; tarikh dan
+ * tajuknya tidak. Teks pemerhatian tidak pernah masuk ke dalam bundle. */
+function LinkedInPage() {
+  if (!argus.available) {
+    return (
+      <Panel title="Argus tiada dalam petikan ini">
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Bundle ini dijana tanpa repo <code className="font-mono text-xs">argus</code>{' '}
+          di sebelahnya, jadi tiada data LinkedIn untuk ditunjukkan. Jalankan
+          semula penjana dengan kedua-dua laluan:{' '}
+          <code className="font-mono text-xs">
+            python3 scripts/sync-hermes.py ../malaysian-regulatory-affairs ../argus
+          </code>.
+        </p>
+      </Panel>
+    );
+  }
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Tile label="Sudah keluar" value={argus.posted.length}
+          tone={argus.posted.length ? 'good' : 'mute'} pill="LinkedIn"
+          foot="Pemerhatian regulatori yang sudah diterbitkan." />
+        <Tile label="Menunggu kelulusan" value={argus.pending}
+          tone={argus.pending ? 'warn' : 'good'}
+          pill={argus.pending ? 'perlu tindakan' : 'bersih'}
+          foot="Kiraan sahaja — draf yang belum diluluskan tidak diterbitkan di sini." />
+        <Tile label="Diluluskan, beratur" value={argus.approved}
+          tone={argus.approved ? 'good' : 'mute'} pill="beratur"
+          foot="Sudah diluluskan dan bertarikh ke hadapan." />
+      </div>
+
+      <Panel title="Diterbitkan ke LinkedIn"
+        hint="Terbaharu dahulu. Setiap baris menghala ke post sebenar.">
+        {argus.posted.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Belum ada yang keluar.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {argus.posted.map((r) => (
+              <li key={r.date} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="font-mono text-[13px] tabular-nums">{r.date}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {r.posted_at
+                    ? new Date(r.posted_at).toLocaleString('ms-MY')
+                    : '—'}
+                </span>
+                {r.url ? (
+                  <a href={r.url} target="_blank" rel="noopener noreferrer"
+                    className="shrink-0 text-[13px] underline underline-offset-2
+                      hover:text-foreground">Buka</a>
+                ) : (
+                  <span className="shrink-0 text-xs text-muted-foreground">tiada pautan</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------- ikhtisar */
@@ -258,55 +381,53 @@ function Sidebar({ here, go, onClose }: {
     overview: '', timeline: hermes.posts.length,
     published: c.posted ?? 0, media: hermes.posts.filter((p) => p.thumb).length,
     schedule: hermes.slots.length, channels: hermes.channels.length,
-    sources: hermes.sources.length,
+    sources: hermes.sources.length, linkedin: argus.posted.length,
   };
+
+  const groups: NavGroupData[] = GROUPS.map((g) => ({
+    heading: g,
+    items: PAGES.filter((p) => p.group === g).map((p) => ({
+      id: p.id, title: p.t, icon: ICON[p.id],
+      badge: n[p.id] === '' ? undefined : n[p.id],
+    })),
+  })).filter((g) => g.items.length);
+
   return (
-    <nav className="flex h-full flex-col gap-1 overflow-y-auto bg-sidebar p-3">
-      <div className="flex items-center gap-2.5 px-2 pb-4">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary
-          font-mono text-[11px] font-semibold text-primary-foreground">ws</span>
-        <span className="min-w-0">
-          <b className="block truncate text-[13.5px] leading-tight">{hermes.brand.name}</b>
-          <span className="text-[11px] text-muted-foreground">Command Centre</span>
-        </span>
-      </div>
-      {GROUPS.map((g) => (
-        <div key={g}>
-          <p className="px-2 pb-1 pt-3 text-[10px] font-semibold uppercase
-            tracking-[.11em] text-muted-foreground">{g}</p>
-          {PAGES.filter((p) => p.group === g).map((p) => (
-            <a key={p.id} href={`#/${p.id}`}
-              onClick={() => { go(p.id); onClose?.(); }}
-              className={cn('flex items-center justify-between gap-2 rounded-md px-2',
-                'py-1.5 text-[13px] transition-colors',
-                p.id === here ? 'bg-primary text-primary-foreground'
-                              : 'hover:bg-secondary')}>
-              <span className="truncate">{p.t}</span>
-              {n[p.id] !== '' && (
-                <span className={cn('shrink-0 text-[11px] tabular-nums',
-                  p.id === here ? 'opacity-80' : 'text-muted-foreground')}>
-                  {n[p.id]}
-                </span>
-              )}
-            </a>
+    <SidebarNav
+      className="w-full border-none bg-sidebar"
+      activeId={here}
+      onSelect={(id) => { go(id as PageId); onClose?.(); }}
+      groups={groups}
+      header={
+        <div className="flex items-center gap-2.5 px-2 pb-4 pt-1">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[6px]
+            bg-primary font-mono text-[11px] font-semibold text-primary-foreground
+            shadow-sm">ws</span>
+          <span className="min-w-0">
+            <b className="block truncate text-[13px] leading-none">
+              {hermes.brand.name}</b>
+            <span className="text-[11px] leading-none text-muted-foreground">
+              Command Centre</span>
+          </span>
+        </div>
+      }
+      footer={
+        <div className="space-y-1">
+          <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase
+            tracking-[.11em] text-muted-foreground/60">Saluran</p>
+          {chStatus().map((ch) => (
+            <div key={ch.label} className="flex items-center justify-between gap-2
+              px-2.5 py-1 text-xs">
+              <span className="truncate text-muted-foreground">{ch.label}</span>
+              <span className={cn('shrink-0 font-medium',
+                ch.connected ? 'text-good' : 'text-crit')}>
+                {ch.connected ? 'hidup' : 'mati'}
+              </span>
+            </div>
           ))}
         </div>
-      ))}
-      <div className="mt-auto space-y-1 pt-4">
-        <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[.11em]
-          text-muted-foreground">Saluran</p>
-        {hermes.channels.map((ch) => (
-          <div key={ch.key} className="flex items-center justify-between gap-2 px-2
-            py-1 text-xs">
-            <span className="truncate text-muted-foreground">{ch.label}</span>
-            <span className={cn('shrink-0 font-medium',
-              ch.connected ? 'text-good' : 'text-crit')}>
-              {ch.connected ? 'hidup' : 'mati'}
-            </span>
-          </div>
-        ))}
-      </div>
-    </nav>
+      }
+    />
   );
 }
 
@@ -359,6 +480,7 @@ export default function Shell() {
     schedule: <div className="space-y-5"><RotationStrip /><CreditMeter /></div>,
     channels: <Channels />,
     sources: <Sources />,
+    linkedin: <LinkedInPage />,
   }[here];
 
   return (
@@ -390,7 +512,7 @@ export default function Shell() {
                 hover:bg-secondary lg:hidden">&#9776;</button>
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-semibold uppercase tracking-[.11em]
-                  text-muted-foreground">{hermes.brand.name} · Hermes</p>
+                  text-muted-foreground">{hermes.brand.name} · {page.agent}</p>
                 <h1 className="truncate text-xl font-semibold tracking-tight
                   sm:text-2xl">{page.t}</h1>
               </div>

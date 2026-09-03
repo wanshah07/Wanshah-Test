@@ -1,33 +1,21 @@
 import React, { useState } from 'react';
-import {
-  Search,
-  LayoutDashboard,
-  FolderKanban,
-  Users,
-  Settings,
-  LogOut,
-  Hash,
-  ChevronDown,
-  ChevronRight,
-  Inbox,
-  Calendar,
-  Activity,
-  CreditCard,
-  Globe,
-  Terminal,
-  Blocks,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
-/* Sidebar nav 21st.dev — komponen tulen, tiada kebergantungan pada
- * data Hermes. Pratonton penuh (cangkerang + palet arahan) duduk dalam
- * src/components/demo/dashboard-sidebar-demo.tsx, bukan di sini.
+/* Sidebar nav 21st.dev — komponen tulen, tiada kebergantungan pada data
+ * Hermes atau Argus. Nav sebenar dipasang dalam components/hermes/Shell.tsx.
  *
- * KENAPA `groups` DAN `bottomItems` IALAH PROP.
- * Sumber asal menanam senarai mock terus di dalam SibarNav, jadi
- * komponen itu hanya boleh melukis satu menu: Acme Corp, Projects,
- * Team. Mock kekal sebagai LALAI supaya <SidebarNav /> kosong masih
- * melukis sesuatu, tetapi data sebenar kini boleh dihantar masuk
- * tanpa menyunting fail ini.
+ * SEMUA DATA MASUK MELALUI PROP, TIADA LALAI MOCK.
+ * Sumber asal menanam senarai mock (Acme Corp, Projects, Team) terus di
+ * dalam SidebarNav, jadi komponen itu hanya boleh melukis satu menu. Mock
+ * itu sempat menjadi lalai; ia dibuang sepenuhnya apabila nav sebenar
+ * dipasang. Lalai mock pada komponen yang kini memegang navigasi sebenar
+ * bermakna satu prop yang tersilap nama melukis "Acme Corp" pada URL awam
+ * dan kelihatan seperti reka bentuk, bukan pepijat.
+ *
+ * `header` dan `footer` menggantikan blok atas dan bawah. Blok atas asal
+ * ialah penukar workspace SaaS — ws.regulab tiada workspace, ia ada satu
+ * jenama. Blok bawah asal ialah Settings / Log out — tapak ini statik dan
+ * tiada log masuk, jadi ruang itu membawa status saluran.
  */
 
 export type NavItemData = {
@@ -43,64 +31,6 @@ export type NavGroupData = {
   heading?: string;
   items: NavItemData[];
 };
-
-export const mockNavGroups: NavGroupData[] = [
-  {
-    items: [
-      { id: 'search', title: 'Search', icon: Search, shortcut: '⌘K' },
-      { id: 'home', title: 'Home', icon: LayoutDashboard },
-      { id: 'inbox', title: 'Inbox', icon: Inbox, badge: 12 },
-      { id: 'analytics', title: 'Analytics', icon: Activity },
-    ],
-  },
-  {
-    heading: 'Workspace',
-    items: [
-      {
-        id: 'projects',
-        title: 'Projects',
-        icon: FolderKanban,
-        children: [
-          { id: 'p-active', title: 'Active', icon: Hash },
-          { id: 'p-archived', title: 'Archived', icon: Hash },
-        ],
-      },
-      { id: 'calendar', title: 'Calendar', icon: Calendar },
-      {
-        id: 'team',
-        title: 'Team',
-        icon: Users,
-        children: [
-          { id: 't-design', title: 'Designers', icon: Hash },
-          { id: 't-eng', title: 'Engineering', icon: Hash },
-          { id: 't-product', title: 'Product', icon: Hash },
-        ],
-      },
-      {
-        id: 'customers',
-        title: 'Customers',
-        icon: Globe,
-        children: [
-          { id: 'c-enterprise', title: 'Enterprise', icon: Hash },
-          { id: 'c-smb', title: 'SMB', icon: Hash },
-        ],
-      },
-      { id: 'finance', title: 'Finance', icon: CreditCard },
-    ],
-  },
-  {
-    heading: 'Developers',
-    items: [
-      { id: 'api', title: 'API Keys', icon: Terminal },
-      { id: 'webhooks', title: 'Webhooks', icon: Blocks },
-    ],
-  },
-];
-
-export const mockBottomItems: NavItemData[] = [
-  { id: 'settings', title: 'Settings', icon: Settings, shortcut: '⌘,' },
-  { id: 'logout', title: 'Log out', icon: LogOut },
-];
 
 /* Meratakan pokok nav supaya pemanggil boleh mencari tajuk daripada id
  * (breadcrumb, tajuk halaman) tanpa menulis semula rekursi itu. */
@@ -282,18 +212,22 @@ export function SidebarNav({
   onSelect,
   activeWorkspace,
   onWorkspaceSelect,
-  groups = mockNavGroups,
-  bottomItems = mockBottomItems,
+  groups,
+  bottomItems,
+  header,
+  footer,
 }: {
   className?: string;
   activeId?: string;
   onSelect?: (id: string) => void;
   activeWorkspace?: string;
   onWorkspaceSelect?: (ws: string) => void;
-  groups?: NavGroupData[];
+  groups: NavGroupData[];
   bottomItems?: NavItemData[];
+  header?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
-  const [internalId, setInternalId] = useState('home');
+  const [internalId, setInternalId] = useState(groups[0]?.items[0]?.id ?? '');
   const currentId = activeId !== undefined ? activeId : internalId;
   const handleSelect = onSelect || setInternalId;
 
@@ -301,7 +235,9 @@ export function SidebarNav({
     <div
       className={`flex flex-col w-[260px] h-full bg-card/50 border-r border-border/50 p-3 font-sans ${className}`}
     >
-      <WorkspaceSwitcher selected={activeWorkspace} onSelect={onWorkspaceSelect} />
+      {header ?? (
+        <WorkspaceSwitcher selected={activeWorkspace} onSelect={onWorkspaceSelect} />
+      )}
 
       <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col gap-4 mt-2">
         {groups.map((group, idx) => (
@@ -318,11 +254,14 @@ export function SidebarNav({
         ))}
       </div>
 
-      <div className="mt-auto pt-4 border-t border-border/50 flex flex-col gap-0.5">
-        {bottomItems.map((item) => (
-          <NavItem key={item.id} item={item} activeId={currentId} onSelect={handleSelect} />
-        ))}
-      </div>
+      {(footer || bottomItems?.length) && (
+        <div className="mt-auto pt-4 border-t border-border/50 flex flex-col gap-0.5">
+          {footer ??
+            bottomItems!.map((item) => (
+              <NavItem key={item.id} item={item} activeId={currentId} onSelect={handleSelect} />
+            ))}
+        </div>
+      )}
     </div>
   );
 }

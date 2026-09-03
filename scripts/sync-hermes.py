@@ -5,7 +5,7 @@ The dashboard is a static site: it cannot read the Hermes repo at runtime,
 and that repo is private anyway. So the state is snapshotted into the
 bundle at build time by this script.
 
-    python3 scripts/sync-hermes.py ../malaysian-regulatory-affairs
+    python3 scripts/sync-hermes.py ../malaysian-regulatory-affairs [../argus]
 
 Written in Python rather than Node because the Hermes configs are YAML and
 this repo has no YAML dependency — adding one to ship a maintenance script
@@ -178,6 +178,85 @@ def post_links(m: dict) -> list[dict]:
         add(key, url if isinstance(url, str) else "")
     return out
 
+ARGUS = pathlib.Path(sys.argv[2] if len(sys.argv) > 2
+                     else "../argus").expanduser().resolve()
+
+# Empat medan. Bukan "semua kecuali badan" — SENARAI PUTIH, kerana
+# front-matter Argus tumbuh setiap larian dan senarai hitam yang
+# ketinggalan satu larian menerbitkan medan yang tiada siapa semak.
+ARGUS_FIELDS = ("date", "status", "posted_at", "post_url")
+
+# Front-matter ialah blok di ANTARA dua baris yang mengandungi `---` dan
+# tiada apa-apa lagi. Versi pertama fungsi ini memisahkan fail pada
+# mana-mana `---`, dan itu memotong front-matter separuh jalan setiap kali
+# satu nota mengandungi sempang panjang — lima daripada lapan draf gagal
+# dihurai, `continue` menelan ralatnya, dan blok yang terhasil kelihatan
+# sah sedangkan ia kehilangan dua pertiga barisnya.
+FRONT = re.compile(r"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
+
+
+def argus_blok() -> dict:
+    """Metadata LinkedIn Argus — post yang SUDAH keluar, dan kiraan sahaja.
+
+    KENAPA BARIS UNTUK POST YANG SUDAH KELUAR, TETAPI KIRAAN SAHAJA
+    UNTUK YANG BELUM. Post yang sudah keluar sudah awam: sesiapa boleh
+    membuka permalink LinkedIn itu. Draf yang menunggu kelulusan ialah
+    kerja yang belum ditandatangani sesiapa, dan "unapproved drafts" ada
+    dalam senarai never-publishable dalam CLAUDE.md. Jadi bilangan yang
+    beratur boleh keluar; tarikh dan tajuknya tidak.
+
+    BADAN TIDAK PERNAH DIBACA. Badan draf Argus ialah teks caption
+    LinkedIn — never-publishable, tanpa pengecualian. Penghurai ini
+    berhenti pada `---` penutup dan tidak pernah melihat baris selepasnya.
+
+    Repo argus ialah repo KETIGA. Ia mungkin tiada di sebelah dua yang
+    lain pada mesin sesiapa, jadi ketiadaannya menghasilkan blok kosong
+    dengan available:false — bukan ralat, dan bukan juga blok yang
+    kelihatan sah sedangkan ia kosong kerana laluan salah.
+    """
+    drafts = ARGUS / "drafts"
+    if not drafts.is_dir():
+        return {"available": False, "posted": [], "pending": 0, "approved": 0,
+                "channel": {"label": "LinkedIn", "connected": False}}
+
+    rows, pending, approved, degil = [], 0, 0, []
+    for f in sorted(drafts.glob("*.md")):
+        head = FRONT.match(f.read_text(encoding="utf-8"))
+        if not head:
+            degil.append(f.name)
+            continue
+        try:
+            m = yaml.safe_load(head.group(1)) or {}
+        except yaml.YAMLError:
+            degil.append(f.name)
+            continue
+        m = {k: m.get(k) for k in ARGUS_FIELDS}
+        status = m.get("status")
+        if status == "posted":
+            url = m.get("post_url") or ""
+            rows.append({"date": str(m.get("date") or f.stem),
+                         "posted_at": m.get("posted_at") or None,
+                         "url": url if str(url).startswith("http") else ""})
+        elif status == "ready_for_approval":
+            pending += 1
+        elif status == "approved":
+            approved += 1
+
+    # Draf yang tidak boleh dihurai DILAPORKAN, tidak ditelan. Kegagalan
+    # senyap di sinilah yang menyembunyikan pepijat pertama fungsi ini.
+    if degil:
+        print(f"  AMARAN argus: {len(degil)} draf tanpa front-matter yang "
+              f"boleh dihurai — {', '.join(degil)}", file=sys.stderr)
+
+    rows.sort(key=lambda r: r["date"], reverse=True)
+    return {"available": True, "posted": rows, "pending": pending,
+            "approved": approved,
+            # Disambung kerana ada bukti, bukan kerana fail berkata begitu:
+            # satu permalink LinkedIn sebenar ialah bukti laluan itu hidup.
+            "channel": {"label": "LinkedIn",
+                        "connected": any(r["url"] for r in rows)}}
+
+
 def collect_posts() -> list[dict]:
     import shutil
     posts = []
@@ -303,6 +382,7 @@ out = {
     ],
     "today_draft": redact(draft),
     "posts": posts,
+    "argus": argus_blok(),
     "ledger": redact(ledger["entries"][-30:]),
 }
 

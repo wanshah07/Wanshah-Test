@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-02T16:30:35+00:00",
+  "generated_at": "2026-09-03T01:06:50+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -631,6 +631,32 @@
       ]
     }
   ],
+  "argus": {
+    "available": true,
+    "posted": [
+      {
+        "date": "2026-09-02",
+        "posted_at": "2026-09-02T21:41:29+08:00",
+        "url": "https://www.linkedin.com/feed/update/urn:li:share:7500910735863009280/"
+      },
+      {
+        "date": "2026-09-01",
+        "posted_at": "2026-09-01T21:41:23+08:00",
+        "url": "https://www.linkedin.com/feed/update/urn:li:share:7500548456717955072/"
+      },
+      {
+        "date": "2026-08-31",
+        "posted_at": "2026-08-31T23:24:40+08:00",
+        "url": "https://www.linkedin.com/feed/update/urn:li:share:7500211921187504128/"
+      }
+    ],
+    "pending": 4,
+    "approved": 1,
+    "channel": {
+      "label": "LinkedIn",
+      "connected": true
+    }
+  },
   "ledger": [
     {
       "date": "2026-08-29",
