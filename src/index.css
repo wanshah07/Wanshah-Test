@@ -193,3 +193,28 @@
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------
+   Radix dialog enter/exit.
+
+   The upstream component used tailwindcss-animate utilities
+   (animate-in, fade-out-0, zoom-in-95, slide-in-from-top-[48%]).
+   That package is not a dependency here, so Tailwind emitted no rule
+   for any of them and the dialog appeared and vanished with no
+   transition. These two keyframes replace the whole set, keyed off
+   Radix's own data-state attribute.
+   --------------------------------------------------------------- */
+@keyframes dlg-overlay-in  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes dlg-content-in  {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(0.95) }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+}
+
+.dlg-overlay[data-state="open"]  { animation: dlg-overlay-in 200ms ease-out }
+.dlg-overlay[data-state="closed"]{ animation: dlg-overlay-in 200ms ease-in reverse }
+.dlg-content[data-state="open"]  { animation: dlg-content-in 200ms ease-out }
+.dlg-content[data-state="closed"]{ animation: dlg-content-in 200ms ease-in reverse }
+
+@media (prefers-reduced-motion: reduce) {
+  .dlg-overlay[data-state], .dlg-content[data-state] { animation: none }
+}
