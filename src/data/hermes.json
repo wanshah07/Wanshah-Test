@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-03T01:06:50+00:00",
+  "generated_at": "2026-09-03T14:28:53+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -24,8 +24,8 @@
     "rehat": false
   },
   "budget": {
-    "plan": "Starter",
-    "monthly_credits": 5000,
+    "plan": "Free",
+    "monthly_credits": 300,
     "cost_per_image": 10,
     "model": "flux-2-klein",
     "spent_this_month": 0,
@@ -33,15 +33,15 @@
     "image_days_per_cycle": 6,
     "projected_monthly": 0,
     "visual_default": "rajah",
-    "headroom": 5000,
-    "halt_below": 300,
-    "warn_below": 800
+    "headroom": 300,
+    "halt_below": 30,
+    "warn_below": 80
   },
   "video": {
     "enabled": false,
-    "reason": "Kos bukan lagi penghalang — 300 kredit ialah 6% daripada bulan 5000 Starter, iaitu enam belas klip. Yang menahannya: tiada apa dalam talian ini yang menghasilkan video, dan tiada saluran Hermes yang memerlukannya. TikTok memerlukannya dan TikTok tiada laluan.",
+    "reason": "Satu klip 480p 5 saat memakan 300 kredit — seluruh kuota bulanan Free. Hidupkan hanya selepas naik taraf pelan BudgetPixel.",
     "cheapest_clip_credits": 300,
-    "months_per_clip": 0.06
+    "months_per_clip": 1.0
   },
   "slots": [
     {
@@ -306,9 +306,59 @@
       ],
       "tindakan": "publish-cards.py akan menjananya semula dan mengesahkannya sebelum penyiaran, seperti setiap post lain."
     },
+    "penghantaran": {
+      "threads": {
+        "keputusan": "berjaya",
+        "laluan": "Buffer MCP create_post, resipi_autopost",
+        "buffer_post_id": "6a997ac5ec6a0aa20e1cb420",
+        "status_buffer": "scheduled",
+        "mode": "addToQueue",
+        "saveToDraft": false,
+        "schedulingType": "automatic",
+        "dihantar_pada": "2026-09-03 21:48 MYT",
+        "slot_giliran": "2026-09-04 09:41 MYT"
+      },
+      "instagram": {
+        "keputusan": "disekat",
+        "disekat_pada": "langkah publish-cards.py, sebelum Zapier dipanggil",
+        "sebab": "Kad tiada URL awam. publish-cards.py gagal push ke wanshah07/Wanshah-Test: proxy git menolak dengan 403 kerana repo itu bukan dalam set repo dibenarkan sesi ini.",
+        "bukan_sebabnya": "BUKAN kebenaran Zapier atau saluran sosial. Zapier tidak pernah dipanggil.",
+        "diperlukan_dari_wan": "Tambah wanshah07/Wanshah-Test ke sources persekitaran Routine (akses push). Tool add_repo tidak wujud dalam sesi ini, jadi larian tidak boleh membetulkannya sendiri.",
+        "pada": "2026-09-03 21:47 MYT"
+      },
+      "facebook_page": {
+        "keputusan": "disekat",
+        "disekat_pada": "langkah publish-cards.py, sebelum Zapier dipanggil",
+        "sebab": "Kad tiada URL awam. publish-cards.py gagal push ke wanshah07/Wanshah-Test: proxy git menolak dengan 403 kerana repo itu bukan dalam set repo dibenarkan sesi ini.",
+        "bukan_sebabnya": "BUKAN kebenaran Zapier atau saluran sosial. Zapier tidak pernah dipanggil.",
+        "diperlukan_dari_wan": "Tambah wanshah07/Wanshah-Test ke sources persekitaran Routine (akses push). Tool add_repo tidak wujud dalam sesi ini, jadi larian tidak boleh membetulkannya sendiri.",
+        "pada": "2026-09-03 21:47 MYT"
+      }
+    },
     "verify_markers": []
   },
   "posts": [
+    {
+      "date": "2026-09-12",
+      "day_index": null,
+      "domain": "kajian_kes",
+      "pillar": "kajian_kes",
+      "angle": "Satu sapuan bukan satu dos — nombor SPF datang dari satu keadaan ujian, dan apa yang jenama boleh/tak boleh cetak",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "citation": "Kolum G matrix: SPF substantiation ISO 24444 @ 2 mg/cm²; NPRA Annex I Part 8 (claims), Annex VII (UV filters). Amaran wajib sunscreen: Annex I Part 9(i).",
+      "credits_spent": 0,
+      "cards": 5,
+      "thumb": "media/preview/2026-09-12/card-1.png",
+      "channels": {
+        "instagram": 1397,
+        "facebook_page": 707,
+        "threads": 452
+      },
+      "posted_at": null,
+      "posted_to": [],
+      "links": []
+    },
     {
       "date": "2026-09-11",
       "day_index": null,
@@ -632,29 +682,13 @@
     }
   ],
   "argus": {
-    "available": true,
-    "posted": [
-      {
-        "date": "2026-09-02",
-        "posted_at": "2026-09-02T21:41:29+08:00",
-        "url": "https://www.linkedin.com/feed/update/urn:li:share:7500910735863009280/"
-      },
-      {
-        "date": "2026-09-01",
-        "posted_at": "2026-09-01T21:41:23+08:00",
-        "url": "https://www.linkedin.com/feed/update/urn:li:share:7500548456717955072/"
-      },
-      {
-        "date": "2026-08-31",
-        "posted_at": "2026-08-31T23:24:40+08:00",
-        "url": "https://www.linkedin.com/feed/update/urn:li:share:7500211921187504128/"
-      }
-    ],
-    "pending": 4,
-    "approved": 1,
+    "available": false,
+    "posted": [],
+    "pending": 0,
+    "approved": 0,
     "channel": {
       "label": "LinkedIn",
-      "connected": true
+      "connected": false
     }
   },
   "ledger": [
@@ -905,6 +939,21 @@
       "credits_spent": 0,
       "visual": "D11 dyk — Did You Know",
       "citation": "",
+      "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-12",
+      "hari": "Sabtu",
+      "brand": "wsregulab",
+      "domain": "kajian_kes",
+      "pillar": "kajian_kes",
+      "angle": "Satu sapuan bukan satu dos — nombor SPF dari satu keadaan ujian; apa yang jenama boleh/tak boleh cetak",
+      "format": "carousel",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "matrix_baris": 2,
+      "visual": "D1 solid + D2 light + D3 inkbg + D4 banner + D2 light — 5 kad",
+      "citation": "Kolum G matrix: ISO 24444 @ 2 mg/cm²; NPRA Annex I Part 8, Annex VII; amaran wajib Annex I Part 9(i)",
       "bahasa": "campur BM + English"
     }
   ]
