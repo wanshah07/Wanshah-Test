@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import HoverRevealCards, { type CardItem } from '@/components/ui/cards';
 
 // Unsplash URLs, cleaned: the upstream strings carried a second "?" and a
@@ -34,10 +36,35 @@ const demoItems: CardItem[] = [
   },
 ];
 
+// Same four, as links. An href turns each card into an anchor, so middle-click
+// and "copy link address" work the way people expect them to.
+const linkItems: CardItem[] = demoItems.map((item) => ({
+  ...item,
+  href: `https://unsplash.com/s/photos/${encodeURIComponent(item.subtitle)}`,
+  target: '_blank',
+}));
+
 const HoverRevealCardsDemo = () => {
+  const [picked, setPicked] = useState<CardItem | null>(null);
+
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-      <HoverRevealCards items={demoItems} />
+    <div className="flex w-full flex-col items-center gap-10 bg-background p-4 py-10">
+      <section className="flex w-full flex-col items-center gap-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Buttons — onSelect fires on click, Enter and Space
+        </h2>
+        <HoverRevealCards items={demoItems} onSelect={setPicked} />
+        <p className="min-h-5 text-sm text-muted-foreground" aria-live="polite">
+          {picked ? `Picked: ${picked.title} (${picked.subtitle})` : 'Nothing picked yet.'}
+        </p>
+      </section>
+
+      <section className="flex w-full flex-col items-center gap-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Links — each card carries an href
+        </h2>
+        <HoverRevealCards items={linkItems} />
+      </section>
     </div>
   );
 };
