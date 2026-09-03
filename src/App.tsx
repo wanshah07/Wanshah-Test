@@ -1,8 +1,7 @@
 import Shell from '@/components/hermes/Shell';
 import SaasTemplate from '@/components/ui/saa-s-template';
-import SidebarNavPreview from '@/components/demo/dashboard-sidebar-demo';
 
-/* Tiga paparan, dipilih oleh ?view=.
+/* Dua paparan, dipilih oleh ?view=.
  *
  * Landing kini muka depan (keputusan Wan, 2026-09-02). Dashboard Hermes
  * TIDAK dibuang — ia berpindah ke ?view=dashboard, dan pautan itu masih
@@ -18,8 +17,5 @@ const view = new URLSearchParams(location.search).get('view');
 
 export default function App() {
   if (view === 'dashboard') return <Shell />;
-  /* Pratonton komponen, bukan halaman produk. Ia membawa data mock
-     (Acme Corp, Projects, Team) dan tidak disambung kepada apa-apa. */
-  if (view === 'sidebar') return <SidebarNavPreview />;
   return <SaasTemplate />;
 }
