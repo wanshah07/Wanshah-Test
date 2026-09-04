@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-03T14:49:20+00:00",
+  "generated_at": "2026-09-04T14:00:42+00:00",
   "brand": {
     "key": "wsregulab",
     "name": "ws.regulab",
@@ -18,9 +18,9 @@
     "timezone": "Asia/Kuala_Lumpur"
   },
   "cycle": {
-    "today": "2026-09-03",
-    "hari": "Khamis",
-    "domain": "farmaseutikal",
+    "today": "2026-09-04",
+    "hari": "Jumaat",
+    "domain": "fatwa",
     "rehat": false
   },
   "budget": {
@@ -82,7 +82,7 @@
       "format": "text_image",
       "rehat": false,
       "amaran": "",
-      "today": true
+      "today": false
     },
     {
       "dow": 5,
@@ -92,7 +92,7 @@
       "format": "carousel",
       "rehat": false,
       "amaran": "",
-      "today": false
+      "today": true
     },
     {
       "dow": 6,
@@ -253,97 +253,91 @@
     }
   ],
   "today_draft": {
-    "date": "2026-09-03",
+    "date": "2026-09-04",
+    "hari": "Jumaat",
     "brand": "wsregulab",
-    "domain": "farmaseutikal",
-    "pillar": "mitos",
-    "angle": "Tiada sijil pendaftaran sejak 2006 — nombor MAL itulah buktinya",
+    "domain": "fatwa",
+    "pillar": "soal_jawab",
+    "angle": "Sumber etanol yang menentukan hukum, dan bukti yang RA kena simpan",
     "format": "carousel",
     "status": "approved",
     "credits_spent": 0,
     "bahasa": "campur BM + English",
+    "varian_ganti": 1,
+    "sumber_matrix": {
+      "fail": "Matriks_Fatwa_Malaysia_Halal_Kosmetik_Makanan_Farmaseutikal.xlsx",
+      "baris": 1,
+      "tajuk": "Alkohol Menurut Pandangan Islam",
+      "kategori": "Halal (Umum)",
+      "status_hukum": "Harus (bersyarat)",
+      "kolum": "D, E, F, G, H, I, J, K, L, M, N"
+    },
     "gates": {
-      "claims": "pass — tidak berkenaan, bukan salinan iklan kosmetik, tiada produk atau dakwaan disebut",
-      "halal": "pass — tiada dakwaan halal, domain farmaseutikal",
-      "credibility": "pass — tiada janji kelulusan, tiada bayangan hubungan NPRA",
-      "tone": "pass dengan nota — disemak terhadap corak AI secara terus, skill stop-slop tidak dipanggil",
-      "facts": "pass — setiap angka dari facts.yml/farmaseutikal, sumber DRGD Julai 2026"
+      "claims": "pass — tidak berkenaan. Ulasan fatwa, bukan iklan produk; tiada jenama atau produk dinamakan",
+      "halal": "pass — ini POST tentang fatwa halal, bukan dakwaan halal terhadap produk",
+      "credibility": "pass — tiada tafsiran sendiri. Post menerangkan keputusan yang sudah dibuat dan menamakan badan serta tarikhnya",
+      "tone": "pass dengan nota — disemak terus",
+      "facts": "pass — setiap kenyataan dari kolum D, E, F, G, H, I matrix. Amaran pewartaan negeri disertakan sebagai kad sendiri"
     },
     "channels": {
-      "instagram": 1374,
-      "facebook_page": 636,
-      "threads": 314
+      "instagram": 1474,
+      "facebook_page": 956
     },
     "posted_at": null,
-    "citation": "DRGD 3rd Edition, 12th Revision, Julai 2026, Seksyen 11.2, 11.3, 18",
-    "nota_threads": "Threads dimatikan 2026-08-29. Post ini keluar ke Facebook dan Instagram sahaja pada 31 Ogos.",
-    "diluluskan_pada": "2026-08-29T15:45Z",
-    "nota_giliran": "Diluluskan awal dan disimpan. Routine 31 Ogos 9.45 malam akan menghantarnya.",
-    "hantar": {
-      "ujian_threads_2026_08_29T16:06Z": {
-        "keputusan": "gagal",
-        "sambungan": "65851493 — dicipta 15:58Z dari URL bersih tanpa connectionId",
-        "ralat": "user id or long lived token not found in metadata"
-      }
+    "citation": "Muzakarah Jawatankuasa Fatwa Majlis Kebangsaan Bagi Hal Ehwal Ugama Islam Malaysia (MKI) Kali Ke-7, 11–12 April 1984",
+    "approved_at": "2026-08-30 19:26",
+    "dikemas_kini": {
+      "pada": "2026-08-30",
+      "sebab": "Pas bahasa yang sama seperti 5 Sep. Caption IG 1,887 aksara ialah yang terpanjang dalam bekas draf, dan itu tepat kecacatan yang Wan namakan.",
+      "apa_berubah": [
+        "IG 1,887 -> 1,474",
+        "FB 1,116 -> 956",
+        "Varian 2 IG 1,514 -> 989",
+        "Ayat memo dipendekkan; kandungan dan rujukan tidak berubah"
+      ],
+      "diluluskan_semula": "2026-08-30 19:26"
     },
-    "varian_ganti": 1,
-    "hari": "Khamis",
-    "dipindah": "2026-08-31 -> 2026-09-03; jadual bertukar kepada hari-dalam-minggu 2026-08-31",
-    "approved_at": "2026-09-01 23:26",
+    "fingerprint_nota": "Ditambah 2026-09-01. Kelulusan disilang-semak dengan blok decisions dashboard dan disahkan datang SELEPAS kandungan semasa masuk.",
     "penghantaran": {
-      "threads": {
-        "keputusan": "berjaya",
-        "laluan": "Buffer MCP create_post, resipi_autopost",
-        "buffer_post_id": "6a997ac5ec6a0aa20e1cb420",
-        "status_buffer": "scheduled",
-        "mode": "addToQueue",
-        "saveToDraft": false,
-        "schedulingType": "automatic",
-        "dihantar_pada": "2026-09-03 21:48 MYT",
-        "slot_giliran": "2026-09-04 09:41 MYT"
-      },
+      "cubaan": "2026-09-04 21:50 MYT",
+      "hasil": "GAGAL SEMUA TIGA SALURAN — tiada apa-apa keluar",
       "instagram": {
-        "keputusan": "disekat",
-        "disekat_pada": "langkah publish-cards.py, sebelum Zapier dipanggil",
-        "sebab": "Kad tiada URL awam. publish-cards.py gagal push ke wanshah07/Wanshah-Test: proxy git menolak dengan 403 kerana repo itu bukan dalam set repo dibenarkan sesi ini.",
-        "bukan_sebabnya": "BUKAN kebenaran Zapier atau saluran sosial. Zapier tidak pernah dipanggil.",
-        "diperlukan_dari_wan": "Tambah wanshah07/Wanshah-Test ke sources persekitaran Routine (akses push). Tool add_repo tidak wujud dalam sesi ini, jadi larian tidak boleh membetulkannya sendiri.",
-        "pada": "2026-09-03 21:47 MYT"
+        "berjaya": false,
+        "sebab": "Tiada public_urls. publish-cards.py gagal: git push ke wanshah07/Wanshah-Test ditolak — 'access denied by the git proxy: wanshah07/Wanshah-Test is not in this session's authorized repository set' (HTTP 403). Repo hos di luar skop GitHub larian ini, dan tiada tool add_repo dalam sesi ini untuk melampirkannya."
       },
       "facebook_page": {
-        "keputusan": "disekat",
-        "disekat_pada": "langkah publish-cards.py, sebelum Zapier dipanggil",
-        "sebab": "Kad tiada URL awam. publish-cards.py gagal push ke wanshah07/Wanshah-Test: proxy git menolak dengan 403 kerana repo itu bukan dalam set repo dibenarkan sesi ini.",
-        "bukan_sebabnya": "BUKAN kebenaran Zapier atau saluran sosial. Zapier tidak pernah dipanggil.",
-        "diperlukan_dari_wan": "Tambah wanshah07/Wanshah-Test ke sources persekitaran Routine (akses push). Tool add_repo tidak wujud dalam sesi ini, jadi larian tidak boleh membetulkannya sendiri.",
-        "pada": "2026-09-03 21:47 MYT"
+        "berjaya": false,
+        "sebab": "Sama seperti Instagram — tiada public_urls kerana publish-cards.py tidak dapat menolak kad ke repo hos."
+      },
+      "threads": {
+        "berjaya": false,
+        "sebab": "mcp__Buffer__create_post DISEKAT PENGELAS auto mode, walaupun tindakan itu ada dalam .claude/settings.json -> permissions.allow. Berhenti di saluran itu seperti diarahkan; tiada laluan lain dicuba."
       }
-    },
-    "public_urls": [
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/28df66b971162613a0e4839efc7389a0018bb267/public/media/2026-09-03/card-1.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/28df66b971162613a0e4839efc7389a0018bb267/public/media/2026-09-03/card-2.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/28df66b971162613a0e4839efc7389a0018bb267/public/media/2026-09-03/card-3.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/28df66b971162613a0e4839efc7389a0018bb267/public/media/2026-09-03/card-4.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/28df66b971162613a0e4839efc7389a0018bb267/public/media/2026-09-03/card-5.png"
-    ],
-    "public_urls_branch": [
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/refs/heads/media/cards/public/media/2026-09-03/card-1.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/refs/heads/media/cards/public/media/2026-09-03/card-2.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/refs/heads/media/cards/public/media/2026-09-03/card-3.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/refs/heads/media/cards/public/media/2026-09-03/card-4.png",
-      "https://raw.githubusercontent.com/wanshah07/Wanshah-Test/refs/heads/media/cards/public/media/2026-09-03/card-5.png"
-    ],
-    "public_urls_commit": "28df66b971162613a0e4839efc7389a0018bb267",
-    "public_urls_sha256": {
-      "card-1.png": "0a26f1c3f0714efae1c3767871118181068dc43499ef87eaec3fc320738505cd",
-      "card-2.png": "3a738e53dec43ef03971de11fc10f05cda09974a1c59b6984a0c4686e0c02712",
-      "card-3.png": "cfb130f1379ba0c16965da1eedb48b3fb562cd226259173fbf4a178acc98b668",
-      "card-4.png": "1b2ad4ffe0169140e0346a37d3aa72fecd80cc5c24069393ed2a1e5f80bb5c61",
-      "card-5.png": "f068bd50d2bedae67685bd625540d06e65b88ebcde035c7c8a3e351678cc23f2"
     },
     "verify_markers": []
   },
   "posts": [
+    {
+      "date": "2026-09-15",
+      "day_index": null,
+      "domain": "makanan",
+      "pillar": "silap",
+      "angle": "Ramuan yang ditonjolkan menarik QUID — peratus wajib, bersebelahan ramuan itu",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "citation": "Peraturan-Peraturan Makanan 1985 (BM), kemas kini November 2024 — Per. 11(1)(eb) dan blok senarai ramuan Per. 11(1)",
+      "credits_spent": 0,
+      "cards": 3,
+      "thumb": "media/preview/2026-09-15/card-1.png",
+      "channels": {
+        "instagram": 1359,
+        "facebook_page": 907,
+        "threads": 480
+      },
+      "posted_at": null,
+      "posted_to": [],
+      "links": []
+    },
     {
       "date": "2026-09-12",
       "day_index": null,
@@ -960,6 +954,20 @@
       "matrix_baris": 2,
       "visual": "D1 solid + D2 light + D3 inkbg + D4 banner + D2 light — 5 kad",
       "citation": "Kolum G matrix: ISO 24444 @ 2 mg/cm²; NPRA Annex I Part 8, Annex VII; amaran wajib Annex I Part 9(i)",
+      "bahasa": "campur BM + English"
+    },
+    {
+      "date": "2026-09-15",
+      "hari": "Selasa",
+      "brand": "wsregulab",
+      "domain": "makanan",
+      "pillar": "silap",
+      "angle": "Ramuan yang ditonjolkan menarik QUID — peratus wajib, bersebelahan ramuan itu",
+      "format": "text_image",
+      "status": "ready_for_approval",
+      "credits_spent": 0,
+      "visual": "banner check + light table + accent rail — 3 kad",
+      "citation": "Peraturan-Peraturan Makanan 1985 (BM), kemas kini Nov 2024 — Per. 10, 11(1)(e), (ea), (eb), (g)",
       "bahasa": "campur BM + English"
     }
   ]
