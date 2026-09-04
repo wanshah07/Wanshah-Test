@@ -11,7 +11,7 @@ Written in Python rather than Node because the Hermes configs are YAML and
 this repo has no YAML dependency — adding one to ship a maintenance script
 is not worth it.
 """
-import json, sys, pathlib, datetime, re
+import json, sys, pathlib, datetime, re, subprocess
 
 try:
     import yaml
@@ -397,3 +397,15 @@ print(f"  {label} · projected {projected}/{cap} credits "
 from collections import Counter
 tally = Counter(p["status"] for p in posts)
 print(f"  {len(posts)} post · " + " · ".join(f"{k} {v}" for k, v in sorted(tally.items())))
+
+# The bundle can name a card that was never committed — a preview thumb for
+# a draft whose folder appeared after the last card push, or a permalink
+# pinned to a branch somebody has since deleted. Either renders as a broken
+# image on a public site, and `vite build` does not look: public/ is copied
+# wholesale and nothing checks that what the bundle asks for is in there.
+#
+# So the sync is not done until the references resolve. Same script CI runs.
+if subprocess.run([sys.executable,
+                   str(pathlib.Path(__file__).resolve().parent / "check-media.py"),
+                   str(dest)]).returncode != 0:
+    sys.exit("sync-hermes: bundle references media that is not committed (above)")
