@@ -1,0 +1,64 @@
+name: CI
+
+# What deploy-pages.yml does after main moves, this does before it. Until
+# now the build only ever ran on push to main as part of the deploy, so a
+# type error or a bundle pointing at a missing card was found by looking at
+# the live site. This runs the same checks while the change is still a
+# proposal.
+#
+# push: [main] as well as pull_request, deliberately. main is protected and
+# CLAUDE.md treats merging as the publishing decision, but the ruleset
+# carries a bypass list — a commit can arrive on main without ever having
+# been a pull request. Checking main directly covers that path too.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Supersede an in-flight run when the same ref is pushed again. The Pages
+# deploy must never be cancelled midway because a half-finished deploy
+# leaves the live site undefined; a cancelled CI run leaves nothing.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # scripts/check-media.py verifies raw.githubusercontent URLs that
+          # are pinned to OTHER branches (media/cards) by resolving them
+          # against the local clone. The default shallow single-branch
+          # checkout cannot see those refs, and the check would quietly
+          # downgrade itself to a warning rather than fail.
+          fetch-depth: 0
+
+      - name: Fetch branches so pinned refs resolve
+        run: git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+
+      # First, because it needs no dependencies and takes about a second.
+      # python3 is present on ubuntu-latest; this script is stdlib only, so
+      # there is nothing to install and no setup-python step.
+      - name: Check media references
+        run: python3 scripts/check-media.py
+
+      # 22, not 20 — same as deploy-pages.yml: vite.config.ts uses
+      # import.meta.dirname, which lands in Node 20.11, and the `20` label
+      # can still resolve below that.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # `tsc -b && vite build`, the same command the deploy runs, so a type
+      # error fails the pull request rather than the published site.
+      - run: npm run build
