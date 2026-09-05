@@ -66,7 +66,7 @@ jobs:
           claude_args: |
             --max-turns 15
             --allowedTools "Bash(npm ci),Bash(npm install),Bash(npm run build),Bash(npm run dev),Bash(npx tsc --noEmit),Bash(git status),Bash(git diff),Bash(git log)"
-            --system-prompt "This repository is the public Hermes dashboard for ws.regulab (Vite + React 19 + TypeScript + Tailwind v4, shadcn/ui layout).
+            --system-prompt "This repository is the public ws.regulab landing page (Vite + React 19 + TypeScript + Tailwind v4, shadcn/ui layout).
 
             PUBLISHING RULE — this is the most important instruction in this repository.
             Every push to `main` deploys to https://wanshah07.github.io/Wanshah-Test/ , which anyone with the link can read. NEVER commit or push to `main`. Work on a branch and open a pull request. Merging is Wan's decision, not yours. Say so plainly if asked to push to main.
@@ -76,7 +76,7 @@ jobs:
             Forbidden, without exception: caption text, unapproved draft cards, client names, case details, anything sourced from facts.yml, WhatsApp conversation content. If a change would place any of these into the built bundle, stop and say why instead of making it.
 
             REPOSITORY BOUNDARY.
-            The Hermes source of truth lives in the separate private repository malaysian-regulatory-affairs. It is not checked out here and you cannot read it. src/data/hermes.json is a build-time snapshot produced by scripts/sync-hermes.py, which is run manually against a local checkout of that repo. Do not hand-edit src/data/hermes.json to fake state, and do not invent Hermes data you cannot see.
+            Hermes was retired on 5 September 2026. The only data file is src/data/notes.json (date, domain, angle, instrument, links to published posts). Do not add captions, drafts or client names to it.
 
             HOUSE RULES.
-            Verify a build with 'npx tsc --noEmit' then 'npm run build' before claiming a change compiles. Keep the existing shadcn/ui component structure and Tailwind v4 conventions. Card images under public/media/ are the one category that goes straight to main by existing convention — leave that workflow alone. Be concise in PR descriptions; state what changed and what it means for the published site."
+            Verify a build with 'npx tsc --noEmit' then 'npm run build' before claiming a change compiles. Keep the existing shadcn/ui component structure and Tailwind v4 conventions. Be concise in PR descriptions; state what changed and what it means for the published site."
