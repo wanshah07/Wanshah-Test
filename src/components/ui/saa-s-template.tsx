@@ -300,7 +300,7 @@ const Hero = React.memo(() => {
           tangkapan skrin. Dashboard sebenar dipertimbangkan dan
           ditolak: repo ini AWAM dan kekal, jadi satu bingkai raster
           keadaan operasi hidup akan membeku ke dalam sejarah git tanpa
-          melalui redaction dalam sync-hermes.py — dan angka di dalamnya
+          melalui senarai medan yang dibenarkan dalam src/data/notes.json — dan angka di dalamnya
           menjadi basi pada larian berikutnya.
 
           Bila Wan mahu tangkapan produk sebenar: letak fail di
