@@ -9,11 +9,11 @@
  * keadaan operasi sahaja.
  *
  * Jadi setiap entri membawa tarikh, domain, sudut, dan instrumen yang
- * dipetik — kesemuanya sudah ada dalam bundle hari ini — dan MENGHALA
+ * dipetik — dari src/data/notes.json — dan MENGHALA
  * KELUAR ke post sebenar. Pembaca yang mahu teks penuh membacanya di
  * tempat ia diterbitkan, di mana ia juga dikira sebagai engagement.
  */
-import { hermes } from '@/lib/hermes';
+import { notes } from '@/lib/notes';
 
 const DOMAIN: Record<string, string> = {
   kosmetik: 'Kosmetik',
@@ -26,7 +26,7 @@ const DOMAIN: Record<string, string> = {
 };
 
 export default function NotaRegulatori() {
-  const posts = hermes.posts.filter((p) => p.status === 'posted');
+  const posts = notes;
 
   return (
     <section id="nota" className="border-t border-gray-800/50 px-6 py-20">
@@ -50,15 +50,6 @@ export default function NotaRegulatori() {
                 key={p.date}
                 className="flex gap-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4"
               >
-                {p.thumb && (
-                  <img
-                    src={p.thumb}
-                    alt=""
-                    aria-hidden="true"
-                    loading="lazy"
-                    className="h-20 w-20 shrink-0 rounded-md border border-gray-800 object-cover"
-                  />
-                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <time
@@ -108,7 +99,7 @@ export default function NotaRegulatori() {
         )}
 
         <p className="mt-8 text-xs" style={{ color: '#9ca3af' }}>
-          Nota baharu keluar setiap malam, 9:45 waktu Malaysia.
+          Nota baharu keluar hampir setiap hari; pautan di atas membawa ke post penuh.
         </p>
       </div>
     </section>

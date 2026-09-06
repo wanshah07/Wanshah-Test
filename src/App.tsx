@@ -1,21 +1,11 @@
-import Shell from '@/components/hermes/Shell';
 import SaasTemplate from '@/components/ui/saa-s-template';
 
-/* Dua paparan, dipilih oleh ?view=.
+/* Satu paparan sahaja sejak 5 September 2026.
  *
- * Landing kini muka depan (keputusan Wan, 2026-09-02). Dashboard Hermes
- * TIDAK dibuang — ia berpindah ke ?view=dashboard, dan pautan itu masih
- * pautan yang sama yang boleh dihantar kepada sesiapa.
- *
- * KENAPA ?view DAN BUKAN #hash. Templat itu membawa penanda dalamannya
- * sendiri: #getting-started, #components, #documentation, #new-version.
- * Dengan laluan hash, mengklik mana-mana satu daripadanya menukar hash
- * dan menukar paparan di tengah halaman. Query param tidak disentuh oleh
- * penanda itu.
+ * Dashboard Hermes (?view=dashboard) dibuang: kandungan sosial ws.regulab
+ * kini diuruskan dalam ws.regulab Studio, halaman kawalan peribadi Wan,
+ * bukan di laman awam ini. Laman ini kekal sebagai muka depan sahaja.
  */
-const view = new URLSearchParams(location.search).get('view');
-
 export default function App() {
-  if (view === 'dashboard') return <Shell />;
   return <SaasTemplate />;
 }

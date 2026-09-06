@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /* Sidebar nav 21st.dev — komponen tulen, tiada kebergantungan pada data
- * Hermes atau Argus. Nav sebenar dipasang dalam components/hermes/Shell.tsx.
+ * Hermes atau Argus. Dashboard Hermes dibuang pada 5 Sep 2026; komponen ini kekal sebagai UI generik.
  *
  * SEMUA DATA MASUK MELALUI PROP, TIADA LALAI MOCK.
  * Sumber asal menanam senarai mock (Acme Corp, Projects, Team) terus di
