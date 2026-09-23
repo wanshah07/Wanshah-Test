@@ -4,6 +4,10 @@ Read this before editing anything.
 
 ## 1. This repo is PUBLIC
 
+**Retired 23 Sep 2026**: merged into `wanshah07/malaysian-regulatory-affairs`
+(`site/`). What deploys now is `retired/`, a redirect to
+https://wanshah07.github.io/kkm-halal/. Do not rebuild a landing page here.
+
 It is served at https://wanshah07.github.io/Wanshah-Test/. Everything
 merged to `main` is world-readable, immediately and permanently. Git
 history included — a secret removed in a later commit is still in the log.

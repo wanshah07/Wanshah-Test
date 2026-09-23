@@ -1,11 +1,9 @@
 name: Deploy to GitHub Pages
 
-# Builds the Vite app and publishes dist/ to GitHub Pages at
+# Publishes the retirement redirect in retired/ to GitHub Pages at
 # https://wanshah07.github.io/Wanshah-Test/
 #
-# vite.config.ts sets `base: './'`, so every asset is referenced
-# relatively and the same build works from that sub-path as well as from
-# a domain root — nothing here needs to know the repository name.
+# The redirect uses an absolute address, so it works from any path.
 
 on:
   push:
@@ -29,33 +27,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 22, not 20: vite.config.ts uses import.meta.dirname, which lands
-      # in Node 20.11 — the `20` label can still resolve below that.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - run: npm ci
-
-      # Runs `tsc -b` first, so a type error fails the deploy rather than
-      # publishing a build that never type-checked.
-      - run: npm run build
-
-      # No actions/configure-pages step here, deliberately. Its only jobs
-      # are to switch Pages on and to hand the build a base path, and
-      # neither applies: creating a Pages site needs admin rights on the
-      # repository, which the workflow's built-in GITHUB_TOKEN does not
-      # carry (tried once, run 1: "Create Pages site failed. Error:
-      # Resource not accessible by integration"), and `base: './'` in
-      # vite.config.ts means the build never needs to know its path.
+      # RETIRED 23 Sep 2026. This landing page was merged into
+      # wanshah07/malaysian-regulatory-affairs (site/), which publishes the
+      # one consultancy page at https://wanshah07.github.io/kkm-halal/.
       #
-      # So Pages is switched on by hand, once, in Settings > Pages >
-      # Source: GitHub Actions. After that every push to main deploys
-      # with no further clicks.
+      # What is published here now is retired/ only: a redirect to that
+      # page, served as index.html and as 404.html so every old path lands
+      # there too. The React app in src/ is kept for its history and is not
+      # built. To bring it back, restore the npm ci / npm run build steps
+      # from git history and upload dist/ again.
+      #
+      # No actions/configure-pages step, deliberately: Pages is already
+      # switched on (Settings > Pages > Source: GitHub Actions), and the
+      # built-in GITHUB_TOKEN cannot create a Pages site anyway.
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: retired
 
   deploy:
     needs: build
