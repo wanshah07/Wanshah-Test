@@ -1,27 +1,35 @@
-# Wanshah-Test — ws.regulab landing page
+# Wanshah-Test — retired
 
-Vite + React 19 + TypeScript + Tailwind CSS v4 on the **shadcn/ui** project
-structure. `src/App.tsx` renders the landing page only.
+**Merged into `wanshah07/malaysian-regulatory-affairs` on 23 Sep 2026.**
+ws.regulab has one landing page now, published at
+https://wanshah07.github.io/kkm-halal/ from that repo's `site/` folder.
 
-The `HolographicBeams` background component is still here, unused by the
-dashboard — see the bottom of this file.
+https://wanshah07.github.io/Wanshah-Test/ serves `retired/` only: a redirect
+to that page, deployed as both `index.html` and `404.html`, so every old path
+lands there.
 
-## Hermes retired (5 September 2026)
+## What moved, and what stayed
 
-This site used to carry a Hermes operations dashboard at `?view=dashboard`,
-a build-time bundle `src/data/hermes.json` written by `scripts/sync-hermes.py`,
-and card images under `public/media/`. All three are gone. Social content for
-ws.regulab is now run from **ws.regulab Studio**, a private control page with
-one approval gate that posts through Buffer and Zapier; images come from
-Unsplash and BudgetPixel URLs, so no public image host is needed.
+| Thing | Where it is now |
+|---|---|
+| "Nota regulatori" section (`src/components/ui/nota-regulatori.tsx`) | `malaysian-regulatory-affairs/site/src/components/ui/nota-regulatori.tsx`, restyled to that page's emerald palette and Tailwind v3 |
+| `src/data/notes.json` | `malaysian-regulatory-affairs/site/src/data/notes.json`. Edit notes there, not here |
+| The SaaS-template landing page (`saa-s-template.tsx`) | Stays here, not built. Its links all pointed to kkmhalalconsultant.com |
+| Ported component shelf (`src/components/demo/*`, 3D card, gradient border, bar chart, dialog, hover-reveal cards, link preview, sidebars, text rotate, `HolographicBeams`) | Stays here, not built. It was never rendered, and it is written for Tailwind v4 where `site/` uses v3 |
 
-What remains here is the landing page. The "Nota regulatori" section reads
-`src/data/notes.json`: date, domain, angle, instrument cited, and links to the
-published posts. Never captions, never client names.
+The React app in `src/` is kept for its history. Nothing builds it now.
 
-## Build
+## Bringing a component back
 
-    npm ci
-    npm run build      # tsc -b first, so a type error fails the build
+Copy the component file into `malaysian-regulatory-affairs/site/src/components/ui/`,
+add its npm dependencies there, and convert any Tailwind v4-only syntax
+(for example `aspect-4/5` becomes `aspect-[4/5]`). Then build that site with
+`npm run build`.
 
-Pushing to `main` deploys via `.github/workflows/deploy-pages.yml`.
+## Deploy
+
+Pushing to `main` runs `.github/workflows/deploy-pages.yml`, which uploads
+`retired/`. `main` is protected, and merging is a publishing decision (see
+`CLAUDE.md`). Once the redirect is live, the repository can be archived in
+Settings. Open https://wanshah07.github.io/Wanshah-Test/ afterwards to confirm
+the redirect still answers.
