@@ -1,38 +1,28 @@
 {
-  "name": "wanshah-test",
+  "name": "slidecraft",
   "private": true,
   "version": "0.1.0",
+  "description": "Prompt-and-file driven slide presentation builder: HTML decks and PPTX export, themeable layouts, OpenAI-written content.",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22.13"
   },
-  "dependencies": {
-    "@radix-ui/react-dialog": "^1.1.23",
-    "@radix-ui/react-hover-card": "^1.1.23",
-    "@radix-ui/react-icons": "^1.3.2",
-    "@radix-ui/react-slot": "^1.3.3",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "framer-motion": "^13.2.0",
-    "lucide-react": "^0.545.0",
-    "motion": "^13.2.0",
-    "qss": "^3.0.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "recharts": "^3.10.1",
-    "tailwind-merge": "^3.6.0"
+  "scripts": {
+    "build": "npm run build -w shared && npm run build -w web && npm run build -w server",
+    "dev": "npm run build -w shared && concurrently -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "start": "node server/dist/index.js",
+    "test": "npm run build -w shared && npm test -w shared && npm test -w server",
+    "smoke": "node scripts/smoke.mjs",
+    "user:add": "node server/dist/cli/user-add.js"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^24.0.0",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "tailwindcss": "^4.3.3",
-    "tw-animate-css": "^1.4.0",
-    "typescript": "^5.9.0",
-    "vite": "^8.2.0"
+    "concurrently": "^9.1.2",
+    "playwright-core": "^1.63.0",
+    "typescript": "^5.9.0"
   }
 }

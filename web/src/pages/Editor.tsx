@@ -1,0 +1,314 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ANGLES, blankSlide, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, sahkanCount, type Deck, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { api, type Job } from "../api";
+import { SlideFrame } from "../components/SlideFrame";
+import { SlideInspector } from "../components/SlideInspector";
+import { ThemePanel } from "../components/ThemePanel";
+import { toast } from "../components/Toast";
+
+type Tab = "slide" | "theme" | "export" | "sources";
+
+export default function Editor() {
+  const { id = "" } = useParams();
+  const [deck, setDeck] = useState<Deck | null>(null);
+  const [sel, setSel] = useState(0);
+  const [tab, setTab] = useState<Tab>("slide");
+  const [saving, setSaving] = useState<"idle" | "dirty" | "saving" | "saved" | "error">("idle");
+  const [addOpen, setAddOpen] = useState(false);
+  const saveTimer = useRef<number | null>(null);
+  const latest = useRef<Deck | null>(null);
+
+  useEffect(() => {
+    api.deck(id).then((r) => {
+      setDeck(r.deck);
+      latest.current = r.deck;
+      setSel(0);
+    }).catch((e) => toast(e.message, true));
+  }, [id]);
+
+  const slop = useMemo(() => (deck ? scanDeck(deck) : {}), [deck]);
+  const sahkan = useMemo(() => (deck ? sahkanCount(deck) : 0), [deck]);
+  const slopCount = Object.values(slop).reduce((a, h) => a + h.length, 0);
+
+  const flush = useCallback(async () => {
+    const d = latest.current;
+    if (!d) return;
+    setSaving("saving");
+    try {
+      await api.saveDeck(d);
+      setSaving("saved");
+    } catch (e) {
+      setSaving("error");
+      toast("Save failed: " + (e as Error).message, true);
+    }
+  }, []);
+
+  const update = useCallback((next: Deck) => {
+    setDeck(next);
+    latest.current = next;
+    setSaving("dirty");
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(flush, 900);
+  }, [flush]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (saveTimer.current) window.clearTimeout(saveTimer.current);
+        flush();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [flush]);
+
+  if (!deck) return <main className="page"><p className="muted">Loading</p></main>;
+  const slide = deck.slides[sel];
+
+  const setSlide = (s: Slide) => update({ ...deck, slides: deck.slides.map((x, i) => (i === sel ? s : x)) });
+  const setTheme = (t: Theme) => update({ ...deck, theme: t });
+  const addSlide = (layout: Layout) => {
+    const s = blankSlide(layout, deck.lang);
+    const slides = [...deck.slides];
+    slides.splice(sel + 1, 0, s);
+    update({ ...deck, slides });
+    setSel(sel + 1);
+    setAddOpen(false);
+    setTab("slide");
+  };
+  const dupSlide = () => {
+    const slides = [...deck.slides];
+    slides.splice(sel + 1, 0, { ...JSON.parse(JSON.stringify(slide)), id: newId() });
+    update({ ...deck, slides });
+    setSel(sel + 1);
+  };
+  const delSlide = () => {
+    if (deck.slides.length <= 1) return;
+    const slides = deck.slides.filter((_, i) => i !== sel);
+    update({ ...deck, slides });
+    setSel(Math.max(0, sel - 1));
+  };
+  const move = (dir: -1 | 1) => {
+    const j = sel + dir;
+    if (j < 0 || j >= deck.slides.length) return;
+    const slides = [...deck.slides];
+    [slides[sel], slides[j]] = [slides[j], slides[sel]];
+    update({ ...deck, slides });
+    setSel(j);
+  };
+  const rewrite = async (instruction: string) => {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      await flush();
+    }
+    try {
+      const r = await api.rewrite(deck.id, slide.id, instruction);
+      const next = { ...deck, slides: deck.slides.map((x, i) => (i === sel ? r.slide : x)) };
+      setDeck(next);
+      latest.current = next;
+      setSaving("saved");
+      toast(r.slop.length ? `Rewritten, ${r.slop.length} flag${r.slop.length === 1 ? "" : "s"} remain` : "Rewritten, nothing flagged");
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+  };
+
+  return (
+    <main className="page wide">
+      <div className="row between" style={{ marginBottom: 10 }}>
+        <div className="row">
+          <Link to="/" className="btn btn-quiet btn-sm">← Decks</Link>
+          <input type="text" value={deck.title} onChange={(e) => update({ ...deck, title: e.target.value })} style={{ width: 420, fontWeight: 600, fontFamily: "var(--font-display)", fontSize: 18 }} />
+          <span className="pill">{deck.lang === "ms" ? "BM" : "EN"}</span>
+          <span className="pill">{ANGLES.find((a) => a.id === deck.angle)?.name ?? deck.angle}</span>
+        </div>
+        <div className="row">
+          {sahkan > 0 && <span className="pill warn" title="Facts the writer could not source. Search for each, then edit the marker away.">{sahkan} SAHKAN</span>}
+          {slopCount > 0 && <span className="pill danger" title="Wording flagged by the de-slop scan">{slopCount} flagged</span>}
+          <span className="small muted">{saving === "saving" ? "Saving" : saving === "dirty" ? "Unsaved" : saving === "saved" ? "Saved" : saving === "error" ? "Not saved" : ""}</span>
+          <a className="btn btn-ghost btn-sm" href={`/deck/${deck.id}/present`} target="_blank" rel="noreferrer">Present</a>
+          <a className="btn btn-primary btn-sm" href={`/api/decks/${deck.id}/export.pptx`}>Download PPTX</a>
+        </div>
+      </div>
+
+      <div className="ed">
+        <aside className="col">
+          <div className="tools">
+            <button className="btn btn-ghost btn-xs" onClick={() => setAddOpen(true)}>+ Add</button>
+            <button className="btn btn-quiet btn-xs" onClick={dupSlide} title="Duplicate">Dup</button>
+            <button className="btn btn-quiet btn-xs" onClick={() => move(-1)} disabled={sel === 0}>↑</button>
+            <button className="btn btn-quiet btn-xs" onClick={() => move(1)} disabled={sel >= deck.slides.length - 1}>↓</button>
+            <button className="btn btn-quiet btn-xs" onClick={delSlide} disabled={deck.slides.length <= 1} title="Delete slide">✕</button>
+          </div>
+          <div className="list">
+            {deck.slides.map((s, i) => (
+              <div key={s.id} className={"thumb" + (i === sel ? " on" : "")} onClick={() => setSel(i)}>
+                <SlideFrame slide={s} theme={deck.theme} index={i} total={deck.slides.length} lang={deck.lang} />
+                <span className="n">{i + 1}</span>
+                {slop[s.id]?.length ? <span className="flag pill danger" style={{ padding: "0 6px", fontSize: 10 }}>{slop[s.id].length}</span> : null}
+              </div>
+            ))}
+            {deck.slides.length === 0 && (
+              <div className="card tight small">
+                <p>No slides yet.</p>
+                <button className="btn btn-ghost btn-xs" style={{ marginTop: 8 }} onClick={() => { update({ ...deck, slides: [blankSlide("title", deck.lang)] }); setSel(0); }}>Add a title slide</button>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <section className="col" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {slide ? (
+            <>
+              <div className="canvasWrap" style={{ padding: 18 }}>
+                <div style={{ width: "100%", maxWidth: 1100 }}>
+                  <SlideFrame slide={slide} theme={deck.theme} index={sel} total={deck.slides.length} lang={deck.lang} />
+                </div>
+              </div>
+              {slide.notes && (
+                <div className="card tight small" style={{ whiteSpace: "pre-line" }}>
+                  <b className="muted" style={{ fontSize: 11, letterSpacing: ".08em" }}>NOTES</b>
+                  <div style={{ marginTop: 4 }}>{slide.notes}</div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="card" style={{ textAlign: "center" }}>
+              <p className="muted">Add a slide, or generate the deck from the Sources tab.</p>
+            </div>
+          )}
+        </section>
+
+        <aside className="col card" style={{ padding: 16 }}>
+          <div className="tabs">
+            {(["slide", "theme", "export", "sources"] as Tab[]).map((t) => (
+              <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
+            ))}
+          </div>
+          {tab === "slide" && slide && <SlideInspector deckId={deck.id} slide={slide} hits={slop[slide.id] ?? []} lang={deck.lang} onChange={setSlide} onRewrite={rewrite} />}
+          {tab === "slide" && !slide && <p className="muted small">No slide selected.</p>}
+          {tab === "theme" && <ThemePanel deckId={deck.id} theme={deck.theme} onChange={setTheme} />}
+          {tab === "export" && <ExportPanel deck={deck} sahkan={sahkan} slopCount={slopCount} />}
+          {tab === "sources" && <SourcesPanel deck={deck} onDeck={(d) => { setDeck(d); latest.current = d; setSel(0); setSaving("saved"); }} />}
+        </aside>
+      </div>
+
+      {addOpen && (
+        <div className="modal-bg" onClick={() => setAddOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 12 }}>Add a slide after {sel + 1}</h3>
+            <div className="grid c3">
+              {(["title", "section", "bullets", "two-column", "chart", "table", "diagram", "image", "quote", "kpi", "closing"] as Layout[]).map((l) => (
+                <button key={l} className="btn btn-ghost btn-sm" onClick={() => addSlide(l)}>{l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function ExportPanel({ deck, sahkan, slopCount }: { deck: Deck; sahkan: number; slopCount: number }) {
+  return (
+    <div className="stack">
+      {sahkan > 0 && <div className="banner warn">{sahkan} unresolved [SAHKAN] marker{sahkan === 1 ? "" : "s"}. They print on the slides in yellow until you replace each with the sourced fact.</div>}
+      {slopCount > 0 && <div className="banner warn">{slopCount} flagged phrase{slopCount === 1 ? "" : "s"} left. Open each slide's inspector to see them, or rewrite the slide.</div>}
+      {sahkan === 0 && slopCount === 0 && <div className="banner info">No unresolved markers and nothing flagged.</div>}
+      <a className="btn btn-primary" href={`/api/decks/${deck.id}/export.pptx`}>PowerPoint (.pptx)</a>
+      <p className="small muted">Native text, charts, tables and shapes. Edit anything in PowerPoint or Keynote. Fonts fall back to the machine's if {deck.theme.fontDisplay} or {deck.theme.fontBody} is not installed.</p>
+      <a className="btn btn-ghost" href={`/api/decks/${deck.id}/export.html`}>Web deck (.html)</a>
+      <p className="small muted">One file with the pictures inside. Opens in any browser: arrows to move, N for notes, G for the grid, F for full screen.</p>
+      <a className="btn btn-ghost" href={`/api/decks/${deck.id}/export.json`}>Deck data (.json)</a>
+      <p className="small muted">The slide specification, for re-import or a script.</p>
+    </div>
+  );
+}
+
+function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void }) {
+  const [sources, setSources] = useState<SourceRef[]>(deck.sources);
+  const [prompt, setPrompt] = useState("");
+  const [slides, setSlides] = useState(Math.max(6, deck.slides.length || 10));
+  const [angle, setAngle] = useState(deck.angle);
+  const [features, setFeatures] = useState<Features>({ ...DEFAULT_FEATURES, ...(ANGLES.find((a) => a.id === deck.angle)?.defaults ?? {}) });
+  const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
+  const [job, setJob] = useState<Job | null>(null);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const reload = () => api.sources(deck.id).then(setSources).catch(() => {});
+  const add = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    try {
+      const r = await api.uploadSources(deck.id, Array.from(files).map((f) => ({ file: f, path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name })));
+      toast(`Added ${r.added.length}`);
+      reload();
+    } catch (e) {
+      toast((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const run = async () => {
+    if (prompt.trim().length < 10) {
+      toast("Write a brief first", true);
+      return;
+    }
+    if (deck.slides.length && !window.confirm("Regenerating replaces every slide in this deck. Continue?")) return;
+    try {
+      const { jobId } = await api.generate(deck.id, { prompt, title: deck.title, lang: deck.lang, angle, audience: deck.audience, slides, features, imageMode });
+      const tick = async () => {
+        const j = await api.job(jobId);
+        setJob(j);
+        if (j.status === "done") {
+          const r = await api.deck(deck.id);
+          onDeck(r.deck);
+          toast("Deck regenerated");
+        } else if (j.status === "failed") toast(j.error || "Failed", true);
+        else setTimeout(tick, 1500);
+      };
+      tick();
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+  };
+  const running = job && (job.status === "queued" || job.status === "running");
+  return (
+    <div className="stack">
+      <div className="row between"><h4>Sources</h4><button className="btn btn-ghost btn-xs" onClick={() => ref.current?.click()} disabled={busy}>Add files</button></div>
+      <input ref={ref} type="file" multiple hidden onChange={(e) => add(e.target.files)} />
+      <div className="srcs">
+        {sources.map((s) => (
+          <div key={s.id} className="src">
+            <span className="k">{s.kind}</span><span className="n" title={s.name}>{s.name}</span>
+            <button className="btn btn-quiet btn-xs" onClick={() => api.deleteSource(s.id).then(reload)}>✕</button>
+          </div>
+        ))}
+        {sources.length === 0 && <p className="small muted">No sources attached.</p>}
+      </div>
+      <hr />
+      <h4>Regenerate</h4>
+      <textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="A new brief for the writer. Every slide is replaced." />
+      <div className="grid c2" style={{ gap: 8 }}>
+        <select value={slides} onChange={(e) => setSlides(Number(e.target.value))}>{LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}</select>
+        <select value={angle} onChange={(e) => setAngle(e.target.value)}>{ANGLES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+      </div>
+      <div className="grid c2" style={{ gap: 4 }}>
+        {(Object.keys(FEATURE_LABELS) as (keyof Features)[]).map((k) => (
+          <label key={k} className="row small" style={{ gap: 6 }}><input type="checkbox" checked={features[k]} onChange={(e) => setFeatures({ ...features, [k]: e.target.checked })} />{FEATURE_LABELS[k].label}</label>
+        ))}
+      </div>
+      {features.images && (
+        <select value={imageMode} onChange={(e) => setImageMode(e.target.value as typeof imageMode)}>
+          <option value="uploaded">Pictures from uploaded files</option>
+          <option value="generate">Pictures from the image model</option>
+          <option value="none">Placeholders only</option>
+        </select>
+      )}
+      <button className="btn btn-primary" onClick={run} disabled={!!running}>{running ? <span className="spin" /> : "Regenerate deck"}</button>
+      {job && <div className="log">{job.progress.join("\n")}</div>}
+    </div>
+  );
+}

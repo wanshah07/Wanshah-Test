@@ -1,0 +1,24 @@
+name: CI
+
+# Builds all three packages and runs the tests on every push and pull request.
+# Nothing here deploys: the server needs a host with a disk and a secret, which
+# GitHub Pages cannot provide. See README.md, "Running it".
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm test
