@@ -66,6 +66,25 @@ The server serves the built web app, so one process and one port is the
 whole deployment. Put it behind HTTPS and set `COOKIE_SECURE=1` when login
 is on. GitHub Pages cannot host it: it needs a disk and a secret.
 
+### On GitHub, no laptop: Codespaces
+
+`.devcontainer/devcontainer.json` builds and starts the server inside a GitHub
+Codespace. Before the first launch add two Codespaces secrets for this
+repository (Settings → Secrets and variables → Codespaces): `APP_SECRET`
+(a long random string) and, optionally, `OPENAI_API_KEY`. Then Code →
+Codespaces → Create codespace on main. When it opens, port 8787 is forwarded
+and the browser tab opens on the app. The forwarded address is **private**:
+only your GitHub login can open it, which is a login screen for free until
+`AUTH_MODE=local` is wanted for other people (make the port public then).
+
+What a Codespace is and is not: it stops after 30 minutes idle (Settings →
+Codespaces → Default idle timeout, up to 4 hours) and starts again in about
+a minute; decks and uploads live in `/workspaces/slidecraft-data` inside the
+codespace and survive stops, but a codespace unused for 30 days is deleted,
+so export anything you want to keep. The free allowance on a personal
+account is 120 core-hours a month, which at 2 cores is 60 hours of running
+time. For an always-on address for a team, use the Docker image on a host.
+
 ### Login
 
     AUTH_MODE=local npm start

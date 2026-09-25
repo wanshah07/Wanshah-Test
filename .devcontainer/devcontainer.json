@@ -1,0 +1,24 @@
+{
+  "name": "Slidecraft",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "hostRequirements": { "cpus": 2, "memory": "4gb" },
+  "postCreateCommand": "npm ci --no-audit --no-fund && npm run build",
+  "postAttachCommand": "npm start",
+  "forwardPorts": [8787],
+  "portsAttributes": {
+    "8787": { "label": "Slidecraft", "onAutoForward": "openBrowser", "visibility": "private" }
+  },
+  "containerEnv": {
+    "PORT": "8787",
+    "DATA_DIR": "/workspaces/slidecraft-data",
+    "AUTH_MODE": "off",
+    "NODE_ENV": "production"
+  },
+  "secrets": {
+    "APP_SECRET": { "description": "Long random string. Encrypts the stored OpenAI key. node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"" },
+    "OPENAI_API_KEY": { "description": "Optional. Can also be entered in the app's Settings page instead." }
+  },
+  "customizations": {
+    "vscode": { "extensions": ["dbaeumer.vscode-eslint"] }
+  }
+}
