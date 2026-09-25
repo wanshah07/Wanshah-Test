@@ -2,3 +2,11 @@ node_modules/
 dist/
 *.tsbuildinfo
 __pycache__/
+data/
+.env
+.env.*
+!.env.example
+web/dist/
+server/dist/
+shared/dist/
+test-results/
