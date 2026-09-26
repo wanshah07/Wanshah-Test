@@ -42,7 +42,6 @@ export interface DeckSummary {
 export interface DeckResponse {
   deck: Deck;
   slop: Record<string, SlopHit[]>;
-  sahkan: number;
 }
 
 export interface Job {

@@ -206,7 +206,7 @@ export default function NewDeck() {
               ))}
             </div>
           )}
-          {sources.length === 0 && <p className="small muted">No sources yet. You can continue without any; every fact the writer is unsure of will carry a [SAHKAN] marker.</p>}
+          {sources.length === 0 && <p className="small muted">No sources yet. You can continue without any; the writer then works from the brief alone and leaves out figures it cannot stand behind.</p>}
         </div>
       )}
 

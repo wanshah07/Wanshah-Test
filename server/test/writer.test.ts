@@ -165,18 +165,19 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(gw.plans).toBe(1);
     expect(gw.planUser).toMatch(/Build the strongest professional deck/);
     const log = job.progress.join("\n");
-    expect(log).toMatch(/Auto: Medical affairs \/ HCP education for dermatologists, 7 slides, using tables, kpis\. The sources are clinical/);
+    expect(log).toMatch(/Auto: Medical affairs \/ HCP education for dermatologists, 7 slides, using tables, diagrams, kpis\. The sources are clinical/);
     // The writer is told what the planner chose, not what the form carried.
     const sys = gw.systems.at(-1)!;
     expect(sys).toMatch(/ANGLE: Medical affairs \/ HCP education/);
     expect(sys).toMatch(/AUDIENCE: dermatologists/);
     expect(sys).toMatch(/exactly 7 slides/);
-    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, table, kpi\./);
+    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, table, diagram, kpi\./);
     expect(gw.users.at(-1)).toMatch(/DECK TITLE \(use it\): Salicylic acid: 2% cap/);
     const deck = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
     expect(deck.angle).toBe("medical-affairs");
     expect(deck.brief).toMatchObject({ auto: true, text: "", slides: 7 });
-    expect(deck.brief.features).toMatchObject({ charts: false, diagrams: false, kpis: true, notes: true, citations: true });
+    // Diagrams and number tiles stay on whatever the plan says: they carry points without paragraphs.
+    expect(deck.brief.features).toMatchObject({ charts: false, diagrams: true, kpis: true, notes: true, citations: true });
   });
 
   it("writes the deck craft rules into every writer's instructions", () => {
@@ -186,6 +187,10 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(sys).toMatch(/action titles/);
     expect(sys).toMatch(/YES \/ PARTLY \/ NO/);
     expect(sys).toMatch(/- cards: 2 to 6 numbered cards/);
+    expect(sys).toMatch(/BALANCE TEXT WITH VISUALS: .*At least half of the content slides are visual \(table, diagram, kpi\)/);
+    expect(sys).toMatch(/at most 60 words per content slide/);
+    expect(sys).not.toMatch(/SAHKAN/);
+    expect(sys).toMatch(/Never write placeholders, square-bracket notes or reminders to check something/);
   });
 
   it("asks the planner for settings only, and gives a chatty model one more turn", async () => {

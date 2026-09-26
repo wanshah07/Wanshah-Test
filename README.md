@@ -38,9 +38,15 @@ single HTML file. Runs on your own machine or server, with your own key.
   must never appear in Malaysian text) and can be sent back for a rewrite of
   that slide alone. Dashes, emoji and exclamation marks are fixed
   automatically because that cannot change meaning; nothing else is.
-- **Facts.** A fact the sources do not carry comes out as
-  `[SAHKAN: the exact missing fact]`, printed in yellow on the slide and
-  counted in the editor, until you replace it with the sourced one.
+- **Facts.** The writer uses only what the sources carry. A figure, date or
+  clause it cannot stand behind is left out, never guessed and never left as a
+  placeholder on the slide.
+- **Fits the slide.** Nothing spills over or is cut off. On screen and in the
+  web deck the text shrinks just enough to fit (the editor says when it had to
+  go below half size); in PowerPoint each text box is sized from its text.
+  The writer keeps the slide face short and at least half the content slides
+  visual (chart, diagram, big numbers, picture, table); a slide with over 90
+  words on its face is flagged.
 - **Themes.** Colours, fonts, radius, slide style, footer and logo per deck,
   with presets. The default preset is the token set of my.facerinna.com
   (Fraunces and Inter, brand `#4898D8` on ink `#1D344E`, 20px radius); the

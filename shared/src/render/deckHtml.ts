@@ -2,6 +2,7 @@ import type { Deck } from "../deck.js";
 import { esc } from "./escape.js";
 import { SLIDE_CSS } from "./css.js";
 import { renderDeckSlides } from "./html.js";
+import { fitSlide } from "./fit.js";
 import { fontsUrl } from "../theme.js";
 
 // A self-contained HTML deck: every slide, keyboard and click navigation,
@@ -67,7 +68,12 @@ ${SLIDE_CSS}
   document.getElementById('stage').addEventListener('click',function(e){show(e.clientX<window.innerWidth/3?i-1:i+1);poke()});
   document.addEventListener('mousemove',poke);
   window.addEventListener('resize',fit);
-  buildGrid();var h=parseInt((location.hash||'#1').slice(1),10);fit();show(isNaN(h)?0:h-1);poke();
+  var fitSlide=${fitSlide.toString()};
+  function fitAll(){slides.forEach(function(s){fitSlide(s)})}
+  function start(){fitAll();buildGrid();var h=parseInt((location.hash||'#1').slice(1),10);fit();show(isNaN(h)?0:h-1);poke()}
+  // Fit once the fonts are in, so the measurement matches what is shown.
+  var started=false;function go(){if(!started){started=true;start()}}
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go);setTimeout(go,3000)}else go();
 })();
 </script>
 </body>

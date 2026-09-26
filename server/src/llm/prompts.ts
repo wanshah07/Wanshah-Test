@@ -59,7 +59,7 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("");
   lines.push("FACTS AND SOURCES:");
   lines.push("- Use the sources provided. Prefer a figure, a date, a clause or a quotation from a source over a general statement.");
-  lines.push("- Do not invent a fee, a date, a clause number, a statistic or a study. If the sources do not carry a fact the slide needs, write the marker [SAHKAN: <the exact missing fact>] in its place, e.g. [SAHKAN: NPRA notification fee 2026]. Never write [SAHKAN: what to verify]; name the fact.");
+  lines.push("- Do not invent a fee, a date, a clause number, a statistic or a study. If the sources do not carry a fact a slide needs, leave that point out or state it without the figure. Never write placeholders, square-bracket notes or reminders to check something.");
   if (f.citations) lines.push("- `citations`: for every slide that states a fact, name where it comes from: the instrument and clause (e.g. EC 1223/2009 Annex III entry 98), the paper (authors, journal, year, DOI), the dataset or the source file name. Never cite a blog, newsletter or aggregator; cite what it was reading.");
   else lines.push("- `citations`: leave empty.");
   lines.push("");
@@ -67,7 +67,7 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("- No dashes (— or –) anywhere; use a comma, a colon or a full stop.");
   lines.push("- No emoji, no exclamation marks, no rhetorical questions as titles, no ellipses.");
   lines.push("- Titles state the point, not the topic: 'Salicylic acid is capped at 2% in rinse-off' not 'Salicylic acid limits'.");
-  lines.push("- Bullets are fragments of at most 14 words, one idea each, at most 6 per slide. Speaker notes carry the argument.");
+  lines.push("- Bullets are fragments of at most 12 words, one idea each, at most 5 per slide. Speaker notes carry the argument.");
   lines.push(`- Banned words and habits: ${slopBanList(p.lang).join("; ")}. Also banned in any language: the words 'landscape', 'journey', 'leverage', 'unlock', 'seamless', 'robust', 'comprehensive', 'holistic', 'synergy', 'stakeholder', 'best practice', 'key takeaway', 'deep dive', 'game-changer', 'cutting-edge'. Say the concrete thing instead.`);
   lines.push("- Do not open with a scene-setter or close with a summary of the summary. Do not congratulate the reader or the presenter.");
   lines.push("- Use **bold** only for the single figure or term on a slide that matters most, at most once per slide.");
@@ -82,14 +82,17 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("- Every chart and table names its source.");
   lines.push("- If the evidence is thin, contested or from a single study, add one slide of caveats that says so plainly.");
   lines.push("- End on substance: a cards slide of the decisions or next steps (who, what, by when where the sources give it), then a references slide if there are citations, then the closing slide.");
-  lines.push("- Density follows the audience: for experts, clinicians, regulators or management a content slide may carry 80 to 160 words across its elements; for consumers, sales or trade keep it under 60 and let the notes carry the rest.");
+  const visuals = allowed.filter((l) => ["chart", "diagram", "kpi", "image", "table"].includes(l));
+  lines.push(`- BALANCE TEXT WITH VISUALS: a slide is looked at, not read. At least half of the content slides are visual (${visuals.join(", ") || "cards"}), and never more than two text-led slides (bullets, two-column, cards, quote) in a row. A process, pathway, mechanism or plan is a diagram (flow is a process map, timeline is dates, matrix is a comparison map), never bullets; figures in a series are a chart; headline numbers are kpi.`);
+  if (allowed.includes("image")) lines.push(p.imageMode === "uploaded" ? "- Put the uploaded pictures to work: every picture that fits the story gets an image slide, with at most 3 short points beside it." : "- Use image slides where a photograph or illustration carries the point better than words (at most 3).");
+  lines.push("- Keep the slide face short: at most 60 words per content slide across title, reading line, body and items (at most 80 for experts, clinicians, regulators or management). A card detail is one sentence under 20 words. Everything else goes in the notes, which carry the full argument.");
   lines.push("");
   lines.push("SLIDE LAYOUTS you may use: " + allowed.join(", ") + ". Any other layout is forbidden.");
   lines.push("- title: first slide only. subtitle carries the occasion, audience or date if known.");
   lines.push("- closing: last slide. If a summary is requested, put it on a bullets slide before the closing slide.");
   if (f.sections) lines.push("- section: a divider before each part. Title is the part name, subtitle one line on what it decides.");
-  lines.push("- bullets: 3 to 6 bullets. body is optional, one sentence of context above the bullets.");
-  lines.push("- cards: 2 to 6 numbered cards. Each has a heading under 10 words, a detail of one or two sentences, and a tag (a verdict, an owner, a date or a priority) or null. body is optional, one line under the cards.");
+  lines.push("- bullets: 3 to 5 bullets. body is optional, one sentence of context above the bullets.");
+  lines.push("- cards: 2 to 6 numbered cards. Each has a heading under 10 words, a detail of one sentence under 20 words, and a tag (a verdict, an owner, a date or a priority) or null. body is optional, one line under the cards.");
   lines.push("- two-column: leftHeading/rightHeading with bullets/bulletsRight, for before/after, option A/B, mandatory/recommended.");
   if (f.charts) lines.push("- chart: ONLY when the sources carry the numbers. categories and series values must come from the sources; unit and source filled. Use column for categories, line/area for time, bar for ranked items, pie/doughnut for shares that sum to a whole. bullets may hold 2 or 3 readings of the chart.");
   if (f.tables) lines.push("- table: header plus 2 to 8 rows, at most 5 columns, cells under 12 words. Fill source.");
@@ -122,7 +125,7 @@ export function userPrompt(p: GenerateParams, sources: { name: string; kind: str
       else parts.push(`### Source: ${s.name} (${s.kind})\n${s.text}`);
     }
   } else {
-    parts.push("SOURCES: none provided. Draw on what the brief states. Mark every fact you cannot stand behind with [SAHKAN: <the fact>].");
+    parts.push("SOURCES: none provided. Draw on what the brief states, and leave out any figure, date or clause you cannot stand behind.");
   }
   return parts.join("\n\n");
 }
@@ -144,7 +147,7 @@ export function rewriteSystem(p: { lang: Lang; angle: string; house?: GeneratePa
     `ANGLE: ${angle.name}. ${angle.brief}`,
     `LANGUAGE: ${LANG_RULES[p.lang]}`,
     "STYLE: no dashes, no emoji, no exclamation marks, no rhetorical questions as titles. Titles state the point. Bullets under 14 words, at most 6. Banned: " + slopBanList(p.lang).join("; ") + ".",
-    "Do not invent facts; use [SAHKAN: <the exact missing fact>] where one is missing.",
+    "Do not invent a fee, a date, a clause number, a statistic or a study. If the sources do not carry a fact a slide needs, leave that point out or state it without the figure. Never write placeholders, square-bracket notes or reminders to check something.",
     "Answer only with the JSON the schema asks for.",
   ].join("\n");
 }

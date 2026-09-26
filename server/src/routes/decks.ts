@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { LAYOUTS, newId, scanDeck, sahkanCount, themePreset, type Deck, type Slide } from "@slidecraft/shared";
+import { LAYOUTS, newId, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
 import { getDb, now } from "../db.js";
 import { loadDeck, saveDeck } from "../store.js";
 import { newDeck } from "../llm/generate.js";
@@ -37,7 +37,7 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     const d = loadDeck(req.user.id, id);
     if (!d) return reply.code(404).send({ error: "not_found" });
-    return { deck: d, slop: scanDeck(d), sahkan: sahkanCount(d) };
+    return { deck: d, slop: scanDeck(d) };
   });
 
   app.put("/api/decks/:id", async (req, reply) => {
@@ -52,7 +52,7 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     if (!next.onedrive) delete next.onedrive;
     if (!next.brief) delete next.brief;
     saveDeck(req.user.id, next);
-    return { deck: next, slop: scanDeck(next), sahkan: sahkanCount(next) };
+    return { deck: next, slop: scanDeck(next) };
   });
 
   app.delete("/api/decks/:id", async (req, reply) => {

@@ -89,7 +89,9 @@ export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): 
   p.slides = Math.max(6, Math.min(30, Math.round(Number(plan.slides) || 12)));
   if (!p.title && plan.title?.trim()) p.title = plan.title.trim().slice(0, 140);
   const f = plan.features ?? ({} as Plan["features"]);
-  p.features = { ...p.features, charts: !!f.charts, tables: !!f.tables, diagrams: !!f.diagrams, kpis: !!f.kpis, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
+  // Diagrams and big numbers stay available whatever the plan says: they are how a slide carries a
+  // point without a paragraph, and the writer only uses a number tile when the sources give numbers.
+  p.features = { ...p.features, charts: !!f.charts, tables: !!f.tables, diagrams: true, kpis: true, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
   p.imageMode = hasPictures ? "uploaded" : "none";
 }
 
@@ -114,7 +116,7 @@ export function fallbackPlan(p: GenerateParams, hasNumbers: boolean, sourceCount
     angle: p.angle,
     audience: p.audience || "professional readers",
     slides: sourceCount >= 4 ? 14 : 10,
-    features: { charts: hasNumbers, tables: true, diagrams: true, kpis: hasNumbers, sections: sourceCount >= 4, summary: true, qa: false },
+    features: { charts: hasNumbers, tables: true, diagrams: true, kpis: true, sections: sourceCount >= 4, summary: true, qa: false },
     reason: "Standard settings, because the model did not return a plan.",
   };
 }
@@ -367,7 +369,7 @@ export function newDeck(userId: string, title: string, lang: "en" | "ms", angle:
 
 /** The instruction the writer gets for a slide's saved feedback. */
 export function feedbackInstruction(items: string[]): string {
-  return `Apply this feedback from the presenter to the slide. Change what it asks; keep every other fact, citation and [SAHKAN] marker.\n${items.map((t) => `- ${t}`).join("\n")}`;
+  return `Apply this feedback from the presenter to the slide. Change what it asks; keep every other fact and citation.\n${items.map((t) => `- ${t}`).join("\n")}`;
 }
 
 /** Applies every slide's waiting feedback, one slide at a time, as a job. */

@@ -71,7 +71,7 @@ export function BriefPicker({ value, onChange, compact }: { value: BriefValue; o
         <input type="text" value={value.audienceText} onChange={(e) => set({ audienceText: e.target.value })} placeholder="Anyone else? e.g. KOL dermatologists in Klang Valley" style={{ marginTop: 8 }} />
       </div>
       <label className="f">
-        Anything to add <span className="h">Optional. Name the product, the instrument, numbers you already know. The more concrete, the fewer [SAHKAN] markers.</span>
+        Anything to add <span className="h">Optional. Name the product, the instrument, numbers you already know. The more concrete, the more precise the deck.</span>
         <textarea value={value.text} onChange={(e) => set({ text: e.target.value })} rows={compact ? 3 : 5} placeholder="e.g. Our toner has 2% salicylic acid; what does the 2026 amendment change for it?" />
       </label>
     </div>

@@ -30,10 +30,10 @@ layout goes into `LAYOUTS`, `blankSlide`, the schema enum, `render/html.ts`,
 
 ## 3. The writer may not invent
 
-The prompt says so and the editor counts it: a fact the sources do not carry
-is written as `[SAHKAN: the exact missing fact]`, never as a guess and never
-as `[SAHKAN: what to verify]`. Citations name the instrument, clause, paper or
-file, never a blog. Do not soften either rule in `server/src/llm/prompts.ts`.
+A fact the sources do not carry is left out or stated without the figure,
+never guessed. No placeholder or marker of any kind is written on a slide
+(the `[SAHKAN: …]` marker was removed on Wan's instruction, 26 Sep 2026).
+Citations name the instrument, clause, paper or file, never a blog. Do not soften either rule in `server/src/llm/prompts.ts`.
 
 ## 4. De-slop is a scan and a rewrite, not a silent edit
 

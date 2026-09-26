@@ -128,7 +128,8 @@ describe("api", () => {
     expect(layouts).not.toContain("kpi");
     const img = d.deck.slides.find((s: { layout: string }) => s.layout === "image");
     expect(img.image.mediaId).toMatch(/^m_/);
-    expect(d.sahkan).toBeGreaterThan(0);
+    expect(d.sahkan).toBeUndefined();
+    expect(JSON.stringify(d.deck.slides)).not.toContain("SAHKAN");
     expect(d.deck.lang).toBe("ms");
     // The mock's dashes were auto-fixed: nothing flagged for dashes.
     const flags = Object.values(d.slop as Record<string, { note: string }[]>).flat();
@@ -170,7 +171,7 @@ describe("api", () => {
     const r = await app.inject({ method: "GET", url: `/api/decks/${deckId}/export.html` });
     expect(r.statusCode).toBe(200);
     expect(r.body).toContain("data:image/png;base64,");
-    expect(r.body).toContain('<mark class="sahkan">');
+    expect(r.body).not.toContain("sahkan");
     expect((r.body.match(/class="sc-slide/g) ?? []).length).toBe(12);
   });
 

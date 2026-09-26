@@ -1,5 +1,5 @@
 import type { DiagramSpec, ThemeColors } from "../deck.js";
-import { esc } from "./escape.js";
+import { esc, inline } from "./escape.js";
 
 export function diagramSvg(d: DiagramSpec, c: ThemeColors, W = 1600, H = 620, fontName = "Inter", radius = 20): string {
   const font = `${fontName}, system-ui, sans-serif`;
@@ -107,4 +107,40 @@ function matrixSvg(rows: string[], cols: string[], cells: string[][], c: ThemeCo
     });
   });
   return g + "</svg>";
+}
+
+const YES = /^(yes|ya|✓|true|wajib|required|mandatory)$/i;
+const NO = /^(no|tidak|✗|false|x)$/i;
+
+/**
+ * The diagram as slide elements rather than a picture, so its words wrap and
+ * shrink with the rest of the slide (fitSlide) and nothing is cut off.
+ */
+export function diagramHtml(d: DiagramSpec): string {
+  if (d.kind === "flow") {
+    const n = Math.max(d.steps.length, 1);
+    const per = n > 5 ? Math.ceil(n / 2) : n;
+    return `<div class="sc-flow" style="--per:${per}">${d.steps
+      .map((s, i) => {
+        const last = i === n - 1;
+        const endOfRow = (i + 1) % per === 0;
+        const arrow = last ? "" : endOfRow ? " a-down" : " a-right";
+        return `<div class="sc-step${arrow}"><span class="no">${i + 1}</span><div class="lb">${inline(s.label)}</div>${s.detail ? `<div class="dt">${inline(s.detail)}</div>` : ""}</div>`;
+      })
+      .join("")}</div>`;
+  }
+  if (d.kind === "timeline") {
+    return `<div class="sc-tl" style="--n:${Math.max(d.events.length, 1)}">${d.events
+      .map((e) => `<div class="sc-ev"><span class="dot"></span><div class="wh">${esc(e.when)}</div><div class="lb">${inline(e.label)}</div></div>`)
+      .join("")}</div>`;
+  }
+  const head = `<tr><th></th>${d.cols.map((c) => `<th>${inline(c)}</th>`).join("")}</tr>`;
+  const body = d.rows
+    .map((r, i) => `<tr><th class="rh">${inline(r)}</th>${d.cols.map((_, j) => {
+      const v = (d.cells[i]?.[j] ?? "").trim();
+      const mark = YES.test(v) ? `<span class="mk yes">✓</span>` : NO.test(v) ? `<span class="mk no">✗</span>` : inline(v);
+      return `<td>${mark}</td>`;
+    }).join("")}</tr>`)
+    .join("");
+  return `<table class="sc-table sc-matrix"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }

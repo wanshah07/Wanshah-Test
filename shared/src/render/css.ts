@@ -1,10 +1,10 @@
 // Slide stylesheet. The canvas is 1920x1080 and the editor scales it with a
 // transform, so every size here is in canvas pixels. Colours and fonts come in
 // as custom properties set on the slide root by render/html.ts.
-export const SLIDE_CSS = `
+const RAW_CSS = `
 .sc-slide{position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;
   background:var(--bg);color:var(--ink);font-family:var(--font-body),system-ui,sans-serif;
-  font-size:32px;line-height:1.35;-webkit-font-smoothing:antialiased}
+  font-size:32px;line-height:1.35;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
 .sc-slide *{box-sizing:border-box}
 .sc-slide.sc-style-gradient{background:linear-gradient(135deg,var(--bg) 0%,color-mix(in srgb,var(--brand) 22%,var(--bg)) 100%)}
 .sc-slide .sc-body{position:absolute;inset:96px 120px 120px 120px;display:flex;flex-direction:column;gap:28px}
@@ -90,6 +90,30 @@ export const SLIDE_CSS = `
 .sc-slide .sc-badge.v-mid{background:#FFF1D6;color:#7A4B00}
 .sc-slide .sc-badge.v-bad{background:#FDECEC;color:#8C2323}
 .sc-slide .sc-badge.v-plain{background:color-mix(in srgb,var(--brand) 14%,var(--surface));color:var(--brand-deep)}
-.sc-slide mark.sahkan{background:#FFE8A3;color:#6B4E00;border-radius:6px;padding:0 .2em}
+.sc-slide .sc-diagram{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+.sc-slide .sc-flow{display:grid;grid-template-columns:repeat(var(--per,4),1fr);column-gap:56px;row-gap:64px}
+.sc-slide .sc-step{position:relative;background:var(--surface);border:2px solid var(--line);border-radius:var(--radius);padding:26px 28px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.sc-slide .sc-step .no{width:48px;height:48px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:24px;display:grid;place-items:center}
+.sc-slide .sc-step .lb{font-weight:600;font-size:28px;line-height:1.25;color:var(--ink)}
+.sc-slide .sc-step .dt{font-size:22px;line-height:1.35;color:var(--ink2)}
+.sc-slide .sc-step.a-right::after{content:"";position:absolute;right:-46px;top:50%;width:0;height:0;border-top:14px solid transparent;border-bottom:14px solid transparent;border-left:22px solid var(--brand-deep);transform:translateY(-50%)}
+.sc-slide .sc-step.a-down::after{content:"";position:absolute;bottom:-50px;left:50%;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:22px solid var(--brand-deep);transform:translateX(-50%)}
+.sc-slide .sc-tl{position:relative;display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:24px}
+.sc-slide .sc-tl::before{content:"";position:absolute;left:0;right:0;top:18px;height:8px;border-radius:4px;background:var(--line)}
+.sc-slide .sc-ev{position:relative;padding-top:60px;text-align:center;min-width:0}
+.sc-slide .sc-ev .dot{position:absolute;top:6px;left:50%;width:32px;height:32px;margin-left:-16px;border-radius:50%;background:var(--brand);border:6px solid var(--surface)}
+.sc-slide .sc-ev .wh{font-weight:700;font-size:26px;color:var(--brand-deep)}
+.sc-slide .sc-ev .lb{font-size:24px;line-height:1.35;color:var(--ink);margin-top:8px}
+.sc-slide table.sc-matrix thead th{text-align:center}
+.sc-slide table.sc-matrix th.rh{background:transparent;color:var(--ink);text-align:left}
+.sc-slide table.sc-matrix td{text-align:center;color:var(--ink2);font-size:24px}
+.sc-slide table.sc-matrix .mk{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;font-weight:700;font-size:26px}
+.sc-slide table.sc-matrix .mk.yes{background:var(--brand);color:#fff}
+.sc-slide table.sc-matrix .mk.no{background:var(--line);color:var(--ink2)}
 .sc-slide code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:color-mix(in srgb,var(--line) 50%,transparent);padding:0 .25em;border-radius:6px}
 `;
+
+// Every font size is a multiple of --k (and the source lines of --kc), which
+// fitSlide() lowers until nothing on the slide overflows. At --k:1 the slide
+// looks exactly as designed.
+export const SLIDE_CSS = RAW_CSS.replace(/(\.sc-cite\{[^}]*?)font-size:(\d+)px/, "$1font-size:calc($2px * var(--kc, 1))").replace(/font-size:(\d+)px/g, "font-size:calc($1px * var(--k, 1))");
