@@ -18,6 +18,7 @@ interface Behaviour {
   /** A rate limit: the number of 429s still to send, and the wait they ask for. */
   limited?: number;
   retryIn?: number;
+  daily?: boolean;
   badModel?: boolean;
 }
 
@@ -53,7 +54,7 @@ beforeAll(async () => {
       if (behaviour.limited && behaviour.limited > 0) {
         behaviour.limited--;
         res.writeHead(429, { "content-type": "application/json" });
-        return res.end(JSON.stringify([{ error: { code: 429, message: `You exceeded your current quota.\nPlease retry in ${behaviour.retryIn}s.`, status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: `${behaviour.retryIn}s` }] } }]));
+        return res.end(JSON.stringify([{ error: { code: 429, message: `You exceeded your current quota.\nPlease retry in ${behaviour.retryIn}s.`, status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: `${behaviour.retryIn}s` }, ...(behaviour.daily ? [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaMetric: "generativelanguage.googleapis.com/generate_content_free_tier_requests", quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] : [])] } }]));
       }
       if (behaviour.badModel) return geminiFail("* GenerateContentRequest.model: unexpected model name format");
       if (behaviour.gemini && body.response_format?.type === "json_schema") return geminiFail('Invalid JSON payload received. Unknown name "additionalProperties" at \'generation_config.response_schema\': Cannot find field.');
@@ -83,6 +84,15 @@ describe("gateway compatibility", () => {
     expect(await chatJson(args())).toEqual({ title: "ok", n: 1 });
     expect(Date.now() - t0).toBeGreaterThanOrEqual(1300); // 0.4 s asked, plus a second's margin
     behaviour = {};
+  });
+
+  it("does not wait on a daily quota even when it says retry in seconds", async () => {
+    behaviour = { limited: 5, retryIn: 1, daily: true };
+    const t0 = Date.now();
+    const e = await chatJson(args()).catch((x) => x);
+    behaviour = {};
+    expect(Date.now() - t0).toBeLessThan(900);
+    expect(e.status).toBe(429);
   });
 
   it("does not sit out a long (daily) limit: it stops and says why", async () => {

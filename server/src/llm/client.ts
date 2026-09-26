@@ -95,7 +95,9 @@ async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: numbe
         // A rate limit says how long to wait. Wait that long when it is short (a per-minute limit);
         // a long wait means a daily limit, where retrying now only spends another request.
         const wait = retryAfterSeconds(res.headers.get("retry-after"), text);
-        if (wait !== null && wait > MAX_RATE_WAIT_S) throw last;
+        // Google names a daily quota in its quotaId ("…PerDay…") and still says "retry in 58 s";
+        // waiting cannot help there, so stop before spending another request.
+        if (/PerDay/.test(text) || (wait !== null && wait > MAX_RATE_WAIT_S)) throw last;
         if (attempt < 2) await new Promise((r) => setTimeout(r, wait !== null ? (wait + 1) * 1000 : 1500 * (attempt + 1)));
         continue;
       }
