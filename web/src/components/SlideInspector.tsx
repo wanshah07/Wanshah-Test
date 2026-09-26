@@ -14,11 +14,56 @@ interface Props {
   onRewrite: (instruction: string) => Promise<void>;
 }
 
+/**
+ * Text the user is typing, kept exactly as typed ("first⏎", "1.", "-"), and
+ * only replaced when the value changes from outside (a rewrite, another slide).
+ */
+function useDraft<T>(value: T, format: (v: T) => string, parse: (s: string) => T): [string, (s: string) => void] {
+  const [draft, setDraft] = useState(() => format(value));
+  const outside = format(value);
+  useEffect(() => {
+    setDraft((d) => (format(parse(d)) === outside ? d : outside));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outside]);
+  return [draft, setDraft];
+}
+
+const splitLines = (s: string) => s.split("\n").filter((l) => l.trim());
+
 function Lines({ label, value, onChange, help, rows = 4 }: { label: string; value: string[] | undefined; onChange: (v: string[]) => void; help?: string; rows?: number }) {
+  const [draft, setDraft] = useDraft(value ?? [], (v) => v.join("\n"), splitLines);
   return (
     <div className="field">
       <label>{label}<span className="help">{help ?? "One per line"}</span></label>
-      <textarea rows={rows} value={(value ?? []).join("\n")} onChange={(e) => onChange(e.target.value.split("\n").filter((l, i, a) => l.trim() || i < a.length - 1))} />
+      <textarea
+        rows={rows}
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          onChange(splitLines(e.target.value));
+        }}
+      />
+    </div>
+  );
+}
+
+const parseNumbers = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean).map(Number).filter((x) => Number.isFinite(x));
+
+/** Numbers as typed: "1." and "-" stay in the box until they are numbers. */
+function Numbers({ label, value, onChange }: { label: string; value: number[]; onChange: (v: number[]) => void }) {
+  const [draft, setDraft] = useDraft(value, (v) => v.join(", "), parseNumbers);
+  return (
+    <div className="field">
+      <label>{label}<span className="help">Comma separated numbers</span></label>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          onChange(parseNumbers(e.target.value));
+        }}
+      />
     </div>
   );
 }
@@ -35,8 +80,18 @@ function Text({ label, value, onChange, help, rows }: { label: string; value: st
 const cardLine = (c: CardItem) => [c.heading, c.detail ?? "", c.tag ?? ""].join(" | ").replace(/( \| )+$/, "");
 
 /** Cards as lines of "heading | detail | tag". The text is kept as typed, so a half-written line is not rewritten under the cursor. */
+const parseCards = (text: string): CardItem[] =>
+  text
+    .split("\n")
+    .map((line) => {
+      const [heading = "", detail, tag] = line.split("|").map((x) => x.trim());
+      return { heading, ...(detail ? { detail } : {}), ...(tag ? { tag } : {}) };
+    })
+    .filter((c) => c.heading);
+
 function CardsEditor({ cards, onChange }: { cards: CardItem[]; onChange: (c: CardItem[]) => void }) {
-  const [text, setText] = useState(() => cards.map(cardLine).join("\n"));
+  // Follows the slide when a rewrite changes its cards, so a keystroke never writes stale cards back.
+  const [text, setText] = useDraft(cards, (c) => c.map(cardLine).join("\n"), parseCards);
   return (
     <div className="field">
       <label>Cards<span className="help">One per line: heading | detail | tag. Tags like YES, PARTLY, NO or HIGH, MEDIUM, LOW are coloured.</span></label>
@@ -45,15 +100,7 @@ function CardsEditor({ cards, onChange }: { cards: CardItem[]; onChange: (c: Car
         value={text}
         onChange={(e) => {
           setText(e.target.value);
-          onChange(
-            e.target.value
-              .split("\n")
-              .map((line) => {
-                const [heading = "", detail, tag] = line.split("|").map((x) => x.trim());
-                return { heading, ...(detail ? { detail } : {}), ...(tag ? { tag } : {}) };
-              })
-              .filter((c) => c.heading),
-          );
+          onChange(parseCards(e.target.value));
         }}
       />
     </div>
@@ -76,7 +123,7 @@ function ChartEditor({ chart, onChange }: { chart: ChartSpec; onChange: (c: Char
       {chart.series.map((s, i) => (
         <div key={i} className="grid" style={{ gridTemplateColumns: "1fr 2fr auto", gap: 6, alignItems: "end" }}>
           <Text label={`Series ${i + 1}`} value={s.name} onChange={(v) => setSeries(i, { name: v })} />
-          <Text label="Values" help="Comma separated numbers" value={s.values.join(", ")} onChange={(v) => setSeries(i, { values: v.split(",").map((x) => Number(x.trim())).filter((x) => !Number.isNaN(x)) })} />
+          <Numbers label="Values" value={s.values} onChange={(v) => setSeries(i, { values: v })} />
           <button className="btn btn-quiet btn-xs" style={{ marginBottom: 12 }} onClick={() => onChange({ ...chart, series: chart.series.filter((_, k) => k !== i) })} disabled={chart.series.length < 2}>✕</button>
         </div>
       ))}

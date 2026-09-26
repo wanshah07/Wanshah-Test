@@ -408,7 +408,7 @@ async function composioFetch(key: string, method: "GET" | "POST", path: string, 
   } catch {
     json = { message: text.slice(0, 200) };
   }
-  if (res.status === 401 || res.status === 403) throw new OneDriveError("Composio refused the API key. Check it in Settings, OneDrive pictures.", "composio_key");
+  if (res.status === 401 || res.status === 403) throw new OneDriveError("Composio refused the API key. Paste the key again in Settings, OneDrive pictures (copy it from composio.dev, Settings, API keys).", "composio_key");
   if (!res.ok) {
     const err = json.error as { message?: string } | string | undefined;
     const msg = (typeof err === "string" ? err : err?.message) || (json.message as string) || res.statusText;

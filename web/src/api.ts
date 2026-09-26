@@ -39,6 +39,9 @@ export interface DeckSummary {
   angle: string;
   slides: number;
   themeId?: string;
+  /** The deck's own theme and first slide, for its card. */
+  theme?: Theme;
+  cover?: Slide;
   createdAt: string;
   updatedAt: string;
 }

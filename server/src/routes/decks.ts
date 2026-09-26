@@ -23,7 +23,9 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     const rows = getDb().prepare("SELECT id, title, doc, created_at, updated_at FROM decks WHERE user_id = ? ORDER BY updated_at DESC").all(req.user.id) as { id: string; title: string; doc: string; created_at: string; updated_at: string }[];
     return rows.map((r) => {
       const d = JSON.parse(r.doc) as Deck;
-      return { id: r.id, title: r.title, lang: d.lang, angle: d.angle, slides: d.slides.length, themeId: d.theme?.id, createdAt: r.created_at, updatedAt: r.updated_at };
+      // The deck's own look and first slide, so the card shows the deck as it is.
+      const first = Array.isArray(d.slides) && d.slides[0] ? sanitizeSlide(d.slides[0]) : undefined;
+      return { id: r.id, title: r.title, lang: d.lang, angle: d.angle, slides: d.slides.length, themeId: d.theme?.id, theme: sanitizeTheme(d.theme), cover: first, createdAt: r.created_at, updatedAt: r.updated_at };
     });
   });
 

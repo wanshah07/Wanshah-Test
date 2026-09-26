@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Design, type Job } from "../api";
@@ -55,11 +55,18 @@ export default function NewDeck() {
   }, []);
 
   // The deck row exists from step 2 so uploads have somewhere to go.
+  // One deck however many uploads start at once: they all wait on the same creation.
+  const creating = useRef<Promise<string> | null>(null);
   const ensureDeck = async (): Promise<string> => {
     if (deckId) return deckId;
-    const d = await api.createDeck({ title, lang, angle, themeId, designId });
-    setDeckId(d.id);
-    return d.id;
+    if (!creating.current) {
+      creating.current = api.createDeck({ title, lang, angle, themeId, designId }).then((d) => {
+        setDeckId(d.id);
+        return d.id;
+      });
+      creating.current.catch(() => (creating.current = null));
+    }
+    return creating.current;
   };
 
   const pickAngle = (id: string) => {
@@ -142,10 +149,10 @@ export default function NewDeck() {
       <p className="muted" style={{ marginBottom: 20 }}>Brief, sources, angle, features. The writer works only from what you give it and marks what it cannot source.</p>
       <div className="steps">
         {STEPS.map((s, i) => (
-          <>
-            <div key={s} className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span>{auto && i === 2 ? "Angle: AI" : auto && i === 3 ? "Design" : s}</div>
-            {i < STEPS.length - 1 && <div key={s + "bar"} className="bar" />}
-          </>
+          <Fragment key={s}>
+            <div className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span><span className="l">{auto && i === 2 ? "Angle: AI" : auto && i === 3 ? "Design" : s}</span></div>
+            {i < STEPS.length - 1 && <div className="bar" />}
+          </Fragment>
         ))}
       </div>
 

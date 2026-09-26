@@ -122,7 +122,10 @@ export default function Settings() {
       const active = r.accounts.filter((a) => a.status.toUpperCase() === "ACTIVE");
       if (active.length === 1) await pickAccount(active[0]);
     } catch (e) {
-      setOdMsg((e as Error).message);
+      // A key Composio refuses is not kept: it would only fail again on every pull.
+      const refused = (e as { code?: string }).code === "composio_key";
+      if (refused) setOd(await api.saveOneDrive({ composioKey: null }).catch(() => od));
+      setOdMsg(refused ? "Composio refused this API key, so it was not kept. Copy the key again from composio.dev (Settings, API keys) and paste it above." : (e as Error).message);
     } finally {
       setCzBusy(false);
     }
@@ -247,12 +250,8 @@ export default function Settings() {
                 <div className="row">
                   <button className="btn btn-ghost" onClick={findAccounts} disabled={czBusy || (!czKey.trim() && !od.composio.key)}>{czBusy ? <span className="spin" /> : "Find my OneDrive accounts"}</button>
                   <button className="btn btn-ghost" onClick={saveOd}>Save folder</button>
-                  {od.connected && (
-                    <>
-                      <span className="pill ok">Connected: {od.account}</span>
-                      <button className="btn btn-quiet" onClick={disconnectOd}>Remove key</button>
-                    </>
-                  )}
+                  {od.connected && <span className="pill ok">Connected: {od.account}</span>}
+                  {(od.connected || od.composio.key) && <button className="btn btn-quiet" onClick={disconnectOd}>Remove key</button>}
                 </div>
                 {czAccounts && czAccounts.length === 0 && <div className="banner warn">This key's Composio project has no OneDrive connection. Connect OneDrive in that project on composio.dev, then try again.</div>}
                 {czAccounts && czAccounts.length > 0 && (
