@@ -40,6 +40,24 @@ export function hostOf(baseUrl: string): string {
   }
 }
 
+/**
+ * The endpoint's own reason for refusing. OpenAI sends {error:{message}};
+ * Gemini sends a list, [{error:{message, status}}]; some gateways send a
+ * bare message or plain text.
+ */
+export function errorOf(json: unknown): { message: string; code: string } {
+  const j = (Array.isArray(json) ? json[0] : json) as Record<string, unknown> | undefined;
+  const e = j?.error;
+  if (e && typeof e === "object") {
+    const o = e as { message?: unknown; code?: unknown; status?: unknown };
+    return { message: String(o.message ?? "").slice(0, 400), code: typeof o.code === "string" ? o.code : typeof o.status === "string" ? o.status : "" };
+  }
+  if (typeof e === "string") return { message: e.slice(0, 400), code: "" };
+  if (typeof j?.message === "string") return { message: j.message.slice(0, 400), code: "" };
+  if (typeof j?.raw === "string") return { message: j.raw.replace(/\s+/g, " ").trim().slice(0, 200), code: "" };
+  return { message: "", code: "" };
+}
+
 async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: number): Promise<Record<string, unknown>> {
   const host = hostOf(auth.baseUrl);
   let last: LlmError | null = null;
@@ -61,8 +79,8 @@ async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: numbe
         json = { raw: text };
       }
       if (res.ok) return json;
-      const err = (json.error as { message?: string; code?: string } | undefined) ?? {};
-      last = new LlmError(err.message || `${host} answered ${res.status}`, res.status, err.code || `http_${res.status}`);
+      const err = errorOf(json);
+      last = new LlmError(err.message ? `${host} answered ${res.status}: ${err.message}` : `${host} answered ${res.status}`, res.status, err.code || `http_${res.status}`);
       if (res.status === 429 || res.status >= 500) {
         await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
         continue;
@@ -106,7 +124,6 @@ export function extractJson(text: string): unknown {
 
 // Gateways that speak the OpenAI protocol differ in what they accept. These
 // are the refusals worth one adjusted retry; anything else is a real error.
-const SCHEMA_REFUSED = /response_format|json_schema|strict|structured output|schema/i;
 const MAX_COMPLETION_REFUSED = /max_completion_tokens/i;
 const TEMPERATURE_REFUSED = /temperature/i;
 
@@ -160,7 +177,9 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
         sendTemperature = false;
         continue;
       }
-      if (mode === "schema" && SCHEMA_REFUSED.test(e.message)) {
+      // Strict schemas are where gateways differ most (Gemini accepts only a subset of JSON Schema),
+      // so any other 400 in schema mode earns one try in plain JSON mode; a real error fails there too.
+      if (mode === "schema") {
         mode = "object";
         continue;
       }
@@ -234,8 +253,7 @@ export async function checkKey(apiKey: string, baseUrl: string, timeoutMs = 2000
   try {
     const res = await fetch(`${baseUrl}/models`, { headers: { authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) {
-      const j = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-      return { ok: false, message: `${host} answered ${res.status}: ${j.error?.message || res.statusText}` };
+      return { ok: false, message: `${host} answered ${res.status}: ${errorOf(await res.json().catch(() => ({}))).message || res.statusText}` };
     }
     const j = (await res.json()) as { data?: { id: string }[] };
     const all = (j.data ?? []).map((m) => m.id).sort();
