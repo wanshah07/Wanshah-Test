@@ -98,6 +98,9 @@ function migrate(d: DatabaseSync): void {
       updated_at TEXT NOT NULL
     );
   `);
+  // Columns added after the first release. SQLite has no ADD COLUMN IF NOT EXISTS.
+  const cols = (d.prepare("PRAGMA table_info(settings)").all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes("openai_base")) d.exec("ALTER TABLE settings ADD COLUMN openai_base TEXT");
 }
 
 export function now(): string {

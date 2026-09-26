@@ -66,6 +66,32 @@ The server serves the built web app, so one process and one port is the
 whole deployment. Put it behind HTTPS and set `COOKIE_SECURE=1` when login
 is on. GitHub Pages cannot host it: it needs a disk and a secret.
 
+### Another provider: Mireld or any OpenAI-compatible endpoint
+
+Settings → Writer endpoint and key → Provider. Mireld is listed
+(`https://api.mireld.my/v1`); "Other OpenAI-compatible" takes any address
+ending in `/v1`. Paste the key, press **Test**: it asks the endpoint for its
+model list from the server Slidecraft is running on, so the answer is the
+real one for that machine. Click a model name to use it, then Save.
+
+Three things behave differently on a gateway, and the client handles each:
+it retries once with `json_object` and the schema in the prompt when strict
+`json_schema` is refused; it retries with `max_tokens` when
+`max_completion_tokens` is refused; and it reads JSON out of code fences.
+An endpoint that accepts the connection and never answers is reported as
+silent after the timeout and is **not** retried, so a dead gateway costs one
+wait, not three.
+
+Reachability depends on the machine, not the app. Measured 25 Sep 2026:
+`api.mireld.my` answers (401 without a key) from the Composio sandbox;
+it sent nothing back to GitHub Actions runners on 19 Sep (three client
+shapes, all timeouts). A Codespace runs on GitHub's own cloud, so **Test**
+from inside it is the check that settles it there.
+
+The key is sent only to the endpoint it was saved with. The server-wide
+`OPENAI_API_KEY` is only ever sent to `OPENAI_BASE_URL`, never to an endpoint
+a user picks in Settings.
+
 ### On GitHub, no laptop: Codespaces
 
 `.devcontainer/devcontainer.json` builds and starts the server inside a GitHub

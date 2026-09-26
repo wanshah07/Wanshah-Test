@@ -217,3 +217,32 @@ describe("api", () => {
     expect((await app.inject({ method: "GET", url: `/api/decks/${c.json().id}` })).statusCode).toBe(404);
   });
 });
+
+describe("endpoint setting", () => {
+  it("stores a Mireld endpoint, rejects a malformed one, and never sends the env key to it", async () => {
+    const ok = await app.inject({ method: "PUT", url: "/api/settings", payload: { baseUrl: "https://api.mireld.my/v1/" } });
+    expect(ok.statusCode).toBe(200);
+    const s = (await app.inject({ method: "GET", url: "/api/settings" })).json();
+    expect(s.endpoint.baseUrl).toBe("https://api.mireld.my/v1");
+    expect(s.endpoint.provider).toBe("mireld");
+    expect(s.providers.map((p: { id: string }) => p.id)).toEqual(["openai", "mireld"]);
+    const bad = await app.inject({ method: "PUT", url: "/api/settings", payload: { baseUrl: "mireld" } });
+    expect(bad.statusCode).toBe(400);
+    const { resolveAuth } = await import("../src/settings.js");
+    const { config } = await import("../src/config.js");
+    const saved = config.openaiKey;
+    config.openaiKey = "sk-env-key";
+    const a = resolveAuth("u_local")!;
+    expect(a.apiKey).toBe("sk-env-key");
+    expect(a.baseUrl).toBe(config.openaiBase);
+    await app.inject({ method: "PUT", url: "/api/settings", payload: { openaiKey: "mireld-key-123456", baseUrl: "https://api.mireld.my/v1" } });
+    const b = resolveAuth("u_local")!;
+    expect(b.apiKey).toBe("mireld-key-123456");
+    expect(b.baseUrl).toBe("https://api.mireld.my/v1");
+    config.openaiKey = saved;
+    const t = (await app.inject({ method: "POST", url: "/api/settings/test-key", payload: { baseUrl: "not a url" } })).json();
+    expect(t.ok).toBe(false);
+    await app.inject({ method: "PUT", url: "/api/settings", payload: { openaiKey: null, baseUrl: null } });
+    expect((await app.inject({ method: "GET", url: "/api/settings" })).json().endpoint.provider).toBe("openai");
+  });
+});

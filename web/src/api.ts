@@ -59,6 +59,8 @@ export interface Settings {
   authMode: "off" | "local";
   mockLlm: boolean;
   key: { own: string; server: string; active: "own" | "server" | "none" };
+  endpoint: { baseUrl: string; host: string; provider: string; serverBaseUrl: string };
+  providers: { id: string; name: string; baseUrl: string }[];
   model: string;
   imageModel: string;
   defaults: { model: string; imageModel: string };
@@ -106,8 +108,8 @@ export const api = {
   job: (jid: string) => req<Job>("GET", `/api/jobs/${jid}`),
   rewrite: (id: string, sid: string, instruction: string) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${id}/slides/${sid}/rewrite`, { instruction }),
   settings: () => req<Settings>("GET", "/api/settings"),
-  saveSettings: (b: Partial<{ openaiKey: string | null; model: string; imageModel: string; appTheme: string; defaultTheme: string }>) => req<{ ok: true }>("PUT", "/api/settings", b),
-  testKey: (openaiKey?: string) => req<{ ok: boolean; message: string; models?: string[] }>("POST", "/api/settings/test-key", { openaiKey }),
+  saveSettings: (b: Partial<{ openaiKey: string | null; model: string; imageModel: string; appTheme: string; defaultTheme: string; baseUrl: string | null }>) => req<{ ok: true }>("PUT", "/api/settings", b),
+  testKey: (openaiKey?: string, baseUrl?: string) => req<{ ok: boolean; message: string; models?: string[] }>("POST", "/api/settings/test-key", { openaiKey, baseUrl }),
 };
 
 export function mediaUrl(id: string): string {
