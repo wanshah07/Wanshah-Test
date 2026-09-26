@@ -9,6 +9,18 @@ single HTML file. Runs on your own machine or server, with your own key.
 
 ## What it does
 
+- **Auto** (on by default). Nothing to fill in: the AI reads the sources,
+  chooses the angle, audience, number of slides and layouts, logs what it
+  chose and why, then writes. Anything ticked or typed still steers it, and
+  Regenerate remembers the choice.
+- **Deck craft.** Every deck is written to one standard: a kicker label and
+  an action title with its number on each content slide, a one-line reading
+  line under the title, an at-a-glance slide second, one visual per slide
+  (big numbers, chart, diagram, table, two columns or numbered cards),
+  verdict tags (YES / PARTLY / NO, HIGH / MEDIUM / LOW, English or Malay)
+  coloured in cards and tables, sources on every chart and table, caveats
+  when the evidence is thin, and decisions and next steps at the end. The
+  same standard is on the Prompts page as the "Deck standard" starter.
 - **Sources.** PDF, Word, PowerPoint, Excel and CSV, Markdown, text, HTML,
   pictures, zips and whole folders. Text is extracted on the server; pictures
   become media the writer can place. A large pile of sources is condensed to
@@ -17,7 +29,8 @@ single HTML file. Runs on your own machine or server, with your own key.
   brand pitch, conference talk, internal update, or custom. Each sets the
   tone, a suggested structure and the default features.
 - **Features.** Charts (column, bar, line, area, pie, doughnut, native in
-  PPTX), tables, diagrams (flow, timeline, matrix), KPI tiles, figures from
+  PPTX), tables, diagrams (flow, timeline, matrix), KPI tiles, numbered
+  cards, figures from
   your uploads or from the image model, speaker notes, citations, section
   dividers, a summary slide, a Q&A slide.
 - **De-slop.** The writer is told what not to write. What slips through is

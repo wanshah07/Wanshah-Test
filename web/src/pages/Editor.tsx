@@ -294,6 +294,7 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
   const [link, setLink] = useState(deck.onedrive);
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
+  const [auto, setAuto] = useState(!!stored?.auto);
   const prompt = composeBrief(brief);
   const reload = () => api.sources(deck.id).then(setSources).catch(() => {});
   const add = async (files: PathedFile[]) => {
@@ -310,13 +311,13 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
     }
   };
   const run = async (allowUnreadPictures = false) => {
-    if (prompt.trim().length < 10) {
+    if (!auto && prompt.trim().length < 10) {
       toast("Tick what the deck is for, or type a few words", true);
       return;
     }
     try {
       const audience = composeAudience(brief.audiences, brief.audienceText) || deck.audience;
-      const { jobId } = await api.generate(deck.id, { prompt, title: deck.title, lang: deck.lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
+      const { jobId } = await api.generate(deck.id, { prompt, auto, title: deck.title, lang: deck.lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
         const j = await api.job(jobId);
         setJob(j);
@@ -352,7 +353,12 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       <hr />
       <h4>Regenerate</h4>
       {stored && <p className="small muted">Your last choices are ticked. Change anything, then regenerate.</p>}
+      <label className="row small" style={{ gap: 6 }} data-testid="regen-auto">
+        <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+        <b>Auto: let the AI decide</b> the angle, length and layouts
+      </label>
       <BriefPicker value={brief} onChange={setBrief} compact />
+      {!auto && <>
       <div className="grid c2" style={{ gap: 8 }}>
         <select value={slides} onChange={(e) => setSlides(Number(e.target.value))}>{LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}</select>
         <select value={angle} onChange={(e) => setAngle(e.target.value)}>{ANGLES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
@@ -369,6 +375,7 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
           <option value="none">Placeholders only</option>
         </select>
       )}
+      </>}
       {deck.slides.length > 0 ? (
         <ConfirmButton className="btn btn-primary" confirm={`Click again: replace all ${deck.slides.length} slides`} onConfirm={() => run()} disabled={!!running}>
           {running ? <span className="spin" /> : "Regenerate deck"}

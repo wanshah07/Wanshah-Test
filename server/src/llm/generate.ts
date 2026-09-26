@@ -1,4 +1,4 @@
-import { angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themePreset, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
+import { ANGLES, angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themePreset, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
 import { config } from "../config.js";
 import { getDb, now } from "../db.js";
 import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, type SourceRow } from "../store.js";
@@ -7,7 +7,7 @@ import fs from "node:fs";
 import { chatJson, chatText, generateImage, LlmError, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
 import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
-import { DECK_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
+import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
 import { resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
 import { getDesign, promptTexts } from "../library.js";
@@ -55,7 +55,45 @@ export function normaliseParams(raw: Record<string, unknown>, fallbackAngle = "c
     slides,
     features,
     imageMode: features.images ? imageMode : "none",
+    auto: raw.auto === true,
   };
+}
+
+/** What Auto writes when the user typed nothing at all. */
+export const AUTO_PROMPT = "Build the strongest professional deck the sources support. Work out the purpose, the audience and the one conclusion from the material itself.";
+
+export function planSystem(): string {
+  return [
+    "You plan a slide deck before it is written. Read the brief and the sources, then choose what a senior consultant would choose.",
+    "ANGLES: " + ANGLES.map((a) => `${a.id} (${a.name}: ${a.summary})`).join("; ") + ".",
+    "Choose: the angle that fits the material; the audience in a few words; the number of slides (6 to 30, about one slide per distinct point the sources can carry, never padding); a working title that states the conclusion; and which devices the material can fill: charts only if the sources carry numbers in series, tables if they carry comparisons, diagrams if they describe a process or dates, kpis if they carry headline figures, sections if the deck has more than 12 slides, summary and qa if the audience will decide or ask.",
+    "reason: one sentence on why, for the user to read.",
+    "Answer only with the JSON the schema asks for.",
+  ].join("\n");
+}
+
+export interface Plan {
+  title: string | null;
+  angle: string;
+  audience: string;
+  slides: number;
+  features: Pick<Features, "charts" | "tables" | "diagrams" | "kpis" | "sections" | "summary" | "qa">;
+  reason: string;
+}
+
+/** Folds a plan into the params. Notes and citations stay on; pictures follow what the deck holds. */
+export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): void {
+  p.angle = angleById(plan.angle).id;
+  if (plan.audience?.trim()) p.audience = plan.audience.trim().slice(0, 120);
+  p.slides = Math.max(6, Math.min(30, Math.round(Number(plan.slides) || 12)));
+  if (!p.title && plan.title?.trim()) p.title = plan.title.trim().slice(0, 140);
+  const f = plan.features ?? ({} as Plan["features"]);
+  p.features = { ...p.features, charts: !!f.charts, tables: !!f.tables, diagrams: !!f.diagrams, kpis: !!f.kpis, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
+  p.imageMode = hasPictures ? "uploaded" : "none";
+}
+
+export function mockPlan(p: GenerateParams, hasNumbers: boolean): Plan {
+  return { title: null, angle: "regulatory-briefing", audience: "management and product teams", slides: 12, features: { charts: hasNumbers, tables: true, diagrams: true, kpis: true, sections: true, summary: true, qa: false }, reason: `Stand-in plan for: ${p.prompt.slice(0, 60)}` };
 }
 
 /** Sources with their text, condensed when the total is over the budget. */
@@ -111,6 +149,7 @@ export function demote(s: Slide): void {
     else items.push(...d.rows.map((r, i) => `${r}: ${d.cols.map((c, j) => `${c} ${d.cells[i]?.[j] ?? ""}`).join(", ")}`));
   }
   if (s.layout === "image" && s.image?.caption) items.push(s.image.caption);
+  if (s.layout === "cards" && s.cards) items.push(...s.cards.map((k) => `${k.tag ? `${k.tag}: ` : ""}${k.heading}${k.detail ? ` (${k.detail})` : ""}`));
   if (s.layout === "section") {
     if (s.subtitle) items.push(s.subtitle);
   }
@@ -131,6 +170,7 @@ function toSlide(raw: Record<string, unknown>, features: Features, imageMode: st
   if (s.layout === "table" && !s.table?.header?.length) s.layout = "bullets";
   if (s.layout === "kpi" && !s.kpi?.length) s.layout = "bullets";
   if (s.layout === "quote" && !s.quote?.text) s.layout = "bullets";
+  if (s.layout === "cards" && !s.cards?.length) s.layout = "bullets";
   const banned: Record<string, boolean> = { chart: !features.charts, table: !features.tables, diagram: !features.diagrams, kpi: !features.kpis, image: !features.images || imageMode === "none", section: !features.sections };
   if (banned[s.layout]) demote(s);
   if (!features.notes) delete s.notes;
@@ -163,8 +203,24 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     }
     if (auth) await readUploadedPictures(jobId, userId, deckId, auth);
     const rows = listSources(deckId);
-    log(jobId, `${rows.length} source${rows.length === 1 ? "" : "s"}, ${p.slides} slides, angle ${angleById(p.angle).name}, ${p.lang === "ms" ? "Bahasa Malaysia" : "English"}`);
     const { sources, condensed } = await prepareSources(jobId, auth, p, rows);
+    if (p.auto) {
+      log(jobId, "Auto: reading the material to choose the angle, audience, length and layouts");
+      const hasPictures = rows.some((r) => r.kind === "image" && r.media_id);
+      const plan: Plan = config.mockLlm || !auth
+        ? mockPlan(p, sources.some((x) => /\d{2,}/.test(x.text)))
+        : await chatJson({ auth, system: planSystem(), user: userPrompt(p, sources.map((x) => ({ ...x, text: x.text.slice(0, 12000) })), condensed), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+      applyPlan(p, plan, hasPictures);
+      const on = (["charts", "tables", "diagrams", "kpis", "sections"] as const).filter((k) => p.features[k]);
+      log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}. ${plan.reason}`);
+      const d = loadDeck(userId, deckId);
+      if (d) {
+        d.brief = { ...(d.brief ?? { text: "", purposes: [], include: [], audiences: [] }), slides: p.slides, imageMode: p.imageMode, features: { ...p.features }, auto: true };
+        saveDeck(userId, d);
+        deck.brief = d.brief;
+      }
+    }
+    log(jobId, `${rows.length} source${rows.length === 1 ? "" : "s"}, ${p.slides} slides, angle ${angleById(p.angle).name}, ${p.lang === "ms" ? "Bahasa Malaysia" : "English"}`);
     log(jobId, "Writing the deck");
     let json: { title: string; subtitle: string | null; slides: Record<string, unknown>[] };
     if (config.mockLlm || !auth) {

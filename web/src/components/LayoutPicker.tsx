@@ -14,6 +14,7 @@ export const LAYOUT_NAMES: Record<Layout, string> = {
   image: "Picture",
   quote: "Quote",
   kpi: "Big numbers",
+  cards: "Numbered cards",
   closing: "Closing",
 };
 
@@ -25,6 +26,7 @@ export function fillFor(slide: Slide, l: Layout): Partial<Slide> {
   if (l === "table" && !slide.table) out.table = b.table;
   if (l === "diagram" && !slide.diagram) out.diagram = b.diagram;
   if (l === "kpi" && !slide.kpi?.length) out.kpi = b.kpi;
+  if (l === "cards" && !slide.cards?.length) out.cards = b.cards;
   if (l === "quote" && !slide.quote) out.quote = b.quote;
   if (l === "image" && !slide.image) out.image = b.image;
   if ((l === "bullets" || l === "two-column") && !slide.bullets?.length) out.bullets = b.bullets;

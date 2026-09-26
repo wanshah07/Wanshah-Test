@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { vision: false, garbage: false, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { vision: false, garbage: false, plans: 0, planUser: "", systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -82,6 +82,11 @@ beforeAll(async () => {
         gw.reads++;
         return reply("Salicylic acid limit | 2%\nEffective | 1 Jan 2027");
       }
+      if (body.response_format?.json_schema?.name === "plan") {
+        gw.plans++;
+        gw.planUser = String(user ?? "");
+        return reply(JSON.stringify({ title: "Salicylic acid: 2% cap needs 4 SKUs reformulated", angle: "medical-affairs", audience: "dermatologists", slides: 7, features: { charts: false, tables: true, diagrams: false, kpis: true, sections: false, summary: true, qa: true }, reason: "The sources are clinical and carry no series of numbers." }));
+      }
       gw.systems.push(String(body.messages?.[0]?.content ?? ""));
       gw.formats.push(String(body.response_format?.type ?? ""));
       gw.users.push(String(user ?? ""));
@@ -125,6 +130,50 @@ describe("the writer's instructions and failures", () => {
     expect(line).toMatch(/Sorry, I can only help with questions about cooking/);
     const snippet = line.split("Model reply (first 500 characters): ")[1];
     expect(snippet.length).toBe(501); // 500 characters and the ellipsis
+  });
+});
+
+describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
+  it("refuses an empty brief without Auto and accepts it with Auto", async () => {
+    const id = await newDeck("auto");
+    const bare = await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "" } });
+    expect(bare.statusCode).toBe(400);
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "", auto: true, slides: 20, angle: "brand-pitch", features: { charts: true, diagrams: true } } }));
+    const job = await waitJob(jobId);
+    expect(job.status, job.error ?? "").toBe("done");
+    expect(gw.plans).toBe(1);
+    expect(gw.planUser).toMatch(/Build the strongest professional deck/);
+    const log = job.progress.join("\n");
+    expect(log).toMatch(/Auto: Medical affairs \/ HCP education for dermatologists, 7 slides, using tables, kpis\. The sources are clinical/);
+    // The writer is told what the planner chose, not what the form carried.
+    const sys = gw.systems.at(-1)!;
+    expect(sys).toMatch(/ANGLE: Medical affairs \/ HCP education/);
+    expect(sys).toMatch(/AUDIENCE: dermatologists/);
+    expect(sys).toMatch(/exactly 7 slides/);
+    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, table, kpi\./);
+    expect(gw.users.at(-1)).toMatch(/DECK TITLE \(use it\): Salicylic acid: 2% cap/);
+    const deck = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
+    expect(deck.angle).toBe("medical-affairs");
+    expect(deck.brief).toMatchObject({ auto: true, text: "", slides: 7 });
+    expect(deck.brief.features).toMatchObject({ charts: false, diagrams: false, kpis: true, notes: true, citations: true });
+  });
+
+  it("writes the deck craft rules into every writer's instructions", () => {
+    const sys = gw.systems.at(-1)!;
+    expect(sys).toMatch(/DECK CRAFT/);
+    expect(sys).toMatch(/`kicker` on every content slide/);
+    expect(sys).toMatch(/action titles/);
+    expect(sys).toMatch(/YES \/ PARTLY \/ NO/);
+    expect(sys).toMatch(/- cards: 2 to 6 numbered cards/);
+  });
+
+  it("leaves the choices alone without Auto", async () => {
+    const before = gw.plans;
+    const id = await newDeck("manual");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits", slides: 8, angle: "training" } }));
+    await waitJob(jobId);
+    expect(gw.plans).toBe(before);
+    expect(gw.systems.at(-1)).toMatch(/exactly 8 slides/);
   });
 });
 

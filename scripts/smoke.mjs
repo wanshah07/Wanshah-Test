@@ -70,6 +70,9 @@ try {
     await d.dismiss();
   });
   await page.fill('input[placeholder^="e.g. Salicylic"]', "Smoke deck");
+  check("Auto starts ticked and needs no brief", (await page.locator("[data-testid=auto] input").isChecked()) && (await page.locator("button:has-text('Continue')").isEnabled()));
+  // The rest of this deck is briefed by hand.
+  await page.click("[data-testid=auto]");
   check("Continue waits for a brief", await page.locator("button:has-text('Continue')").isDisabled());
   // A brief made of ticks only, no typing.
   await page.click(".chip:has-text('Explain a regulation change')");
@@ -96,7 +99,7 @@ try {
     genCalls++;
     if (genCalls === 1) return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "timeout", message: "api.mireld.my did not answer within 240 s" }) });
     if (genCalls === 2) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: "pictures_unreadable", message: "The writer model (m1) cannot read pictures. 1 picture source (scan.png) would be used only as slide pictures; any text, table or figure inside them would not reach the deck.", pictures: ["scan.png"] }) });
-    allowSent = JSON.parse(route.request().postData() || "{}").allowUnreadPictures === true;
+    if (genCalls === 3) allowSent = JSON.parse(route.request().postData() || "{}").allowUnreadPictures === true;
     return route.continue();
   });
   await page.click("button:has-text('Generate')");
@@ -108,7 +111,8 @@ try {
   await page.click("button:has-text('Write anyway')");
   await page.waitForURL(/\/deck\//, { timeout: 30000 });
   check("Try again and Write anyway recover with the same choices", allowSent);
-  await page.unroute("**/api/decks/*/generate");
+  // No unroute: removing a route while the editor's first request is in flight can leave that request hanging.
+  // The handler already lets every later call through.
   await page.waitForSelector(".thumb", { timeout: 10000 });
   const thumbs = await page.locator(".thumb").count();
   check("editor shows the generated slides", thumbs >= 6);
@@ -120,7 +124,7 @@ try {
   // Layouts as pictures: change one slide's layout, add a slide from the picture modal.
   await page.locator(".thumb").nth(3).click();
   await page.click("button:has-text('Change layout')");
-  check("layouts show as pictures", (await page.locator(".field .pickcard").count()) === 11);
+  check("layouts show as pictures", (await page.locator(".field .pickcard").count()) === 12);
   await page.locator(".field .pickcard", { hasText: "Table" }).click();
   await page.waitForTimeout(1200);
   {
@@ -203,6 +207,22 @@ try {
   await page.locator(".deckcard button:has-text('Click again')").first().click();
   await page.waitForFunction((n) => document.querySelectorAll(".deckcard").length < n, cards, { timeout: 5000 }).catch(() => {});
   check("delete works with two clicks", (await page.locator(".deckcard").count()) === cards - 1);
+  // Auto: nothing typed, nothing ticked; the AI chooses. Angle is skipped.
+  await page.click("text=New deck");
+  await page.click("button:has-text('Continue')");
+  await page.locator("text=Drop files").first().waitFor({ timeout: 5000 }).catch(() => {});
+  await page.click("button:has-text('Continue')");
+  check("Auto skips the angle step and the feature choices", (await page.locator("h3", { hasText: "Design" }).count()) === 1 && (await page.locator("h3", { hasText: "Features" }).count()) === 0 && (await page.locator("text=Training / workshop").count()) === 0);
+  await page.click("button:has-text('Generate (AI decides)')");
+  await page.waitForURL(/\/deck\//, { timeout: 30000 });
+  {
+    const id = page.url().split("/deck/")[1];
+    const d = await (await fetch(`http://localhost:${PORT}/api/decks/${id}`)).json();
+    check("an Auto deck is written from an empty brief", d.deck.slides.length >= 6 && d.deck.brief?.auto === true);
+    check("an Auto deck has kickers and numbered cards", d.deck.slides.some((x) => x.kicker) && d.deck.slides.some((x) => x.layout === "cards" && x.cards?.length >= 2));
+  }
+  await page.click("button:has-text('Add files / regenerate')");
+  check("Regenerate remembers Auto", await page.locator("[data-testid=regen-auto] input").isChecked());
   check("no browser pop-ups used", dialogs === 0);
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);

@@ -39,6 +39,8 @@ export default function NewDeck() {
   const [pasteText, setPasteText] = useState("");
   const [job, setJob] = useState<Job | null>(null);
   const [startError, setStartError] = useState("");
+  // Auto: the AI reads the material and chooses the angle, audience, length and layouts.
+  const [auto, setAuto] = useState(true);
   const prompt = composeBrief(brief);
   const audience = composeAudience(brief.audiences, brief.audienceText);
 
@@ -104,7 +106,7 @@ export default function NewDeck() {
         if (designId) await api.applyDesign(id, designId);
         else await api.applyPreset(id, themeId);
       }
-      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
+      const { jobId } = await api.generate(id, { prompt, auto, title, lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
         try {
           const j = await api.job(jobId);
@@ -124,8 +126,11 @@ export default function NewDeck() {
   };
 
   const hasPictures = sources.some((s) => s.kind === "image");
-  const canNext = step === 0 ? prompt.trim().length > 10 : true;
+  const canNext = step === 0 ? auto || prompt.trim().length > 10 : true;
   const briefHint = step === 0 && !canNext ? "Tick what the deck is for, or type a few words." : "";
+  // Auto skips the Angle step; the Features step keeps only the design.
+  const next = () => setStep((s) => (auto && s === 1 ? 3 : s + 1) as Step);
+  const back = () => setStep((s) => Math.max(0, auto && s === 3 ? 1 : s - 1) as Step);
 
   return (
     <main className="page" style={{ maxWidth: 900 }}>
@@ -134,7 +139,7 @@ export default function NewDeck() {
       <div className="steps">
         {STEPS.map((s, i) => (
           <>
-            <div key={s} className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span>{s}</div>
+            <div key={s} className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span>{auto && i === 2 ? "Angle: AI" : auto && i === 3 ? "Design" : s}</div>
             {i < STEPS.length - 1 && <div key={s + "bar"} className="bar" />}
           </>
         ))}
@@ -142,11 +147,25 @@ export default function NewDeck() {
 
       {step === 0 && (
         <div className="card stack">
+          <label className={"toggle" + (auto ? " on" : "")} data-testid="auto">
+            <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+            <div>
+              <b>Auto: let the AI decide</b>
+              <span>Nothing to fill in. The AI reads your sources and chooses the angle, audience, number of slides and layouts, then builds the deck to a professional standard (kicker labels, action titles, an at-a-glance slide, verdict tags, next steps). Anything you tick or type below still steers it.</span>
+            </div>
+          </label>
           <label className="f">
             Deck title <span className="h">Optional. The writer proposes one if empty.</span>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Salicylic acid: what the 2026 amendment changes for our range" />
           </label>
-          <BriefPicker value={brief} onChange={setBrief} />
+          {auto ? (
+            <details>
+              <summary className="small">Steer it (optional)</summary>
+              <BriefPicker value={brief} onChange={setBrief} />
+            </details>
+          ) : (
+            <BriefPicker value={brief} onChange={setBrief} />
+          )}
           <div>
             <b className="small">Language</b>
             <div className="chips">
@@ -201,7 +220,7 @@ export default function NewDeck() {
 
       {step === 3 && (
         <div className="stack">
-          <div className="card stack">
+          {!auto && <div className="card stack">
             <h3>Length and theme</h3>
             <div className="grid c2">
               <label className="f">
@@ -211,7 +230,7 @@ export default function NewDeck() {
                 </select>
               </label>
             </div>
-          </div>
+          </div>}
           <div className="card stack">
             <div className="row between">
               <h3>Design</h3>
@@ -226,7 +245,8 @@ export default function NewDeck() {
             />
             <span className="small muted">Your designs also carry notes the writer follows (title length, text per slide). Colours and fonts can be changed later in the editor.</span>
           </div>
-          <div className="card stack">
+          {auto && <p className="small muted">Auto chooses the length and the layouts from your material, and uses your uploaded pictures if there are any. Untick Auto on the first step to choose them yourself.</p>}
+          {!auto && <div className="card stack">
             <h3>Features</h3>
             <div className="grid c2">
               {(Object.keys(FEATURE_LABELS) as (keyof Features)[]).map((k) => (
@@ -246,7 +266,7 @@ export default function NewDeck() {
                 </select>
               </label>
             )}
-          </div>
+          </div>}
         </div>
       )}
 
@@ -272,7 +292,7 @@ export default function NewDeck() {
                 <button className="btn btn-primary" onClick={() => start()}>Try again</button>
                 {why?.anyway && <button className="btn btn-ghost" onClick={() => start(true)}>Write anyway (pictures as slide pictures only)</button>}
                 {why?.settings && <Link className="btn btn-ghost" to="/settings" target="_blank">Open Settings</Link>}
-                <button className="btn btn-ghost" onClick={() => setStep(3)}>Change the choices</button>
+                <button className="btn btn-ghost" onClick={() => setStep(auto ? 0 : 3)}>Change the choices</button>
                 {deckId && <button className="btn btn-quiet" onClick={() => nav(`/deck/${deckId}`)}>Open the deck</button>}
               </div>
             )}
@@ -283,14 +303,14 @@ export default function NewDeck() {
 
       {step < 4 && (
         <div className="row between" style={{ marginTop: 20 }}>
-          <button className="btn btn-quiet" onClick={() => setStep((s) => Math.max(0, s - 1) as Step)} disabled={step === 0}>Back</button>
+          <button className="btn btn-quiet" onClick={back} disabled={step === 0}>Back</button>
           {step < 3 ? (
             <span className="row">
               {briefHint && <span className="small muted">{briefHint}</span>}
-              <button className="btn btn-primary" onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext}>Continue</button>
+              <button className="btn btn-primary" onClick={next} disabled={!canNext}>Continue</button>
             </span>
           ) : (
-            <button className="btn btn-primary" onClick={() => start()}>Generate {slides} slides</button>
+            <button className="btn btn-primary" onClick={() => start()}>{auto ? "Generate (AI decides)" : `Generate ${slides} slides`}</button>
           )}
         </div>
       )}

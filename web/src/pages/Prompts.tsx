@@ -9,6 +9,18 @@ import { toast } from "../components/Toast";
 const EXAMPLES = [
   { name: "Malaysia first", text: "Cite NPRA, JAKIM or KKM instruments before any EU or other source. Use Malaysian examples and ringgit." },
   { name: "Plain words for brand owners", text: "Write for a brand owner with no regulatory background. Explain each term the first time it appears." },
+  {
+    name: "Deck standard",
+    text: [
+      "Build every deck to a professional consultancy standard.",
+      "1. Structure: title; an at-a-glance slide that gives the answer and the 3 or 4 numbers or decisions behind it; the evidence, one point per slide; a caveats slide if the evidence is thin; decisions and next steps as numbered cards (owner, action, date); references; closing.",
+      "2. Every content slide has a kicker (a 1 to 4 word uppercase label such as AT A GLANCE, THE EVIDENCE, COSTING, NEXT STEPS), an action title under 12 words that states the conclusion with its number, and a one-sentence reading line under the title.",
+      "3. One visual per slide, chosen by the content: figures as big-number tiles or a chart; a process or plan as a flow or timeline; a comparison as a table or two columns; points, answers, risks or steps as numbered cards. Never two plain bullet slides in a row.",
+      "4. Show judgements as verdict tags: YES / PARTLY / NO, HIGH / MEDIUM / LOW, PASS / FAIL.",
+      "5. Every chart and table names its source. Cite the instrument, clause or paper, never a blog.",
+      "6. Density follows the audience: experts, clinicians and management get 80 to 160 words a slide; consumers and trade get under 60. Speaker notes on every slide carry the argument and the caveats.",
+    ].join("\n"),
+  },
   { name: "Numbers up front", text: "Lead each slide with the figure or date that matters, then the explanation." },
 ];
 

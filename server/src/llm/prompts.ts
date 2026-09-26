@@ -13,6 +13,8 @@ export interface GenerateParams {
   house?: { name: string; text: string }[];
   /** Notes read from the reference design the deck uses. */
   designNotes?: string;
+  /** The AI chose the angle, audience, length and features itself. */
+  auto?: boolean;
 }
 
 function houseLines(house: GenerateParams["house"], designNotes: string | undefined): string[] {
@@ -38,7 +40,7 @@ const LANG_RULES: Record<Lang, string> = {
 export function systemPrompt(p: GenerateParams): string {
   const angle = angleById(p.angle);
   const f = p.features;
-  const allowed: string[] = ["title", "bullets", "two-column", "quote", "closing"];
+  const allowed: string[] = ["title", "bullets", "two-column", "cards", "quote", "closing"];
   if (f.sections) allowed.push("section");
   if (f.charts) allowed.push("chart");
   if (f.tables) allowed.push("table");
@@ -70,11 +72,24 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("- Do not open with a scene-setter or close with a summary of the summary. Do not congratulate the reader or the presenter.");
   lines.push("- Use **bold** only for the single figure or term on a slide that matters most, at most once per slide.");
   lines.push("");
+  lines.push("DECK CRAFT (how a strong professional deck is built; follow all of it):");
+  lines.push("- `kicker` on every content slide: a short uppercase label of 1 to 4 words naming the part of the argument, e.g. AT A GLANCE, THE EVIDENCE, COSTING, YEAR 1, NEXT STEPS. Null on title, section and closing slides.");
+  lines.push("- Titles are action titles: the conclusion of the slide in under 12 words, carrying its number where there is one ('3 of 5 claims need a clinical study', not 'Claims review').");
+  lines.push("- `subtitle` on a content slide is the reading line: one sentence under 20 words that tells the reader how to read the slide or what it means for them.");
+  lines.push("- One visual device per slide, chosen by what the content is: figures to kpi or chart; a process, pathway or plan to diagram; a comparison to table or two-column; a set of points, answers, decisions, risks or next steps to cards. Use plain bullets only when nothing else fits, and never on two slides in a row.");
+  lines.push("- Slide 2 answers first: an at-a-glance slide (kpi or cards) with the conclusion and the 3 or 4 numbers or decisions that carry it, before any background.");
+  lines.push("- Put a verdict where there is a judgement: tag cards and table cells with YES / PARTLY / NO, HIGH / MEDIUM / LOW, PASS / FAIL or MET / NOT MET so the reader sees the answer before the reasoning.");
+  lines.push("- Every chart and table names its source.");
+  lines.push("- If the evidence is thin, contested or from a single study, add one slide of caveats that says so plainly.");
+  lines.push("- End on substance: a cards slide of the decisions or next steps (who, what, by when where the sources give it), then a references slide if there are citations, then the closing slide.");
+  lines.push("- Density follows the audience: for experts, clinicians, regulators or management a content slide may carry 80 to 160 words across its elements; for consumers, sales or trade keep it under 60 and let the notes carry the rest.");
+  lines.push("");
   lines.push("SLIDE LAYOUTS you may use: " + allowed.join(", ") + ". Any other layout is forbidden.");
   lines.push("- title: first slide only. subtitle carries the occasion, audience or date if known.");
   lines.push("- closing: last slide. If a summary is requested, put it on a bullets slide before the closing slide.");
   if (f.sections) lines.push("- section: a divider before each part. Title is the part name, subtitle one line on what it decides.");
   lines.push("- bullets: 3 to 6 bullets. body is optional, one sentence of context above the bullets.");
+  lines.push("- cards: 2 to 6 numbered cards. Each has a heading under 10 words, a detail of one or two sentences, and a tag (a verdict, an owner, a date or a priority) or null. body is optional, one line under the cards.");
   lines.push("- two-column: leftHeading/rightHeading with bullets/bulletsRight, for before/after, option A/B, mandatory/recommended.");
   if (f.charts) lines.push("- chart: ONLY when the sources carry the numbers. categories and series values must come from the sources; unit and source filled. Use column for categories, line/area for time, bar for ranked items, pie/doughnut for shares that sum to a whole. bullets may hold 2 or 3 readings of the chart.");
   if (f.tables) lines.push("- table: header plus 2 to 8 rows, at most 5 columns, cells under 12 words. Fill source.");

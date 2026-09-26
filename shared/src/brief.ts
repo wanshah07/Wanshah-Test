@@ -61,6 +61,7 @@ export function cleanBrief(raw: Partial<DeckBrief> | undefined | null): DeckBrie
     slides: typeof b.slides === "number" ? b.slides : undefined,
     imageMode: b.imageMode === "none" || b.imageMode === "uploaded" || b.imageMode === "generate" ? b.imageMode : undefined,
     features: b.features && typeof b.features === "object" ? Object.fromEntries(Object.entries(b.features).filter(([, v]) => typeof v === "boolean")) : undefined,
+    auto: b.auto === true ? true : undefined,
   };
 }
 

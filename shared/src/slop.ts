@@ -136,6 +136,8 @@ export function scanSlide(slide: Slide, lang: "en" | "ms"): SlopHit[] {
   (slide.bullets ?? []).forEach((b, i) => hits.push(...scanText(b, `bullets[${i}]`, lang)));
   (slide.bulletsRight ?? []).forEach((b, i) => hits.push(...scanText(b, `bulletsRight[${i}]`, lang)));
   if (slide.quote?.text) hits.push(...scanText(slide.quote.text, "quote", lang));
+  if (slide.kicker) hits.push(...scanText(slide.kicker, "kicker", lang));
+  (slide.cards ?? []).forEach((c, i) => hits.push(...scanText(`${c.heading} ${c.detail ?? ""}`, `cards[${i}]`, lang)));
   if (slide.notes) hits.push(...scanText(slide.notes, "notes", lang));
   (slide.kpi ?? []).forEach((k, i) => {
     hits.push(...scanText(k.label, `kpi[${i}].label`, lang));

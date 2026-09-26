@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type ChartSpec, type DiagramSpec, type Slide, type SlopHit, type TableSpec, type Theme } from "@slidecraft/shared";
+import { type CardItem, type ChartSpec, type DiagramSpec, type Slide, type SlopHit, type TableSpec, type Theme } from "@slidecraft/shared";
 import { fillFor, LAYOUT_NAMES, LayoutPicker } from "./LayoutPicker";
 import { api, type MediaItem } from "../api";
 import { toast } from "./Toast";
@@ -28,6 +28,34 @@ function Text({ label, value, onChange, help, rows }: { label: string; value: st
     <div className="field">
       <label>{label}{help && <span className="help">{help}</span>}</label>
       {rows ? <textarea rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} /> : <input type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}
+    </div>
+  );
+}
+
+const cardLine = (c: CardItem) => [c.heading, c.detail ?? "", c.tag ?? ""].join(" | ").replace(/( \| )+$/, "");
+
+/** Cards as lines of "heading | detail | tag". The text is kept as typed, so a half-written line is not rewritten under the cursor. */
+function CardsEditor({ cards, onChange }: { cards: CardItem[]; onChange: (c: CardItem[]) => void }) {
+  const [text, setText] = useState(() => cards.map(cardLine).join("\n"));
+  return (
+    <div className="field">
+      <label>Cards<span className="help">One per line: heading | detail | tag. Tags like YES, PARTLY, NO or HIGH, MEDIUM, LOW are coloured.</span></label>
+      <textarea
+        rows={6}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          onChange(
+            e.target.value
+              .split("\n")
+              .map((line) => {
+                const [heading = "", detail, tag] = line.split("|").map((x) => x.trim());
+                return { heading, ...(detail ? { detail } : {}), ...(tag ? { tag } : {}) };
+              })
+              .filter((c) => c.heading),
+          );
+        }}
+      />
     </div>
   );
 }
@@ -224,9 +252,10 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
           </>
         )}
       </div>
+      {L !== "title" && L !== "closing" && L !== "section" && <Text label="Kicker" help="Small label above the title, e.g. AT A GLANCE" value={slide.kicker} onChange={(v) => set({ kicker: v || undefined })} />}
       <Text label="Title" value={slide.title} onChange={(v) => set({ title: v })} rows={2} />
-      {(L === "title" || L === "closing" || L === "section") && <Text label="Subtitle" value={slide.subtitle} onChange={(v) => set({ subtitle: v || undefined })} rows={2} />}
-      {(L === "bullets" || L === "kpi" || L === "diagram" || L === "title" || L === "closing") && <Text label="Body text" help={L === "bullets" ? "One sentence above the bullets" : "Optional line under the content"} value={slide.body} onChange={(v) => set({ body: v || undefined })} rows={2} />}
+      <Text label={L === "title" || L === "closing" || L === "section" ? "Subtitle" : "Reading line"} help={L === "title" || L === "closing" || L === "section" ? undefined : "One sentence under the title: how to read this slide"} value={slide.subtitle} onChange={(v) => set({ subtitle: v || undefined })} rows={2} />
+      {(L === "bullets" || L === "kpi" || L === "diagram" || L === "cards" || L === "title" || L === "closing") && <Text label="Body text" help={L === "bullets" ? "One sentence above the bullets" : "Optional line under the content"} value={slide.body} onChange={(v) => set({ body: v || undefined })} rows={2} />}
       {(L === "bullets" || L === "chart" || L === "image") && <Lines label={L === "bullets" ? "Bullets" : "Points beside the figure"} value={slide.bullets} onChange={(v) => set({ bullets: v })} rows={L === "bullets" ? 7 : 4} />}
       {L === "two-column" && (
         <>
@@ -255,6 +284,7 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
           <div className="row"><button className="btn btn-ghost btn-xs" onClick={() => set({ kpi: [...(slide.kpi ?? []), { label: "Metric", value: "0" }] })} disabled={(slide.kpi?.length ?? 0) >= 4}>Add tile</button></div>
         </div>
       )}
+      {L === "cards" && <CardsEditor key={slide.id} cards={slide.cards ?? []} onChange={(cards) => set({ cards })} />}
       {L === "quote" && (
         <>
           <Text label="Quotation" value={slide.quote?.text} onChange={(v) => set({ quote: { ...(slide.quote ?? { text: "" }), text: v } })} rows={3} />

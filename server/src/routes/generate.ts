@@ -4,7 +4,7 @@ import { listSources, loadDeck, saveDeck, unreadPictures } from "../store.js";
 import { config } from "../config.js";
 import { resolveAuth } from "../settings.js";
 import { visionFor } from "../llm/vision.js";
-import { feedbackInstruction, normaliseParams, rewriteSlide, runApplyFeedback, runGenerate } from "../llm/generate.js";
+import { AUTO_PROMPT, feedbackInstruction, normaliseParams, rewriteSlide, runApplyFeedback, runGenerate } from "../llm/generate.js";
 import { cleanBrief, scanSlide } from "@slidecraft/shared";
 import { LlmError } from "../llm/client.js";
 
@@ -14,6 +14,8 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
     const deck = loadDeck(req.user.id, id);
     if (!deck) return reply.code(404).send({ error: "not_found" });
     const p = normaliseParams((req.body ?? {}) as Record<string, unknown>, deck.angle);
+    const typed = p.prompt;
+    if (!p.prompt && p.auto) p.prompt = AUTO_PROMPT;
     if (!p.prompt) return reply.code(400).send({ error: "prompt_required" });
     const running = getDb().prepare("SELECT id FROM jobs WHERE deck_id = ? AND status IN ('queued','running')").get(id);
     if (running) return reply.code(409).send({ error: "already_running", jobId: (running as { id: string }).id });
@@ -34,7 +36,7 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
     }
     // Keep the choices, so Regenerate in the editor starts from them.
     const b = (req.body ?? {}) as { brief?: Record<string, unknown> };
-    deck.brief = cleanBrief({ text: p.prompt, ...(b.brief ?? {}), slides: p.slides, imageMode: p.imageMode, features: { ...p.features } });
+    deck.brief = cleanBrief({ text: typed, ...(b.brief ?? {}), auto: p.auto, slides: p.slides, imageMode: p.imageMode, features: { ...p.features } });
     saveDeck(req.user.id, deck);
     const jobId = uid("job");
     getDb().prepare("INSERT INTO jobs (id, user_id, deck_id, kind, status, progress, created_at, updated_at) VALUES (?, ?, ?, 'generate', 'queued', '[]', ?, ?)").run(jobId, req.user.id, id, now(), now());
