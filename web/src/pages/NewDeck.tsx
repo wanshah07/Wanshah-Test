@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ANGLES, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type SourceRef } from "@slidecraft/shared";
+import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Job } from "../api";
 import { toast } from "../components/Toast";
+import { BriefPicker, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
+import { DropZone } from "../components/DropZone";
+import { OneDriveBox } from "../components/OneDriveBox";
+import type { PathedFile } from "../lib/files";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 const STEPS = ["Brief", "Sources", "Angle", "Features", "Generate"];
@@ -16,8 +20,8 @@ export default function NewDeck() {
   const [step, setStep] = useState<Step>(0);
   const [deckId, setDeckId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [audience, setAudience] = useState("");
+  const [brief, setBrief] = useState<BriefValue>(EMPTY_BRIEF);
+  const [link, setLink] = useState<OneDriveLink | undefined>(undefined);
   const [lang, setLang] = useState<"en" | "ms">("en");
   const [angle, setAngle] = useState("regulatory-briefing");
   const [features, setFeatures] = useState<Features>({ ...DEFAULT_FEATURES, ...ANGLES[0].defaults });
@@ -26,12 +30,11 @@ export default function NewDeck() {
   const [themeId, setThemeId] = useState("facerinna");
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [over, setOver] = useState(false);
   const [pasteName, setPasteName] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [job, setJob] = useState<Job | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const dirRef = useRef<HTMLInputElement>(null);
+  const prompt = composeBrief(brief);
+  const audience = composeAudience(brief.audiences, brief.audienceText);
 
   useEffect(() => {
     api.settings().then((s) => setThemeId(s.defaultTheme)).catch(() => {});
@@ -51,8 +54,7 @@ export default function NewDeck() {
     setFeatures({ ...DEFAULT_FEATURES, ...(a?.defaults ?? {}) });
   };
 
-  const addFiles = async (list: FileList | File[]) => {
-    const files = Array.from(list).map((f) => ({ file: f, path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name }));
+  const addFiles = async (files: PathedFile[]) => {
     if (!files.length) return;
     setUploading(true);
     try {
@@ -66,34 +68,6 @@ export default function NewDeck() {
     } finally {
       setUploading(false);
     }
-  };
-
-  const onDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setOver(false);
-    const items = e.dataTransfer.items;
-    const out: File[] = [];
-    // Folders dropped from the desktop arrive as directory entries.
-    const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
-      if (entry.isFile) {
-        const f = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
-        Object.defineProperty(f, "webkitRelativePath", { value: prefix + f.name });
-        out.push(f);
-      } else if (entry.isDirectory) {
-        const reader = (entry as FileSystemDirectoryEntry).createReader();
-        const entries = await new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
-        for (const en of entries) await walk(en, prefix + entry.name + "/");
-      }
-    };
-    if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
-      for (const it of Array.from(items)) {
-        const en = it.webkitGetAsEntry();
-        if (en) await walk(en, "");
-      }
-    } else {
-      out.push(...Array.from(e.dataTransfer.files));
-    }
-    await addFiles(out);
   };
 
   const addPaste = async () => {
@@ -114,7 +88,7 @@ export default function NewDeck() {
     const id = await ensureDeck();
     setStep(4);
     try {
-      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode });
+      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences } });
       const tick = async () => {
         const j = await api.job(jobId);
         setJob(j);
@@ -134,6 +108,7 @@ export default function NewDeck() {
 
   const hasPictures = sources.some((s) => s.kind === "image");
   const canNext = step === 0 ? prompt.trim().length > 10 : true;
+  const briefHint = step === 0 && !canNext ? "Tick what the deck is for, or type a few words." : "";
 
   return (
     <main className="page" style={{ maxWidth: 900 }}>
@@ -154,44 +129,25 @@ export default function NewDeck() {
             Deck title <span className="h">Optional. The writer proposes one if empty.</span>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Salicylic acid: what the 2026 amendment changes for our range" />
           </label>
-          <label className="f">
-            Brief <span className="h">What the deck must say and decide. Name the products, the instrument, the numbers you already know. The more concrete, the fewer [SAHKAN] markers.</span>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={7} placeholder="Brief the deck the way you would brief a colleague." />
-          </label>
-          <div className="grid c2">
-            <label className="f">
-              Audience <span className="h">Who is in the room.</span>
-              <input type="text" value={audience} onChange={(e) => setAudience(e.target.value)} placeholder="e.g. brand owner and product team, non-technical" />
-            </label>
-            <label className="f">
-              Language
-              <select value={lang} onChange={(e) => setLang(e.target.value as "en" | "ms")}>
-                <option value="en">English</option>
-                <option value="ms">Bahasa Malaysia</option>
-              </select>
-            </label>
+          <BriefPicker value={brief} onChange={setBrief} />
+          <div>
+            <b className="small">Language</b>
+            <div className="chips">
+              {([["en", "English"], ["ms", "Bahasa Malaysia"]] as const).map(([v, l]) => (
+                <label key={v} className={"chip" + (lang === v ? " on" : "")}>
+                  <input type="radio" name="lang" checked={lang === v} onChange={() => setLang(v)} />
+                  {l}
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {step === 1 && (
         <div className="stack">
-          <div
-            className={"drop" + (over ? " over" : "")}
-            onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-            onDragLeave={() => setOver(false)}
-            onDrop={onDrop}
-          >
-            <p style={{ fontWeight: 600, marginBottom: 6 }}>Drop files or folders here</p>
-            <p className="small muted" style={{ marginBottom: 14 }}>PDF, Word, PowerPoint, Excel, CSV, Markdown, text, HTML, images, zip. Folders are read recursively.</p>
-            <div className="row" style={{ justifyContent: "center" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>Choose files</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => dirRef.current?.click()} disabled={uploading}>Choose a folder</button>
-              {uploading && <span className="spin" />}
-            </div>
-            <input ref={fileRef} type="file" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
-            <input ref={dirRef} type="file" multiple hidden {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => e.target.files && addFiles(e.target.files)} />
-          </div>
+          <DropZone onFiles={addFiles} busy={uploading} />
+          <OneDriveBox getDeckId={ensureDeck} link={link} onImported={(src, l) => { setSources(src.length ? src : sources); setLink(l); }} />
           <div className="card tight stack">
             <div className="row between"><b className="small">Paste text</b><span className="small muted">Notes, an email, a clause you copied.</span></div>
             <input type="text" value={pasteName} onChange={(e) => setPasteName(e.target.value)} placeholder="Name this source" />
@@ -289,7 +245,10 @@ export default function NewDeck() {
         <div className="row between" style={{ marginTop: 20 }}>
           <button className="btn btn-quiet" onClick={() => setStep((s) => Math.max(0, s - 1) as Step)} disabled={step === 0}>Back</button>
           {step < 3 ? (
-            <button className="btn btn-primary" onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext}>Continue</button>
+            <span className="row">
+              {briefHint && <span className="small muted">{briefHint}</span>}
+              <button className="btn btn-primary" onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext}>Continue</button>
+            </span>
           ) : (
             <button className="btn btn-primary" onClick={start}>Generate {slides} slides</button>
           )}

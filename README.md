@@ -92,6 +92,40 @@ The key is sent only to the endpoint it was saved with. The server-wide
 `OPENAI_API_KEY` is only ever sent to `OPENAI_BASE_URL`, never to an endpoint
 a user picks in Settings.
 
+### Pictures from OneDrive
+
+A deck can pull the pictures in one OneDrive folder, and pull again before
+every generation, so the folder stays the one place photos live. New and
+changed pictures come in; a changed picture replaces the old one on every
+slide that shows it. Nothing in OneDrive is changed: the only permission
+asked for is `Files.Read`.
+
+One-time setup, about ten minutes:
+
+1. portal.azure.com, Microsoft Entra ID, App registrations, New registration.
+   Name it `Slidecraft`. Supported account types: "Accounts in any
+   organizational directory and personal Microsoft accounts". No redirect URI.
+2. In the new registration, Authentication, set "Allow public client flows"
+   to Yes and save.
+3. Copy the Application (client) ID. Put it in Settings, OneDrive pictures,
+   or in the `MS_CLIENT_ID` Codespaces secret or `.env`.
+4. Settings, Connect OneDrive. Open the address shown, enter the code, sign
+   in with the account that owns the folder. The page updates by itself.
+
+Then, in a deck (the wizard's Sources step, or Files & regenerate in the
+editor), type a folder path such as `40. HERMES/photos`, or Browse and click
+through the folders, or paste a OneDrive share link, and press Pull pictures.
+
+- The writer picks a picture by its file name. Name files for what they show.
+- JPG, PNG, WebP, GIF and SVG are pulled. HEIC and camera RAW files are
+  listed as skipped: save them as JPG first.
+- At most 300 pictures a pull, each under `MAX_UPLOAD_MB`, subfolders to
+  three levels when ticked.
+- A work or school account may need an administrator to approve the app.
+- Sign-in uses the device code flow, so it needs no client secret and no
+  redirect address, which a codespace (whose address changes) could not give.
+  The refresh token is stored encrypted with `APP_SECRET`.
+
 ### On GitHub, no laptop: Codespaces
 
 `.devcontainer/devcontainer.json` builds and starts the server inside a GitHub
@@ -147,3 +181,5 @@ time. For an always-on address for a team, use the Docker image on a host.
 | `SOURCE_BUDGET` | Characters of source text sent in one call before condensing, default 90000. |
 | `MAX_UPLOAD_MB` | Per-file upload limit, default 40. |
 | `MOCK_LLM` | `1` to skip OpenAI and return a fixture deck. |
+| `MS_CLIENT_ID` | Microsoft app (client) ID for OneDrive pictures. Optional; a per-user one in Settings takes precedence. |
+| `MS_TENANT` | Sign-in authority for OneDrive, default `common` (personal and work accounts). |

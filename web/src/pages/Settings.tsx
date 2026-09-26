@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { THEME_PRESETS } from "@slidecraft/shared";
-import { api, type Settings as S } from "../api";
+import { api, type OneDriveStatus, type Settings as S } from "../api";
 import { toast } from "../components/Toast";
 import { applyAppTheme, type AppTheme } from "../lib/theme";
 
@@ -15,6 +15,18 @@ export default function Settings() {
   const [models, setModels] = useState<string[]>([]);
   const [provider, setProvider] = useState("openai");
   const [baseUrl, setBaseUrl] = useState("");
+  const [od, setOd] = useState<OneDriveStatus | null>(null);
+  const [odClient, setOdClient] = useState("");
+  const [odFolder, setOdFolder] = useState("");
+  const [odMsg, setOdMsg] = useState("");
+  const loadOd = () => api.oneDrive().then((r) => {
+    setOd(r);
+    setOdClient(r.clientIdFrom === "settings" ? r.clientId : "");
+    setOdFolder(r.defaultFolder);
+  });
+  useEffect(() => {
+    loadOd().catch(() => {});
+  }, []);
   const load = () => api.settings().then((r) => {
     setS(r);
     setModel(r.model);
@@ -86,6 +98,36 @@ export default function Settings() {
     toast("Default theme set");
   };
 
+  const saveOd = async () => {
+    try {
+      setOd(await api.saveOneDrive({ clientId: odClient.trim() || null, defaultFolder: odFolder }));
+      toast("OneDrive settings saved");
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+  };
+  const connectOd = async () => {
+    setOdMsg("");
+    try {
+      const p = await api.oneDriveLogin();
+      setOd((o) => (o ? { ...o, pending: p } : o));
+      const poll = async () => {
+        const r = await api.oneDrivePoll();
+        if (r.state === "waiting") return void setTimeout(poll, Math.max(2, p.interval) * 1000);
+        if (r.state === "connected") toast(`OneDrive connected${r.account ? `: ${r.account}` : ""}`);
+        else setOdMsg(r.message || "Sign-in did not finish");
+        loadOd();
+      };
+      setTimeout(poll, Math.max(2, p.interval) * 1000);
+    } catch (e) {
+      setOdMsg((e as Error).message);
+    }
+  };
+  const disconnectOd = async () => {
+    setOd(await api.disconnectOneDrive());
+    toast("OneDrive disconnected");
+  };
+
   return (
     <main className="page stack" style={{ maxWidth: 820 }}>
       <div>
@@ -129,6 +171,45 @@ export default function Settings() {
             Models this key can use: {models.slice(0, 40).map((m, i) => <span key={m}>{i ? ", " : ""}<a href="#" onClick={(e) => { e.preventDefault(); setModel(m); }}>{m}</a></span>)}
             {models.length > 40 ? ` and ${models.length - 40} more` : ""}. Click one to put it in the writer model box below.
           </p>
+        )}
+      </section>
+
+      <section className="card stack">
+        <h2>OneDrive pictures</h2>
+        <p className="small">Pull pictures from a OneDrive folder into a deck. Slidecraft only reads (Files.Read); it never changes anything in OneDrive. The sign-in is stored encrypted.</p>
+        {od && (
+          <>
+            <div className="grid c2">
+              <label className="f">
+                Microsoft app client ID <span className="h">{od.clientIdFrom === "server" ? "Set on the server (MS_CLIENT_ID). Fill this only to use a different one." : "Application (client) ID from your app registration. See README, OneDrive."}</span>
+                <input type="text" value={odClient} onChange={(e) => setOdClient(e.target.value)} placeholder={od.clientIdFrom === "server" ? od.clientId : "1a2b3c4d-…"} autoComplete="off" />
+              </label>
+              <label className="f">
+                Default folder <span className="h">Filled in for every new deck. A path, or a OneDrive share link.</span>
+                <input type="text" value={odFolder} onChange={(e) => setOdFolder(e.target.value)} placeholder="e.g. 40. HERMES/photos" />
+              </label>
+            </div>
+            <div className="row">
+              <button className="btn btn-ghost" onClick={saveOd}>Save</button>
+              {od.connected ? (
+                <>
+                  <span className="pill ok">Connected{od.account ? `: ${od.account}` : ""}</span>
+                  <button className="btn btn-quiet" onClick={disconnectOd}>Disconnect</button>
+                </>
+              ) : (
+                <button className="btn btn-primary" onClick={connectOd} disabled={!od.clientId || !!od.pending}>Connect OneDrive</button>
+              )}
+            </div>
+            {!od.connected && !od.clientId && <p className="small muted">Save a client ID first, then Connect.</p>}
+            {od.pending && !od.connected && (
+              <div className="banner info" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                <span>1. Open <a href={od.pending.verificationUri} target="_blank" rel="noreferrer"><b>{od.pending.verificationUri}</b></a></span>
+                <span>2. Enter this code: <b style={{ fontSize: 20, letterSpacing: 2 }}>{od.pending.userCode}</b></span>
+                <span>3. Sign in with the Microsoft account that owns the folder and accept. This page updates by itself.</span>
+              </div>
+            )}
+            {odMsg && <div className="banner danger">{odMsg}</div>}
+          </>
         )}
       </section>
 

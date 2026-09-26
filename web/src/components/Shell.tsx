@@ -1,11 +1,25 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api, type Settings } from "../api";
+import { framed } from "../lib/files";
 
 export function Shell() {
   const [me, setMe] = useState<Settings["user"] | null>(null);
   const [mode, setMode] = useState<string>("off");
   const nav = useNavigate();
+  const [inFrame] = useState(framed);
+  // A file dropped beside a drop zone would otherwise replace the whole page with the file.
+  useEffect(() => {
+    const stop = (e: DragEvent) => {
+      if (!(e.target as HTMLElement | null)?.closest?.(".drop")) e.preventDefault();
+    };
+    window.addEventListener("dragover", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragover", stop);
+      window.removeEventListener("drop", stop);
+    };
+  }, []);
   useEffect(() => {
     api.me().then((r) => {
       setMe(r.user);
@@ -38,6 +52,12 @@ export function Shell() {
           )}
         </div>
       </header>
+      {inFrame && (
+        <div className="banner warn" style={{ margin: "10px auto 0", maxWidth: 1100 }}>
+          Slidecraft is open inside another window (such as VS Code's preview pane), where dragging files in and some buttons do not work.
+          <a href={window.location.href} target="_blank" rel="noreferrer"><b>Open it in its own browser tab</b></a>
+        </div>
+      )}
       <Outlet />
     </>
   );

@@ -155,8 +155,30 @@ export interface Deck {
   theme: Theme;
   slides: Slide[];
   sources: SourceRef[];
+  /** OneDrive folder whose pictures are pulled in before each generation. Written by the server only. */
+  onedrive?: OneDriveLink;
+  /** The choices behind the last generation, so Regenerate starts from them. Written by the server only. */
+  brief?: DeckBrief;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DeckBrief {
+  /** Free text typed by the user, without the ticked lines. */
+  text: string;
+  purposes: string[];
+  include: string[];
+  audiences: string[];
+  slides?: number;
+  imageMode?: "none" | "uploaded" | "generate";
+  features?: Record<string, boolean>;
+}
+
+export interface OneDriveLink {
+  /** A path in the signed-in user's OneDrive, or a share link. */
+  folder: string;
+  subfolders: boolean;
+  lastSync?: string;
 }
 
 let counter = 0;

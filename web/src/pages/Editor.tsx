@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ANGLES, blankSlide, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, sahkanCount, type Deck, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { ANGLES, blankSlide, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, sahkanCount, type Deck, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
 import { api, type Job } from "../api";
 import { SlideFrame } from "../components/SlideFrame";
 import { SlideInspector } from "../components/SlideInspector";
 import { ThemePanel } from "../components/ThemePanel";
 import { toast } from "../components/Toast";
+import { BriefPicker, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
+import { ConfirmButton } from "../components/ConfirmButton";
+import { DropZone } from "../components/DropZone";
+import { OneDriveBox } from "../components/OneDriveBox";
+import type { PathedFile } from "../lib/files";
 
 type Tab = "slide" | "theme" | "export" | "sources";
+const TAB_LABEL: Record<Tab, string> = { slide: "Slide", theme: "Theme", export: "Export", sources: "Files & regenerate" };
 
 export default function Editor() {
   const { id = "" } = useParams();
@@ -128,6 +134,7 @@ export default function Editor() {
           {sahkan > 0 && <span className="pill warn" title="Facts the writer could not source. Search for each, then edit the marker away.">{sahkan} SAHKAN</span>}
           {slopCount > 0 && <span className="pill danger" title="Wording flagged by the de-slop scan">{slopCount} flagged</span>}
           <span className="small muted">{saving === "saving" ? "Saving" : saving === "dirty" ? "Unsaved" : saving === "saved" ? "Saved" : saving === "error" ? "Not saved" : ""}</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setTab("sources")}>Add files / regenerate</button>
           <a className="btn btn-ghost btn-sm" href={`/deck/${deck.id}/present`} target="_blank" rel="noreferrer">Present</a>
           <a className="btn btn-primary btn-sm" href={`/api/decks/${deck.id}/export.pptx`}>Download PPTX</a>
         </div>
@@ -184,7 +191,7 @@ export default function Editor() {
         <aside className="col card" style={{ padding: 16 }}>
           <div className="tabs">
             {(["slide", "theme", "export", "sources"] as Tab[]).map((t) => (
-              <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
+              <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>
             ))}
           </div>
           {tab === "slide" && slide && <SlideInspector deckId={deck.id} slide={slide} hits={slop[slide.id] ?? []} lang={deck.lang} onChange={setSlide} onRewrite={rewrite} />}
@@ -228,22 +235,24 @@ function ExportPanel({ deck, sahkan, slopCount }: { deck: Deck; sahkan: number; 
 }
 
 function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void }) {
+  const stored = deck.brief;
   const [sources, setSources] = useState<SourceRef[]>(deck.sources);
-  const [prompt, setPrompt] = useState("");
-  const [slides, setSlides] = useState(Math.max(6, deck.slides.length || 10));
+  const [brief, setBrief] = useState<BriefValue>(stored ? { purposes: stored.purposes, include: stored.include, audiences: stored.audiences, text: stored.text, audienceText: "" } : { ...EMPTY_BRIEF, audienceText: deck.audience ?? "" });
+  const [slides, setSlides] = useState(stored?.slides ?? Math.max(6, deck.slides.length || 10));
   const [angle, setAngle] = useState(deck.angle);
-  const [features, setFeatures] = useState<Features>({ ...DEFAULT_FEATURES, ...(ANGLES.find((a) => a.id === deck.angle)?.defaults ?? {}) });
-  const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
+  const [features, setFeatures] = useState<Features>({ ...DEFAULT_FEATURES, ...(ANGLES.find((a) => a.id === deck.angle)?.defaults ?? {}), ...((stored?.features as Partial<Features> | undefined) ?? {}) });
+  const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">(stored?.imageMode ?? "uploaded");
+  const [link, setLink] = useState(deck.onedrive);
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
-  const ref = useRef<HTMLInputElement>(null);
+  const prompt = composeBrief(brief);
   const reload = () => api.sources(deck.id).then(setSources).catch(() => {});
-  const add = async (files: FileList | null) => {
-    if (!files?.length) return;
+  const add = async (files: PathedFile[]) => {
     setBusy(true);
     try {
-      const r = await api.uploadSources(deck.id, Array.from(files).map((f) => ({ file: f, path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name })));
-      toast(`Added ${r.added.length}`);
+      const r = await api.uploadSources(deck.id, files);
+      if (r.skipped.length) toast(`Added ${r.added.length}, skipped ${r.skipped.length} that could not be read`, true);
+      else toast(`Added ${r.added.length}`);
       reload();
     } catch (e) {
       toast((e as Error).message, true);
@@ -253,12 +262,12 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
   };
   const run = async () => {
     if (prompt.trim().length < 10) {
-      toast("Write a brief first", true);
+      toast("Tick what the deck is for, or type a few words", true);
       return;
     }
-    if (deck.slides.length && !window.confirm("Regenerating replaces every slide in this deck. Continue?")) return;
     try {
-      const { jobId } = await api.generate(deck.id, { prompt, title: deck.title, lang: deck.lang, angle, audience: deck.audience, slides, features, imageMode });
+      const audience = composeAudience(brief.audiences, brief.audienceText) || deck.audience;
+      const { jobId } = await api.generate(deck.id, { prompt, title: deck.title, lang: deck.lang, angle, audience, slides, features, imageMode, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences } });
       const tick = async () => {
         const j = await api.job(jobId);
         setJob(j);
@@ -277,8 +286,9 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
   const running = job && (job.status === "queued" || job.status === "running");
   return (
     <div className="stack">
-      <div className="row between"><h4>Sources</h4><button className="btn btn-ghost btn-xs" onClick={() => ref.current?.click()} disabled={busy}>Add files</button></div>
-      <input ref={ref} type="file" multiple hidden onChange={(e) => add(e.target.files)} />
+      <h4>Sources</h4>
+      <DropZone onFiles={add} busy={busy} compact />
+      <OneDriveBox getDeckId={async () => deck.id} link={link} onImported={(src, l) => { if (src.length) setSources(src); setLink(l); }} />
       <div className="srcs">
         {sources.map((s) => (
           <div key={s.id} className="src">
@@ -290,7 +300,8 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       </div>
       <hr />
       <h4>Regenerate</h4>
-      <textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="A new brief for the writer. Every slide is replaced." />
+      {stored && <p className="small muted">Your last choices are ticked. Change anything, then regenerate.</p>}
+      <BriefPicker value={brief} onChange={setBrief} compact />
       <div className="grid c2" style={{ gap: 8 }}>
         <select value={slides} onChange={(e) => setSlides(Number(e.target.value))}>{LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}</select>
         <select value={angle} onChange={(e) => setAngle(e.target.value)}>{ANGLES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
@@ -302,12 +313,18 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       </div>
       {features.images && (
         <select value={imageMode} onChange={(e) => setImageMode(e.target.value as typeof imageMode)}>
-          <option value="uploaded">Pictures from uploaded files</option>
+          <option value="uploaded">Pictures from sources (uploads and OneDrive)</option>
           <option value="generate">Pictures from the image model</option>
           <option value="none">Placeholders only</option>
         </select>
       )}
-      <button className="btn btn-primary" onClick={run} disabled={!!running}>{running ? <span className="spin" /> : "Regenerate deck"}</button>
+      {deck.slides.length > 0 ? (
+        <ConfirmButton className="btn btn-primary" confirm={`Click again: replace all ${deck.slides.length} slides`} onConfirm={run} disabled={!!running}>
+          {running ? <span className="spin" /> : "Regenerate deck"}
+        </ConfirmButton>
+      ) : (
+        <button className="btn btn-primary" onClick={run} disabled={!!running}>{running ? <span className="spin" /> : "Generate deck"}</button>
+      )}
       {job && <div className="log">{job.progress.join("\n")}</div>}
     </div>
   );

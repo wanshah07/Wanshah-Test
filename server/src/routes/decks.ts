@@ -45,7 +45,11 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     if (!cur) return reply.code(404).send({ error: "not_found" });
     const body = req.body;
     if (!validDeck(body) || body.id !== id) return reply.code(400).send({ error: "invalid_deck" });
-    const next: Deck = { ...body, createdAt: cur.createdAt, sources: cur.sources };
+    // Sources, the OneDrive link and the stored brief are the server's: an editor tab opened
+    // before an import must not wipe the link when it autosaves.
+    const next: Deck = { ...body, createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief };
+    if (!next.onedrive) delete next.onedrive;
+    if (!next.brief) delete next.brief;
     saveDeck(req.user.id, next);
     return { deck: next, slop: scanDeck(next), sahkan: sahkanCount(next) };
   });

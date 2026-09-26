@@ -16,7 +16,8 @@
   },
   "secrets": {
     "APP_SECRET": { "description": "Long random string. Encrypts the stored OpenAI key. node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"" },
-    "OPENAI_API_KEY": { "description": "Optional. Can also be entered in the app's Settings page instead." }
+    "OPENAI_API_KEY": { "description": "Optional. Can also be entered in the app's Settings page instead." },
+    "MS_CLIENT_ID": { "description": "Optional. Application (client) ID of a Microsoft app registration, for pulling pictures from OneDrive. Can also be entered in Settings." }
   },
   "customizations": {
     "vscode": { "extensions": ["dbaeumer.vscode-eslint"] }

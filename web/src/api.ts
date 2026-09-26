@@ -1,4 +1,4 @@
-import type { Deck, Slide, SlopHit, SourceRef } from "@slidecraft/shared";
+import type { Deck, OneDriveLink, Slide, SlopHit, SourceRef } from "@slidecraft/shared";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) {
@@ -68,6 +68,22 @@ export interface Settings {
   defaultTheme: string;
 }
 
+export interface OneDriveStatus {
+  clientId: string;
+  clientIdFrom: "settings" | "server" | "none";
+  connected: boolean;
+  account: string;
+  defaultFolder: string;
+  pending: { userCode: string; verificationUri: string; expiresAt: string; interval: number } | null;
+}
+
+export interface OneDriveImport {
+  report: { folder: string; added: number; updated: number; unchanged: number; skipped: { name: string; reason: string }[]; capped: boolean };
+  summary: string;
+  link: OneDriveLink;
+  sources: SourceRef[];
+}
+
 export interface MediaItem {
   id: string;
   name: string;
@@ -109,6 +125,14 @@ export const api = {
   rewrite: (id: string, sid: string, instruction: string) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${id}/slides/${sid}/rewrite`, { instruction }),
   settings: () => req<Settings>("GET", "/api/settings"),
   saveSettings: (b: Partial<{ openaiKey: string | null; model: string; imageModel: string; appTheme: string; defaultTheme: string; baseUrl: string | null }>) => req<{ ok: true }>("PUT", "/api/settings", b),
+  oneDrive: () => req<OneDriveStatus>("GET", "/api/onedrive"),
+  saveOneDrive: (b: { clientId?: string | null; defaultFolder?: string | null }) => req<OneDriveStatus>("PUT", "/api/onedrive", b),
+  disconnectOneDrive: () => req<OneDriveStatus>("DELETE", "/api/onedrive"),
+  oneDriveLogin: () => req<NonNullable<OneDriveStatus["pending"]>>("POST", "/api/onedrive/login"),
+  oneDrivePoll: () => req<{ state: "waiting" | "connected" | "expired" | "declined" | "none"; account?: string; message?: string }>("POST", "/api/onedrive/login/poll"),
+  oneDriveBrowse: (folder: string) => req<{ name: string; folders: string[]; pictures: number }>("GET", `/api/onedrive/browse?folder=${encodeURIComponent(folder)}`),
+  importOneDrive: (id: string, folder: string, subfolders: boolean) => req<OneDriveImport>("POST", `/api/decks/${id}/onedrive`, { folder, subfolders }),
+  unlinkOneDrive: (id: string) => req<{ ok: true }>("DELETE", `/api/decks/${id}/onedrive`),
   testKey: (openaiKey?: string, baseUrl?: string) => req<{ ok: boolean; message: string; models?: string[] }>("POST", "/api/settings/test-key", { openaiKey, baseUrl }),
 };
 

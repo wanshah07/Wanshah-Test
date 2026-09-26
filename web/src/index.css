@@ -168,3 +168,10 @@ table.edit input{padding:5px 8px;font-size:12px}
 .kbd{display:inline-block;padding:1px 6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;font-size:11px;font-family:ui-monospace,Menlo,monospace;background:var(--surface)}
 .deckcard h3{font-size:19px;margin-bottom:6px}
 .deckcard .frame{border-radius:10px;border:1px solid var(--line);margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:13px;cursor:pointer;user-select:none;transition:border-color .15s,background .15s}
+.chip:hover{border-color:var(--brand)}
+.chip.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-deep);font-weight:600}
+.chip input{margin:0;accent-color:var(--brand)}
+.drop.compact{padding:16px}
+.btn-danger{background:#C63B3B !important;color:#fff !important;border-color:#C63B3B !important}

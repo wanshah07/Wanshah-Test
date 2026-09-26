@@ -7,6 +7,7 @@ import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
 import { DECK_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
 import { resolveAuth } from "../settings.js";
+import { importFolder, summarise } from "../onedrive.js";
 
 export interface Job {
   id: string;
@@ -141,6 +142,18 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     if (!deck) throw new Error("deck not found");
     const auth = config.mockLlm ? null : resolveAuth(userId);
     if (!config.mockLlm && !auth) throw new LlmError("No OpenAI key. Add one in Settings.", 0, "no_key");
+    if (deck.onedrive && p.imageMode === "uploaded") {
+      log(jobId, `Checking OneDrive folder "${deck.onedrive.folder || "(root)"}" for new pictures`);
+      try {
+        const r = await importFolder(userId, deckId, deck.onedrive.folder, deck.onedrive.subfolders, (l) => log(jobId, l));
+        log(jobId, summarise(r));
+        deck.onedrive.lastSync = now();
+        saveDeck(userId, deck);
+      } catch (e) {
+        // A OneDrive outage costs the fresh pull, never the deck.
+        log(jobId, `OneDrive not read (${(e as Error).message}). Using the pictures already pulled.`);
+      }
+    }
     const rows = listSources(deckId);
     log(jobId, `${rows.length} source${rows.length === 1 ? "" : "s"}, ${p.slides} slides, angle ${angleById(p.angle).name}, ${p.lang === "ms" ? "Bahasa Malaysia" : "English"}`);
     const { sources, condensed } = await prepareSources(jobId, auth, p, rows);

@@ -4,6 +4,7 @@ import { ANGLES, blankSlide, themePreset } from "@slidecraft/shared";
 import { api, type DeckSummary } from "../api";
 import { SlideFrame } from "../components/SlideFrame";
 import { toast } from "../components/Toast";
+import { ConfirmButton } from "../components/ConfirmButton";
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -18,7 +19,6 @@ export default function Decks() {
     load();
   }, []);
   const del = async (d: DeckSummary) => {
-    if (!window.confirm(`Delete "${d.title}"? This cannot be undone.`)) return;
     await api.deleteDeck(d.id);
     toast("Deleted");
     load();
@@ -63,7 +63,7 @@ export default function Decks() {
                 <Link to={`/deck/${d.id}`} className="btn btn-ghost btn-sm">Open</Link>
                 <a href={`/deck/${d.id}/present`} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">Present</a>
                 <button className="btn btn-quiet btn-sm" onClick={() => dup(d)}>Duplicate</button>
-                <button className="btn btn-quiet btn-sm" onClick={() => del(d)}>Delete</button>
+                <ConfirmButton confirm="Click again to delete for good" onConfirm={() => del(d)}>Delete</ConfirmButton>
               </div>
             </div>
           );
