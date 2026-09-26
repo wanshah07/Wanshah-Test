@@ -156,6 +156,14 @@ describe("api", () => {
     expect(names.some((n) => n.startsWith("ppt/media/"))).toBe(true);
     const slide1 = await zip.file("ppt/slides/slide1.xml")!.async("string");
     expect(slide1).toContain(d.title.split(" ")[0]);
+    // Numbered cards come out as shapes with the kicker and a coloured verdict tag.
+    const ci = d.slides.findIndex((s: { layout: string }) => s.layout === "cards");
+    expect(ci).toBeGreaterThan(-1);
+    const cx = await zip.file(`ppt/slides/slide${ci + 1}.xml`)!.async("string");
+    expect(cx).toContain("NEXT STEPS");
+    expect(cx).toContain("HIGH");
+    expect(cx).toContain("E3F5EA");
+    expect(cx).toContain("Each card is one owner");
   });
 
   it("exports a standalone HTML deck with pictures inlined", async () => {

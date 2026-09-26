@@ -1,4 +1,5 @@
 import type { Deck, Slide, Theme } from "../deck.js";
+import { fontStack } from "../theme.js";
 import { esc, inline } from "./escape.js";
 import { chartSvg } from "./charts.js";
 import { diagramSvg } from "./diagrams.js";
@@ -25,8 +26,8 @@ export function themeVars(t: Theme): string {
     `--accent:${c.accent}`,
     `--gold:${c.gold}`,
     `--radius:${t.radius}px`,
-    `--font-display:'${t.fontDisplay.replace(/'/g, "")}'`,
-    `--font-body:'${t.fontBody.replace(/'/g, "")}'`,
+    `--font-display:${fontStack(t.fontDisplay)}`,
+    `--font-body:${fontStack(t.fontBody)}`,
   ].join(";");
 }
 
@@ -37,7 +38,35 @@ function bulletsHtml(items: string[] | undefined, cls = ""): string {
 }
 
 function heading(s: Slide, kicker?: string): string {
-  return `<h2 class="sc-h">${kicker ? `<span class="sc-kicker">${esc(kicker)}</span>` : ""}${inline(s.title)}</h2>`;
+  const k = s.kicker || kicker;
+  const dek = s.subtitle && !["title", "closing", "section"].includes(s.layout) ? `<p class="sc-dek">${inline(s.subtitle)}</p>` : "";
+  return `<h2 class="sc-h">${k ? `<span class="sc-kicker">${esc(k)}</span>` : ""}${inline(s.title)}</h2>${dek}`;
+}
+
+/** Verdict words shown as coloured badges in tables and card tags. */
+export function verdictTone(text: string): "good" | "mid" | "bad" | "" {
+  const t = text.trim().replace(/[.!]$/, "").toUpperCase();
+  if (/^(YES|YA|HIGH|TINGGI|PASS|LULUS|DONE|SIAP|GO|STRONG|✓|MET|ON TRACK|APPROVED|OFFICIAL)$/.test(t)) return "good";
+  if (/^(PARTLY|PARTIAL|SEBAHAGIAN|MEDIUM|MID|SEDERHANA|MID-HIGH|MID TO HIGH|PENDING|TBC|ESTIMATE|ANGGARAN|WATCH|MODERATE)$/.test(t)) return "mid";
+  if (/^(NO|TIDAK|LOW|RENDAH|FAIL|GAGAL|✗|NOT MET|AT RISK|NO GO|BLOCKED|WEAK)$/.test(t)) return "bad";
+  return "";
+}
+
+function cell(v: string): string {
+  const tone = verdictTone(v);
+  return tone ? `<span class="sc-badge v-${tone}">${inline(v)}</span>` : inline(v);
+}
+
+function cardsHtml(s: Slide): string {
+  const items = s.cards ?? [];
+  const n = items.length;
+  const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : 3;
+  return `<div class="sc-cards" style="--cols:${cols}">${items
+    .map((c, i) => {
+      const tone = c.tag ? verdictTone(c.tag) : "";
+      return `<div class="sc-card"><div class="top"><span class="no">${i + 1}</span>${c.tag ? `<span class="sc-badge ${tone ? `v-${tone}` : "v-plain"}">${inline(c.tag)}</span>` : ""}</div><div class="hd">${inline(c.heading)}</div>${c.detail ? `<div class="dt">${inline(c.detail)}</div>` : ""}</div>`;
+    })
+    .join("")}</div>`;
 }
 
 function logoHtml(t: Theme, ctx: RenderCtx): string {
@@ -59,7 +88,7 @@ function chrome(s: Slide, t: Theme, ctx: RenderCtx): string {
 
 export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
   const c = t.colors;
-  const font = t.fontBody;
+  const font = fontStack(t.fontBody);
   let body = "";
   switch (s.layout) {
     case "title":
@@ -87,7 +116,7 @@ export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
       const many = (t2?.rows.length ?? 0) > 7 ? "rows-many" : "";
       const tbl = t2
         ? `<table class="sc-table ${many}"><thead><tr>${t2.header.map((h) => `<th>${inline(h)}</th>`).join("")}</tr></thead><tbody>${t2.rows
-            .map((r) => `<tr>${r.map((v) => `<td>${inline(v)}</td>`).join("")}</tr>`)
+            .map((r) => `<tr>${r.map((v) => `<td>${cell(v)}</td>`).join("")}</tr>`)
             .join("")}</tbody></table>`
         : placeholder("No table", ctx.lang);
       const cap = t2?.source ? `<p class="sc-cap">${inline(t2.source)}</p>` : "";
@@ -108,6 +137,9 @@ export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
       body = `${heading(s)}<div class="sc-content" style="flex-direction:row;gap:40px">${fig}${side}</div>${s.image?.caption ? `<p class="sc-cap">${inline(s.image.caption)}</p>` : ""}`;
       break;
     }
+    case "cards":
+      body = `${heading(s)}<div class="sc-content">${cardsHtml(s)}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:26px">${inline(s.body)}</p>` : ""}`;
+      break;
     case "quote":
       body = `${heading(s)}<div class="sc-quote"><p class="q">${inline(s.quote?.text ?? "")}</p>${s.quote?.by ? `<p class="by">${inline(s.quote.by)}</p>` : ""}</div>`;
       break;

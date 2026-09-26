@@ -10,7 +10,8 @@ export const SLIDE_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
-    layout: { type: "string", enum: ["title", "section", "bullets", "two-column", "chart", "table", "diagram", "image", "quote", "kpi", "closing"] },
+    layout: { type: "string", enum: ["title", "section", "bullets", "two-column", "chart", "table", "diagram", "image", "quote", "kpi", "cards", "closing"] },
+    kicker: nstr,
     title: str,
     subtitle: nstr,
     body: nstr,
@@ -50,6 +51,7 @@ export const SLIDE_SCHEMA = {
       required: ["kind", "steps", "events", "rows", "cols", "cells"],
     },
     kpi: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: str, value: str, note: nstr }, required: ["label", "value", "note"] } },
+    cards: { type: "array", items: { type: "object", additionalProperties: false, properties: { heading: str, detail: nstr, tag: nstr }, required: ["heading", "detail", "tag"] } },
     image: {
       type: ["object", "null"],
       additionalProperties: false,
@@ -60,7 +62,7 @@ export const SLIDE_SCHEMA = {
     notes: nstr,
     citations: strArr,
   },
-  required: ["layout", "title", "subtitle", "body", "bullets", "leftHeading", "rightHeading", "bulletsRight", "chart", "table", "diagram", "kpi", "image", "quote", "notes", "citations"],
+  required: ["layout", "kicker", "title", "subtitle", "body", "bullets", "leftHeading", "rightHeading", "bulletsRight", "chart", "table", "diagram", "kpi", "cards", "image", "quote", "notes", "citations"],
 };
 
 export const DECK_SCHEMA = {
@@ -72,4 +74,25 @@ export const DECK_SCHEMA = {
     slides: { type: "array", items: SLIDE_SCHEMA },
   },
   required: ["title", "subtitle", "slides"],
+};
+
+const bool = { type: "boolean" };
+
+export const PLAN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    title: nstr,
+    angle: str,
+    audience: str,
+    slides: { type: "integer" },
+    features: {
+      type: "object",
+      additionalProperties: false,
+      properties: { charts: bool, tables: bool, diagrams: bool, kpis: bool, sections: bool, summary: bool, qa: bool },
+      required: ["charts", "tables", "diagrams", "kpis", "sections", "summary", "qa"],
+    },
+    reason: str,
+  },
+  required: ["title", "angle", "audience", "slides", "features", "reason"],
 };

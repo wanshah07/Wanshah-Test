@@ -9,6 +9,18 @@ single HTML file. Runs on your own machine or server, with your own key.
 
 ## What it does
 
+- **Auto** (on by default). Nothing to fill in: the AI reads the sources,
+  chooses the angle, audience, number of slides and layouts, logs what it
+  chose and why, then writes. Anything ticked or typed still steers it, and
+  Regenerate remembers the choice.
+- **Deck craft.** Every deck is written to one standard: a kicker label and
+  an action title with its number on each content slide, a one-line reading
+  line under the title, an at-a-glance slide second, one visual per slide
+  (big numbers, chart, diagram, table, two columns or numbered cards),
+  verdict tags (YES / PARTLY / NO, HIGH / MEDIUM / LOW, English or Malay)
+  coloured in cards and tables, sources on every chart and table, caveats
+  when the evidence is thin, and decisions and next steps at the end. The
+  same standard is on the Prompts page as the "Deck standard" starter.
 - **Sources.** PDF, Word, PowerPoint, Excel and CSV, Markdown, text, HTML,
   pictures, zips and whole folders. Text is extracted on the server; pictures
   become media the writer can place. A large pile of sources is condensed to
@@ -17,7 +29,8 @@ single HTML file. Runs on your own machine or server, with your own key.
   brand pitch, conference talk, internal update, or custom. Each sets the
   tone, a suggested structure and the default features.
 - **Features.** Charts (column, bar, line, area, pie, doughnut, native in
-  PPTX), tables, diagrams (flow, timeline, matrix), KPI tiles, figures from
+  PPTX), tables, diagrams (flow, timeline, matrix), KPI tiles, numbered
+  cards, figures from
   your uploads or from the image model, speaker notes, citations, section
   dividers, a summary slide, a Q&A slide.
 - **De-slop.** The writer is told what not to write. What slips through is
@@ -32,6 +45,39 @@ single HTML file. Runs on your own machine or server, with your own key.
   with presets. The default preset is the token set of my.facerinna.com
   (Fraunces and Inter, brand `#4898D8` on ink `#1D344E`, 20px radius); the
   app chrome uses the same tokens, light and dark.
+- **Brief by ticking.** What the deck is for, what it must include, the
+  audience and the language are tick boxes; typing is optional. The choices
+  are kept on the deck, so Regenerate starts from them.
+- **Saved prompts** (Prompts page). Instructions written once, such as "cite
+  NPRA before any EU source", ticked on any deck; some can start ticked on
+  every new deck. They sit below the fact rules: no prompt can make the
+  writer invent a fee, date or clause.
+- **Reference designs** (Designs page). Drop a PowerPoint, a PDF or a
+  screenshot of slides you like. A PowerPoint gives its theme colours
+  (through its colour map), the colours its slides actually use, its fonts,
+  and how dense it is (title length, lines per slide, charts, tables,
+  pictures). A PDF gives the page background, text and fill colours, and
+  fonts by size and by use. A screenshot gives its colours from the pixels;
+  its fonts and layout need a writer model that can see pictures. Text
+  colours are adjusted until they read on the background; brand colours are
+  kept exact. Pick a design for a new deck or in the editor's Theme tab; its
+  notes, which you can edit, guide the writer. Office fonts (Calibri,
+  Cambria, Arial, Times New Roman) stay named in the PPTX and are shown in
+  the browser with free fonts of the same widths.
+- **Slide sign-off.** Under every slide: OK, or say what should change and
+  apply it now or save it for later. Feedback can be added to a slide that
+  was already OK, which reopens it. Apply saved feedback runs every waiting
+  note in one go. The editor counts the slides that are OK.
+- **Pictures as sources.** Settings, Test also checks whether the writer
+  model can read pictures, and remembers the answer per endpoint and model.
+  If it can, pictures uploaded as sources are read (text, tables, chart
+  values) before the deck is written, once each. If it cannot, Slidecraft
+  stops before writing and names the pictures; the user can paste their
+  content, change model, or write anyway with them as slide pictures only.
+  Pictures pulled from OneDrive are slide pictures and are never read.
+- **When the writer fails.** The JSON rules are written into the instructions
+  on every call, not only set as a request option, and the first 500
+  characters of a reply that could not be used go into the job log.
 - **Export.** PowerPoint with editable text, native charts, tables and shapes;
   a standalone HTML deck with keyboard navigation, speaker notes and a grid
   view; the JSON spec.
@@ -92,6 +138,53 @@ The key is sent only to the endpoint it was saved with. The server-wide
 `OPENAI_API_KEY` is only ever sent to `OPENAI_BASE_URL`, never to an endpoint
 a user picks in Settings.
 
+### Pictures from OneDrive
+
+A deck can pull the pictures in one OneDrive folder, and pull again before
+every generation, so the folder stays the one place photos live. New and
+changed pictures come in; a changed picture replaces the old one on every
+slide that shows it. Nothing in OneDrive is changed: the only permission
+asked for is `Files.Read`.
+
+Two ways to connect, chosen in Settings, OneDrive pictures:
+
+- **Composio.** Uses the OneDrive already connected in a Composio project.
+  Paste that project's API key, press Find my OneDrive accounts, pick the
+  account. No Microsoft setup. The key reaches every app connected in its
+  project, so give Slidecraft a key from a project that holds only OneDrive,
+  or a scoped key limited to reading. Pictures pass through Composio's
+  servers. Folder paths only (no share links).
+- **Microsoft direct.** No third party; needs the one-time registration below.
+
+Either way, a picture whose SHA-256 does not match the one OneDrive reports
+is not stored.
+
+One-time setup for Microsoft direct, about ten minutes:
+
+1. portal.azure.com, Microsoft Entra ID, App registrations, New registration.
+   Name it `Slidecraft`. Supported account types: "Accounts in any
+   organizational directory and personal Microsoft accounts". No redirect URI.
+2. In the new registration, Authentication, set "Allow public client flows"
+   to Yes and save.
+3. Copy the Application (client) ID. Put it in Settings, OneDrive pictures,
+   or in the `MS_CLIENT_ID` Codespaces secret or `.env`.
+4. Settings, Connect OneDrive. Open the address shown, enter the code, sign
+   in with the account that owns the folder. The page updates by itself.
+
+Then, in a deck (the wizard's Sources step, or Files & regenerate in the
+editor), type a folder path such as `40. HERMES/photos`, or Browse and click
+through the folders, or paste a OneDrive share link, and press Pull pictures.
+
+- The writer picks a picture by its file name. Name files for what they show.
+- JPG, PNG, WebP, GIF and SVG are pulled. HEIC and camera RAW files are
+  listed as skipped: save them as JPG first.
+- At most 300 pictures a pull, each under `MAX_UPLOAD_MB`, subfolders to
+  three levels when ticked.
+- A work or school account may need an administrator to approve the app.
+- Sign-in uses the device code flow, so it needs no client secret and no
+  redirect address, which a codespace (whose address changes) could not give.
+  The refresh token is stored encrypted with `APP_SECRET`.
+
 ### On GitHub, no laptop: Codespaces
 
 `.devcontainer/devcontainer.json` builds and starts the server inside a GitHub
@@ -147,3 +240,5 @@ time. For an always-on address for a team, use the Docker image on a host.
 | `SOURCE_BUDGET` | Characters of source text sent in one call before condensing, default 90000. |
 | `MAX_UPLOAD_MB` | Per-file upload limit, default 40. |
 | `MOCK_LLM` | `1` to skip OpenAI and return a fixture deck. |
+| `MS_CLIENT_ID` | Microsoft app (client) ID for OneDrive pictures. Optional; a per-user one in Settings takes precedence. |
+| `MS_TENANT` | Sign-in authority for OneDrive, default `common` (personal and work accounts). |

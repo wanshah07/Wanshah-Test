@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import PptxGenJSImport from "pptxgenjs";
-import { seriesPalette, type ChartSpec, type Deck, type DiagramSpec, type Slide, type Theme } from "@slidecraft/shared";
+import { seriesPalette, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type Slide, type Theme } from "@slidecraft/shared";
 import { getMedia } from "../store.js";
 
 // Native PPTX from the same spec the HTML renderer reads. Sizes are in inches
@@ -63,19 +63,53 @@ function chrome(ps: PSlide, s: Slide, i: number, c: Ctx, dark = false): void {
   if (s.notes) ps.addNotes(plain(s.notes));
 }
 
+const TONE = { good: { bg: "E3F5EA", ink: "0F5A34" }, mid: { bg: "FFF1D6", ink: "7A4B00" }, bad: { bg: "FDECEC", ink: "8C2323" } } as const;
+
+function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const col = c.theme.colors;
+  const n = items.length;
+  const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : 3;
+  const rows = Math.ceil(n / cols);
+  const gap = 0.25;
+  const cw = (w - gap * (cols - 1)) / cols;
+  const ch = Math.min((h - gap * (rows - 1)) / rows, 2.6);
+  items.slice(0, 9).forEach((it, i) => {
+    const cx = x + (i % cols) * (cw + gap);
+    const cy = y + Math.floor(i / cols) * (ch + gap);
+    panel(ps, cx, cy, cw, ch, c);
+    ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
+    ps.addShape(c.pres.ShapeType.ellipse, { x: cx + 0.2, y: cy + 0.22, w: 0.4, h: 0.4, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
+    ps.addText(String(i + 1), { x: cx + 0.2, y: cy + 0.22, w: 0.4, h: 0.4, fontSize: 13, bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody) });
+    if (it.tag) {
+      const tone = verdictTone(it.tag);
+      const tw = Math.min(cw - 0.9, 0.25 + it.tag.length * 0.09);
+      ps.addText(it.tag.toUpperCase(), { x: cx + cw - tw - 0.2, y: cy + 0.26, w: tw, h: 0.32, fontSize: 9, bold: true, align: "center", valign: "middle", color: tone ? TONE[tone].ink : hex(col.brandDeep), fill: { color: tone ? TONE[tone].bg : hex(col.surface) }, fontFace: fontOk(c.theme.fontBody), rectRadius: 0.16, shape: c.pres.ShapeType.roundRect });
+    }
+    ps.addText(plain(it.heading), { x: cx + 0.2, y: cy + 0.72, w: cw - 0.4, h: 0.55, fontSize: 15, bold: true, color: hex(col.ink), fontFace: fontOk(c.theme.fontDisplay), valign: "top", fit: "shrink" });
+    if (it.detail) ps.addText(plain(it.detail), { x: cx + 0.2, y: cy + 1.28, w: cw - 0.4, h: ch - 1.38, fontSize: 11, color: hex(col.ink2), fontFace: fontOk(c.theme.fontBody), valign: "top", fit: "shrink" });
+  });
+}
+
 function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; color?: string; kicker?: string } = {}): number {
   const t = c.theme;
   const y = opts.y ?? px(96);
   let yy = y;
-  if (opts.kicker) {
-    ps.addText(opts.kicker.toUpperCase(), { x: px(120), y: yy, w: W - px(240), h: px(36), fontSize: 12, bold: true, charSpacing: 3, color: opts.color ?? hex(t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
+  const kicker = s.kicker || opts.kicker;
+  if (kicker) {
+    ps.addText(kicker.toUpperCase(), { x: px(120), y: yy, w: W - px(240), h: px(36), fontSize: 12, bold: true, charSpacing: 3, color: opts.color ?? hex(t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
     yy += px(44);
   }
   const size = opts.size ?? 30;
   const lines = Math.ceil(plain(s.title).length / 52);
   const h = px(Math.max(80, lines * size * 2.2));
   ps.addText(plain(s.title), { x: px(120), y: yy, w: W - px(240), h, fontSize: size, bold: true, color: opts.color ?? hex(t.colors.ink), fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
-  return yy + h + px(16);
+  let end = yy + h + px(16);
+  // The reading line under a content slide's title.
+  if (s.subtitle) {
+    ps.addText(plain(s.subtitle), { x: px(120), y: end - px(8), w: W - px(240), h: px(56), fontSize: 14, color: hex(t.colors.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
+    end += px(60);
+  }
+  return end;
 }
 
 function bullets(ps: PSlide, items: string[], x: number, y: number, w: number, h: number, c: Ctx, size?: number): void {
@@ -127,7 +161,12 @@ function table(ps: PSlide, t: NonNullable<Slide["table"]>, x: number, y: number,
   const many = t.rows.length > 7;
   const rows: TableRows = [
     t.header.map((hd) => ({ text: plain(hd), options: { bold: true, color: hex(c.theme.colors.brandDeep), fill: { color: hex(c.theme.colors.surface) }, fontSize: many ? 11 : 13 } })),
-    ...t.rows.map((r) => r.map((v) => ({ text: plain(v), options: { color: hex(c.theme.colors.ink), fontSize: many ? 10 : 12 } }))),
+    ...t.rows.map((r) =>
+      r.map((v) => {
+        const tone = verdictTone(plain(v));
+        return { text: plain(v), options: tone ? { color: TONE[tone].ink, fill: { color: TONE[tone].bg }, bold: true, fontSize: many ? 10 : 12 } : { color: hex(c.theme.colors.ink), fontSize: many ? 10 : 12 } };
+      }),
+    ),
   ];
   ps.addTable(rows, { x, y, w, colW: Array(t.header.length).fill(w / Math.max(t.header.length, 1)), border: { type: "solid", color: hex(c.theme.colors.line), pt: 0.75 }, fontFace: fontOk(c.theme.fontBody), valign: "top", autoPage: false, rowH: many ? 0.3 : 0.4 });
 }
@@ -296,6 +335,11 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
         ps.addText(plain(k.label), { x: x + 0.2, y: ty + 1.35, w: tw - 0.4, h: 0.6, fontSize: 13, bold: true, color: hex(col.ink), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
         if (k.note) ps.addText(plain(k.note), { x: x + 0.2, y: ty + 1.9, w: tw - 0.4, h: th - 2, fontSize: 10, color: hex(col.muted), fontFace: fontOk(t.fontBody), valign: "top" });
       });
+      if (s.body) ps.addText(plain(s.body), { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4, fontSize: 12, color: hex(col.ink2), fontFace: fontOk(t.fontBody) });
+      break;
+    }
+    case "cards": {
+      cards(ps, s.cards ?? [], contentX, y0, contentW, availH - (s.body ? 0.5 : 0), c);
       if (s.body) ps.addText(plain(s.body), { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4, fontSize: 12, color: hex(col.ink2), fontFace: fontOk(t.fontBody) });
       break;
     }

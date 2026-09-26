@@ -7,6 +7,8 @@ import NewDeck from "./pages/NewDeck";
 import Editor from "./pages/Editor";
 import Present from "./pages/Present";
 import Settings from "./pages/Settings";
+import Designs from "./pages/Designs";
+import Prompts from "./pages/Prompts";
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
           <Route path="/" element={<Decks />} />
           <Route path="/new" element={<NewDeck />} />
           <Route path="/deck/:id" element={<Editor />} />
+          <Route path="/designs" element={<Designs />} />
+          <Route path="/prompts" element={<Prompts />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

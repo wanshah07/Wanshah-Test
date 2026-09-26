@@ -1,0 +1,227 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import type { AddressInfo } from "node:net";
+import { PNG } from "pngjs";
+
+// The real writer path (no mock) against a stand-in endpoint that can see
+// pictures or not, and can answer with something that is not JSON:
+// the JSON rules are always in the written instructions, a failed reply is
+// logged (trimmed), and pictures a model cannot read stop the job until the
+// user chooses.
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "slidecraft-writer-"));
+process.env.DATA_DIR = tmp;
+process.env.MOCK_LLM = "0";
+process.env.AUTH_MODE = "off";
+process.env.APP_SECRET = "test-secret-test-secret-test-secret";
+process.env.NODE_ENV = "test";
+process.env.OPENAI_API_KEY = "sk-test-writer";
+process.env.OPENAI_MODEL = "writer-1";
+
+const gw = { vision: false, garbage: false, plans: 0, planUser: "", systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+let server: http.Server;
+let app: App;
+type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
+const J = (r: { json: () => unknown }) => r.json() as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+function pngBytes(): Buffer {
+  const p = new PNG({ width: 8, height: 8 });
+  for (let i = 0; i < 64; i++) p.data.set([10, 20, 30, 255], i * 4);
+  return PNG.sync.write(p);
+}
+
+function multipart(files: { name: string; content: Buffer }[]) {
+  const boundary = "----vitest" + Math.random().toString(36).slice(2);
+  const parts: Buffer[] = [];
+  for (const f of files) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${encodeURIComponent(f.name)}"\r\nContent-Type: application/octet-stream\r\n\r\n`), f.content, Buffer.from("\r\n"));
+  }
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+  return { payload: Buffer.concat(parts), headers: { "content-type": `multipart/form-data; boundary=${boundary}` } };
+}
+
+async function waitJob(id: string) {
+  for (let i = 0; i < 200; i++) {
+    const j = J(await app.inject({ method: "GET", url: `/api/jobs/${id}` }));
+    if (j.status === "done" || j.status === "failed") return j;
+    await new Promise((r) => setTimeout(r, 30));
+  }
+  throw new Error("job did not finish");
+}
+
+beforeAll(async () => {
+  const { mockDeckJson } = await import("../src/llm/mock.js");
+  const { DEFAULT_FEATURES } = await import("@slidecraft/shared");
+  server = http.createServer((req, res) => {
+    let raw = "";
+    req.on("data", (c) => (raw += c));
+    req.on("end", () => {
+      const reply = (content: string) => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }] }));
+      };
+      if (req.url === "/v1/models") {
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ data: [{ id: "writer-1" }] }));
+      }
+      const body = JSON.parse(raw || "{}");
+      const user = body.messages?.[1]?.content;
+      if (Array.isArray(user)) {
+        if (!gw.vision) {
+          res.writeHead(400, { "content-type": "application/json" });
+          return res.end(JSON.stringify({ error: { message: "This model does not support image input." } }));
+        }
+        const text = String(user.find((p: { type: string }) => p.type === "text")?.text ?? "");
+        if (/What colour/.test(text)) {
+          gw.probes++;
+          return reply("Red");
+        }
+        gw.reads++;
+        return reply("Salicylic acid limit | 2%\nEffective | 1 Jan 2027");
+      }
+      if (body.response_format?.json_schema?.name === "plan") {
+        gw.plans++;
+        gw.planUser = String(user ?? "");
+        return reply(JSON.stringify({ title: "Salicylic acid: 2% cap needs 4 SKUs reformulated", angle: "medical-affairs", audience: "dermatologists", slides: 7, features: { charts: false, tables: true, diagrams: false, kpis: true, sections: false, summary: true, qa: true }, reason: "The sources are clinical and carry no series of numbers." }));
+      }
+      gw.systems.push(String(body.messages?.[0]?.content ?? ""));
+      gw.formats.push(String(body.response_format?.type ?? ""));
+      gw.users.push(String(user ?? ""));
+      if (gw.garbage) return reply("Sorry, I can only help with questions about cooking. " + "x".repeat(900));
+      reply(JSON.stringify(mockDeckJson({ prompt: "x", lang: "en", angle: "custom", slides: 6, features: DEFAULT_FEATURES, imageMode: "none" }, [])));
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  process.env.OPENAI_BASE_URL = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
+  const { buildApp } = await import("../src/index.js");
+  app = await buildApp();
+});
+
+afterAll(async () => {
+  await app?.close();
+  server.closeAllConnections();
+  await new Promise<void>((r) => server.close(() => r()));
+});
+
+async function newDeck(title: string) {
+  return J(await app.inject({ method: "POST", url: "/api/decks", payload: { title } })).id as string;
+}
+
+describe("the writer's instructions and failures", () => {
+  it("writes the JSON rules into the instructions even when strict JSON is accepted", async () => {
+    const id = await newDeck("rules");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
+    expect((await waitJob(jobId)).status).toBe("done");
+    expect(gw.formats.at(-1)).toBe("json_schema");
+    expect(gw.systems.at(-1)).toMatch(/OUTPUT FORMAT: answer with one JSON object and nothing else[\s\S]*"slides"/);
+  });
+
+  it("logs what the model sent, trimmed to 500 characters, when it is not JSON", async () => {
+    gw.garbage = true;
+    const id = await newDeck("garbage");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
+    const job = await waitJob(jobId);
+    gw.garbage = false;
+    expect(job.status).toBe("failed");
+    const line = (job.progress as string[]).find((l) => l.includes("Model reply (first 500 characters)"))!;
+    expect(line).toMatch(/Sorry, I can only help with questions about cooking/);
+    const snippet = line.split("Model reply (first 500 characters): ")[1];
+    expect(snippet.length).toBe(501); // 500 characters and the ellipsis
+  });
+});
+
+describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
+  it("refuses an empty brief without Auto and accepts it with Auto", async () => {
+    const id = await newDeck("auto");
+    const bare = await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "" } });
+    expect(bare.statusCode).toBe(400);
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "", auto: true, slides: 20, angle: "brand-pitch", features: { charts: true, diagrams: true } } }));
+    const job = await waitJob(jobId);
+    expect(job.status, job.error ?? "").toBe("done");
+    expect(gw.plans).toBe(1);
+    expect(gw.planUser).toMatch(/Build the strongest professional deck/);
+    const log = job.progress.join("\n");
+    expect(log).toMatch(/Auto: Medical affairs \/ HCP education for dermatologists, 7 slides, using tables, kpis\. The sources are clinical/);
+    // The writer is told what the planner chose, not what the form carried.
+    const sys = gw.systems.at(-1)!;
+    expect(sys).toMatch(/ANGLE: Medical affairs \/ HCP education/);
+    expect(sys).toMatch(/AUDIENCE: dermatologists/);
+    expect(sys).toMatch(/exactly 7 slides/);
+    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, table, kpi\./);
+    expect(gw.users.at(-1)).toMatch(/DECK TITLE \(use it\): Salicylic acid: 2% cap/);
+    const deck = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
+    expect(deck.angle).toBe("medical-affairs");
+    expect(deck.brief).toMatchObject({ auto: true, text: "", slides: 7 });
+    expect(deck.brief.features).toMatchObject({ charts: false, diagrams: false, kpis: true, notes: true, citations: true });
+  });
+
+  it("writes the deck craft rules into every writer's instructions", () => {
+    const sys = gw.systems.at(-1)!;
+    expect(sys).toMatch(/DECK CRAFT/);
+    expect(sys).toMatch(/`kicker` on every content slide/);
+    expect(sys).toMatch(/action titles/);
+    expect(sys).toMatch(/YES \/ PARTLY \/ NO/);
+    expect(sys).toMatch(/- cards: 2 to 6 numbered cards/);
+  });
+
+  it("leaves the choices alone without Auto", async () => {
+    const before = gw.plans;
+    const id = await newDeck("manual");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits", slides: 8, angle: "training" } }));
+    await waitJob(jobId);
+    expect(gw.plans).toBe(before);
+    expect(gw.systems.at(-1)).toMatch(/exactly 8 slides/);
+  });
+});
+
+describe("pictures the writer may not be able to read", () => {
+  let id = "";
+  it("stops before writing when the model cannot read an uploaded picture, naming it", async () => {
+    id = await newDeck("pictures");
+    await app.inject({ method: "POST", url: `/api/decks/${id}/sources`, ...multipart([{ name: "label-table.png", content: pngBytes() }]) });
+    const r = await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "What the label table says about limits" } });
+    expect(r.statusCode).toBe(409);
+    expect(J(r)).toMatchObject({ error: "pictures_unreadable", pictures: ["label-table.png"] });
+    expect(J(r).message).toMatch(/writer-1\) cannot read pictures/);
+  });
+
+  it("writes when the user chooses to go on, and says the picture was not read", async () => {
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "What the label table says about limits", allowUnreadPictures: true } }));
+    const job = await waitJob(jobId);
+    expect(job.status).toBe("done");
+    expect(job.progress.join("\n")).toMatch(/1 picture source used only as slide pictures: writer-1 cannot read pictures/);
+    expect(gw.reads).toBe(0);
+  });
+
+  it("Test in Settings rechecks and reports picture reading", async () => {
+    gw.vision = true;
+    const t = J(await app.inject({ method: "POST", url: "/api/settings/test-key", payload: {} }));
+    expect(t.vision).toBe("yes");
+    expect(t.message).toMatch(/writer-1 reads pictures/);
+    expect(J(await app.inject({ method: "GET", url: "/api/settings" })).vision).toBe("yes");
+  });
+
+  it("reads an uploaded picture once and gives its content to the writer", async () => {
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "What the label table says about limits" } }));
+    const job = await waitJob(jobId);
+    expect(job.status).toBe("done");
+    expect(job.progress.join("\n")).toMatch(/Reading picture 1: label-table.png/);
+    expect(gw.users.at(-1)).toMatch(/### Picture: label-table.png[\s\S]*Effective \| 1 Jan 2027/);
+    const again = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "Again" } }));
+    await waitJob(again.jobId);
+    expect(gw.reads).toBe(1);
+  });
+
+  it("leaves OneDrive pictures alone: they are slide pictures, not documents", async () => {
+    const { unreadPictures } = await import("../src/store.js");
+    const rows = [
+      { id: "a", name: "photo.jpg", rel_path: null, kind: "image", chars: 0, text: "", media_id: "m", remote_id: "od1" },
+      { id: "b", name: "scan.png", rel_path: null, kind: "image", chars: 0, text: "", media_id: "m", remote_id: null },
+      { id: "c", name: "read.png", rel_path: null, kind: "image", chars: 0, text: "NONE", media_id: "m", remote_id: null },
+    ];
+    expect(unreadPictures(rows).map((r) => r.name)).toEqual(["scan.png"]);
+  });
+});

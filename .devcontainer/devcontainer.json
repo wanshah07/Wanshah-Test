@@ -2,7 +2,7 @@
   "name": "Slidecraft",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
   "hostRequirements": { "cpus": 2, "memory": "4gb" },
-  "postCreateCommand": "npm ci --no-audit --no-fund && npm run build",
+  "postCreateCommand": "npm ci --include=dev --no-audit --no-fund && npm run build",
   "postAttachCommand": "npm start",
   "forwardPorts": [8787],
   "portsAttributes": {
@@ -16,7 +16,8 @@
   },
   "secrets": {
     "APP_SECRET": { "description": "Long random string. Encrypts the stored OpenAI key. node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"" },
-    "OPENAI_API_KEY": { "description": "Optional. Can also be entered in the app's Settings page instead." }
+    "OPENAI_API_KEY": { "description": "Optional. Can also be entered in the app's Settings page instead." },
+    "MS_CLIENT_ID": { "description": "Optional. Application (client) ID of a Microsoft app registration, for pulling pictures from OneDrive. Can also be entered in Settings." }
   },
   "customizations": {
     "vscode": { "extensions": ["dbaeumer.vscode-eslint"] }

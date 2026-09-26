@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS } from "../src/index.js";
+import { verdictTone, renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS } from "../src/index.js";
 import type { Deck, Slide } from "../src/index.js";
 
 const theme = themePreset("facerinna");
@@ -76,5 +76,46 @@ describe("normaliseSlide", () => {
     expect(s.chart?.unit).toBeUndefined();
     expect(s.id).toMatch(/^s_/);
     expect(normaliseSlide({ layout: "nope", title: 3 }).layout).toBe("bullets");
+  });
+});
+
+describe("deck craft: kicker, reading line, cards and verdicts", () => {
+  it("draws the kicker and the reading line above a content slide", () => {
+    const s: Slide = { id: "a", layout: "bullets", kicker: "AT A GLANCE", title: "3 of 5 claims need a study", subtitle: "Read left to right: claim, evidence, verdict.", bullets: ["b"] };
+    const html = renderSlideHtml(s, theme, ctx);
+    expect(html).toContain('<span class="sc-kicker">AT A GLANCE</span>');
+    expect(html).toContain('<p class="sc-dek">Read left to right');
+  });
+  it("keeps a title slide's subtitle out of the reading line", () => {
+    const s: Slide = { id: "a", layout: "title", title: "T", subtitle: "Board, 3 Oct" };
+    expect(renderSlideHtml(s, theme, ctx)).not.toContain("sc-dek");
+  });
+  it("numbers the cards and colours verdict tags", () => {
+    const s: Slide = { id: "a", layout: "cards", title: "T", cards: [{ heading: "Reformulate", detail: "R&D by Q1", tag: "HIGH" }, { heading: "Relabel", tag: "Partly" }, { heading: "Wait", tag: "NO" }, { heading: "Owner", tag: "RA team" }] };
+    const html = renderSlideHtml(s, theme, ctx);
+    expect(html).toContain("--cols:2");
+    expect(html.match(/class="no"/g)?.length).toBe(4);
+    expect(html).toContain('sc-badge v-good">HIGH');
+    expect(html).toContain('sc-badge v-mid">Partly');
+    expect(html).toContain('sc-badge v-bad">NO');
+    expect(html).toContain('sc-badge v-plain">RA team');
+    expect(html).toContain("R&amp;D by Q1");
+  });
+  it("reads English and Malay verdicts and ignores ordinary words", () => {
+    expect(["YES", "Tinggi", "lulus.", "PASS"].map(verdictTone)).toEqual(["good", "good", "good", "good"]);
+    expect(["Sebahagian", "MEDIUM", "pending"].map(verdictTone)).toEqual(["mid", "mid", "mid"]);
+    expect(["Tidak", "LOW", "fail"].map(verdictTone)).toEqual(["bad", "bad", "bad"]);
+    expect(["Notification", "2%", "", "Not yet reviewed"].map(verdictTone)).toEqual(["", "", "", ""]);
+  });
+  it("badges verdict cells in a table", () => {
+    const s: Slide = { id: "a", layout: "table", title: "T", table: { header: ["Claim", "Supported"], rows: [["Brightening", "PARTLY"], ["Anti-ageing", "2 studies"]] } };
+    const html = renderSlideHtml(s, theme, ctx);
+    expect(html).toContain('sc-badge v-mid">PARTLY');
+    expect(html).not.toContain(">2 studies</span>");
+  });
+  it("cleans cards and kickers the writer sends with nulls", () => {
+    const s = normaliseSlide({ layout: "cards", title: "T", kicker: "   ", cards: [{ heading: "A", detail: null, tag: null }, { heading: "", detail: "x" }, null] } as unknown as Record<string, unknown>);
+    expect(s.kicker).toBeUndefined();
+    expect(s.cards).toEqual([{ heading: "A" }]);
   });
 });

@@ -77,6 +77,19 @@ export const SLIDE_CSS = `
 /* image */
 .sc-slide .sc-placeholder{flex:1;border:3px dashed var(--line);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;
   text-align:center;padding:60px;color:var(--muted);font-size:28px;background:color-mix(in srgb,var(--surface) 60%,transparent)}
+.sc-slide .sc-dek{font-size:30px;color:var(--ink2);margin-top:-12px;max-width:1600px;line-height:1.35}
+.sc-slide .sc-cards{display:grid;grid-template-columns:repeat(var(--cols,3),1fr);gap:28px;flex:1;min-height:0;align-content:start}
+.sc-slide .sc-card{background:var(--surface);border:2px solid var(--line);border-radius:var(--radius);padding:30px 34px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden;
+  box-shadow:0 6px 24px rgba(23,50,79,.05);border-top:8px solid var(--brand)}
+.sc-slide .sc-card .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sc-slide .sc-card .no{width:52px;height:52px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:28px;display:grid;place-items:center;flex:none}
+.sc-slide .sc-card .hd{font-family:var(--font-display);font-weight:600;font-size:34px;line-height:1.2;color:var(--ink)}
+.sc-slide .sc-card .dt{font-size:26px;color:var(--ink2);line-height:1.4}
+.sc-slide .sc-badge{display:inline-block;padding:4px 14px;border-radius:999px;font-size:20px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.sc-slide .sc-badge.v-good{background:#E3F5EA;color:#0F5A34}
+.sc-slide .sc-badge.v-mid{background:#FFF1D6;color:#7A4B00}
+.sc-slide .sc-badge.v-bad{background:#FDECEC;color:#8C2323}
+.sc-slide .sc-badge.v-plain{background:color-mix(in srgb,var(--brand) 14%,var(--surface));color:var(--brand-deep)}
 .sc-slide mark.sahkan{background:#FFE8A3;color:#6B4E00;border-radius:6px;padding:0 .2em}
 .sc-slide code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:color-mix(in srgb,var(--line) 50%,transparent);padding:0 .25em;border-radius:6px}
 `;

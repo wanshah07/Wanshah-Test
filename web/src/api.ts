@@ -1,4 +1,4 @@
-import type { Deck, Slide, SlopHit, SourceRef } from "@slidecraft/shared";
+import type { Deck, OneDriveLink, Slide, SlopHit, SourceRef, Theme } from "@slidecraft/shared";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) {
@@ -64,8 +64,53 @@ export interface Settings {
   model: string;
   imageModel: string;
   defaults: { model: string; imageModel: string };
+  /** Whether the writer model reads pictures, as last checked. */
+  vision: "yes" | "no" | "unknown";
   appTheme: "light" | "dark" | "system";
   defaultTheme: string;
+}
+
+export interface OneDriveStatus {
+  provider: "microsoft" | "composio";
+  composio: { key: string; account: string; accountLabel: string };
+  clientId: string;
+  clientIdFrom: "settings" | "server" | "none";
+  connected: boolean;
+  account: string;
+  defaultFolder: string;
+  pending: { userCode: string; verificationUri: string; expiresAt: string; interval: number } | null;
+}
+
+export interface OneDriveImport {
+  report: { folder: string; added: number; updated: number; unchanged: number; skipped: { name: string; reason: string }[]; capped: boolean };
+  summary: string;
+  link: OneDriveLink;
+  sources: SourceRef[];
+}
+
+export interface Design {
+  id: string;
+  name: string;
+  theme: Theme;
+  notes: string;
+  analysis: {
+    kind?: "pptx" | "pdf" | "image";
+    files?: string[];
+    colours?: { hex: string; share: number }[];
+    fonts?: { display?: string; body?: string; found: string[] };
+    stats?: { slides: number; titleWords: number; longestTitle: number; linesPerSlide: number; charts: number; tables: number; pictures: number };
+    warnings?: string[];
+  };
+  previewMediaId: string | null;
+  sourceName: string | null;
+  updatedAt: string;
+}
+
+export interface SavedPrompt {
+  id: string;
+  name: string;
+  text: string;
+  isDefault: boolean;
 }
 
 export interface MediaItem {
@@ -83,7 +128,7 @@ export const api = {
   login: (email: string, password: string) => req<{ user: Settings["user"] }>("POST", "/api/auth/login", { email, password }),
   logout: () => req<{ ok: true }>("POST", "/api/auth/logout"),
   decks: () => req<DeckSummary[]>("GET", "/api/decks"),
-  createDeck: (b: { title?: string; lang?: string; angle?: string; themeId?: string }) => req<Deck>("POST", "/api/decks", b),
+  createDeck: (b: { title?: string; lang?: string; angle?: string; themeId?: string; designId?: string }) => req<Deck>("POST", "/api/decks", b),
   deck: (id: string) => req<DeckResponse>("GET", `/api/decks/${id}`),
   saveDeck: (deck: Deck) => req<DeckResponse>("PUT", `/api/decks/${deck.id}`, deck),
   deleteDeck: (id: string) => req<{ ok: true }>("DELETE", `/api/decks/${id}`),
@@ -109,7 +154,34 @@ export const api = {
   rewrite: (id: string, sid: string, instruction: string) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${id}/slides/${sid}/rewrite`, { instruction }),
   settings: () => req<Settings>("GET", "/api/settings"),
   saveSettings: (b: Partial<{ openaiKey: string | null; model: string; imageModel: string; appTheme: string; defaultTheme: string; baseUrl: string | null }>) => req<{ ok: true }>("PUT", "/api/settings", b),
-  testKey: (openaiKey?: string, baseUrl?: string) => req<{ ok: boolean; message: string; models?: string[] }>("POST", "/api/settings/test-key", { openaiKey, baseUrl }),
+  oneDrive: () => req<OneDriveStatus>("GET", "/api/onedrive"),
+  saveOneDrive: (b: { clientId?: string | null; defaultFolder?: string | null; provider?: "microsoft" | "composio"; composioKey?: string | null; composioAccount?: string | null; composioAccountLabel?: string | null }) => req<OneDriveStatus>("PUT", "/api/onedrive", b),
+  disconnectOneDrive: () => req<OneDriveStatus>("DELETE", "/api/onedrive"),
+  composioAccounts: (key?: string) => req<{ accounts: { id: string; label: string; status: string }[] }>("POST", "/api/onedrive/composio/accounts", { key }),
+  oneDriveLogin: () => req<NonNullable<OneDriveStatus["pending"]>>("POST", "/api/onedrive/login"),
+  oneDrivePoll: () => req<{ state: "waiting" | "connected" | "expired" | "declined" | "none"; account?: string; message?: string }>("POST", "/api/onedrive/login/poll"),
+  oneDriveBrowse: (folder: string) => req<{ name: string; folders: string[]; pictures: number }>("GET", `/api/onedrive/browse?folder=${encodeURIComponent(folder)}`),
+  importOneDrive: (id: string, folder: string, subfolders: boolean) => req<OneDriveImport>("POST", `/api/decks/${id}/onedrive`, { folder, subfolders }),
+  unlinkOneDrive: (id: string) => req<{ ok: true }>("DELETE", `/api/decks/${id}/onedrive`),
+  designs: () => req<Design[]>("GET", "/api/designs"),
+  analyseDesign: (files: File[], name: string) => {
+    const fd = new FormData();
+    if (name.trim()) fd.append("name", name.trim());
+    for (const f of files) fd.append("files", f, encodeURIComponent(f.name));
+    return req<Design>("POST", "/api/designs/analyse", undefined, fd);
+  },
+  saveDesign: (name: string, theme: Theme, notes = "") => req<Design>("POST", "/api/designs", { name, theme, notes }),
+  updateDesign: (id: string, b: { name?: string; notes?: string; theme?: Theme }) => req<Design>("PUT", `/api/designs/${id}`, b),
+  deleteDesign: (id: string) => req<{ ok: true }>("DELETE", `/api/designs/${id}`),
+  applyDesign: (deckId: string, designId: string) => req<Deck>("POST", `/api/decks/${deckId}/design`, { designId }),
+  prompts: () => req<SavedPrompt[]>("GET", "/api/prompts"),
+  addPrompt: (b: { name: string; text: string; isDefault: boolean }) => req<SavedPrompt>("POST", "/api/prompts", b),
+  updatePrompt: (id: string, b: { name: string; text: string; isDefault: boolean }) => req<SavedPrompt>("PUT", `/api/prompts/${id}`, b),
+  deletePrompt: (id: string) => req<{ ok: true }>("DELETE", `/api/prompts/${id}`),
+  feedback: (deckId: string, sid: string, text: string, apply: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/feedback`, { text, apply }),
+  slideOk: (deckId: string, sid: string, ok: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/ok`, { ok }),
+  applyAllFeedback: (deckId: string) => req<{ jobId: string }>("POST", `/api/decks/${deckId}/feedback/apply`),
+  testKey: (openaiKey?: string, baseUrl?: string, model?: string) => req<{ ok: boolean; message: string; models?: string[]; vision?: string }>("POST", "/api/settings/test-key", { openaiKey, baseUrl, model }),
 };
 
 export function mediaUrl(id: string): string {

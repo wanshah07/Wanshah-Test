@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ANGLES, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type SourceRef } from "@slidecraft/shared";
-import { api, type Job } from "../api";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
+import { api, type Design, type Job } from "../api";
 import { toast } from "../components/Toast";
+import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
+import { ThemeCards } from "../components/ThemeCards";
+import { DropZone } from "../components/DropZone";
+import { OneDriveBox } from "../components/OneDriveBox";
+import type { PathedFile } from "../lib/files";
+import { explainFailure } from "../lib/errors";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 const STEPS = ["Brief", "Sources", "Angle", "Features", "Generate"];
@@ -16,31 +22,38 @@ export default function NewDeck() {
   const [step, setStep] = useState<Step>(0);
   const [deckId, setDeckId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [audience, setAudience] = useState("");
+  const [brief, setBrief] = useState<BriefValue>(EMPTY_BRIEF);
+  const [link, setLink] = useState<OneDriveLink | undefined>(undefined);
   const [lang, setLang] = useState<"en" | "ms">("en");
   const [angle, setAngle] = useState("regulatory-briefing");
   const [features, setFeatures] = useState<Features>({ ...DEFAULT_FEATURES, ...ANGLES[0].defaults });
   const [slides, setSlides] = useState(10);
   const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
   const [themeId, setThemeId] = useState("facerinna");
+  const [params] = useSearchParams();
+  const [designId, setDesignId] = useState<string | undefined>(params.get("design") ?? undefined);
+  const [designs, setDesigns] = useState<Design[]>([]);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [over, setOver] = useState(false);
   const [pasteName, setPasteName] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [job, setJob] = useState<Job | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const dirRef = useRef<HTMLInputElement>(null);
+  const [startError, setStartError] = useState("");
+  // Auto: the AI reads the material and chooses the angle, audience, length and layouts.
+  const [auto, setAuto] = useState(true);
+  const prompt = composeBrief(brief);
+  const audience = composeAudience(brief.audiences, brief.audienceText);
 
   useEffect(() => {
     api.settings().then((s) => setThemeId(s.defaultTheme)).catch(() => {});
+    api.designs().then(setDesigns).catch(() => {});
+    defaultPromptIds().then((prompts) => setBrief((b) => ({ ...b, prompts })));
   }, []);
 
   // The deck row exists from step 2 so uploads have somewhere to go.
   const ensureDeck = async (): Promise<string> => {
     if (deckId) return deckId;
-    const d = await api.createDeck({ title, lang, angle, themeId });
+    const d = await api.createDeck({ title, lang, angle, themeId, designId });
     setDeckId(d.id);
     return d.id;
   };
@@ -51,8 +64,7 @@ export default function NewDeck() {
     setFeatures({ ...DEFAULT_FEATURES, ...(a?.defaults ?? {}) });
   };
 
-  const addFiles = async (list: FileList | File[]) => {
-    const files = Array.from(list).map((f) => ({ file: f, path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name }));
+  const addFiles = async (files: PathedFile[]) => {
     if (!files.length) return;
     setUploading(true);
     try {
@@ -66,34 +78,6 @@ export default function NewDeck() {
     } finally {
       setUploading(false);
     }
-  };
-
-  const onDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setOver(false);
-    const items = e.dataTransfer.items;
-    const out: File[] = [];
-    // Folders dropped from the desktop arrive as directory entries.
-    const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
-      if (entry.isFile) {
-        const f = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
-        Object.defineProperty(f, "webkitRelativePath", { value: prefix + f.name });
-        out.push(f);
-      } else if (entry.isDirectory) {
-        const reader = (entry as FileSystemDirectoryEntry).createReader();
-        const entries = await new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
-        for (const en of entries) await walk(en, prefix + entry.name + "/");
-      }
-    };
-    if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
-      for (const it of Array.from(items)) {
-        const en = it.webkitGetAsEntry();
-        if (en) await walk(en, "");
-      }
-    } else {
-      out.push(...Array.from(e.dataTransfer.files));
-    }
-    await addFiles(out);
   };
 
   const addPaste = async () => {
@@ -110,30 +94,43 @@ export default function NewDeck() {
     setSources((x) => x.filter((y) => y.id !== s.id));
   };
 
-  const start = async () => {
-    const id = await ensureDeck();
+  const start = async (allowUnreadPictures = false) => {
+    setJob(null);
+    setStartError("");
     setStep(4);
     try {
-      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode });
+      const existed = !!deckId;
+      const id = await ensureDeck();
+      // The deck may have been created at the Sources step, before a design was picked.
+      if (existed) {
+        if (designId) await api.applyDesign(id, designId);
+        else await api.applyPreset(id, themeId);
+      }
+      const { jobId } = await api.generate(id, { prompt, auto, title, lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
-        const j = await api.job(jobId);
-        setJob(j);
-        if (j.status === "done") {
-          toast("Deck ready");
-          nav(`/deck/${id}`);
-        } else if (j.status === "failed") {
-          toast(j.error || "Generation failed", true);
-        } else setTimeout(tick, 1500);
+        try {
+          const j = await api.job(jobId);
+          setJob(j);
+          if (j.status === "done") {
+            toast("Deck ready");
+            nav(`/deck/${id}`);
+          } else if (j.status !== "failed") setTimeout(tick, 1500);
+        } catch (e) {
+          setStartError((e as Error).message);
+        }
       };
       tick();
     } catch (e) {
-      toast((e as Error).message, true);
-      setStep(3);
+      setStartError((e as Error).message);
     }
   };
 
   const hasPictures = sources.some((s) => s.kind === "image");
-  const canNext = step === 0 ? prompt.trim().length > 10 : true;
+  const canNext = step === 0 ? auto || prompt.trim().length > 10 : true;
+  const briefHint = step === 0 && !canNext ? "Tick what the deck is for, or type a few words." : "";
+  // Auto skips the Angle step; the Features step keeps only the design.
+  const next = () => setStep((s) => (auto && s === 1 ? 3 : s + 1) as Step);
+  const back = () => setStep((s) => Math.max(0, auto && s === 3 ? 1 : s - 1) as Step);
 
   return (
     <main className="page" style={{ maxWidth: 900 }}>
@@ -142,7 +139,7 @@ export default function NewDeck() {
       <div className="steps">
         {STEPS.map((s, i) => (
           <>
-            <div key={s} className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span>{s}</div>
+            <div key={s} className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span>{auto && i === 2 ? "Angle: AI" : auto && i === 3 ? "Design" : s}</div>
             {i < STEPS.length - 1 && <div key={s + "bar"} className="bar" />}
           </>
         ))}
@@ -150,48 +147,43 @@ export default function NewDeck() {
 
       {step === 0 && (
         <div className="card stack">
+          <label className={"toggle" + (auto ? " on" : "")} data-testid="auto">
+            <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+            <div>
+              <b>Auto: let the AI decide</b>
+              <span>Nothing to fill in. The AI reads your sources and chooses the angle, audience, number of slides and layouts, then builds the deck to a professional standard (kicker labels, action titles, an at-a-glance slide, verdict tags, next steps). Anything you tick or type below still steers it.</span>
+            </div>
+          </label>
           <label className="f">
             Deck title <span className="h">Optional. The writer proposes one if empty.</span>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Salicylic acid: what the 2026 amendment changes for our range" />
           </label>
-          <label className="f">
-            Brief <span className="h">What the deck must say and decide. Name the products, the instrument, the numbers you already know. The more concrete, the fewer [SAHKAN] markers.</span>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={7} placeholder="Brief the deck the way you would brief a colleague." />
-          </label>
-          <div className="grid c2">
-            <label className="f">
-              Audience <span className="h">Who is in the room.</span>
-              <input type="text" value={audience} onChange={(e) => setAudience(e.target.value)} placeholder="e.g. brand owner and product team, non-technical" />
-            </label>
-            <label className="f">
-              Language
-              <select value={lang} onChange={(e) => setLang(e.target.value as "en" | "ms")}>
-                <option value="en">English</option>
-                <option value="ms">Bahasa Malaysia</option>
-              </select>
-            </label>
+          {auto ? (
+            <details>
+              <summary className="small">Steer it (optional)</summary>
+              <BriefPicker value={brief} onChange={setBrief} />
+            </details>
+          ) : (
+            <BriefPicker value={brief} onChange={setBrief} />
+          )}
+          <div>
+            <b className="small">Language</b>
+            <div className="chips">
+              {([["en", "English"], ["ms", "Bahasa Malaysia"]] as const).map(([v, l]) => (
+                <label key={v} className={"chip" + (lang === v ? " on" : "")}>
+                  <input type="radio" name="lang" checked={lang === v} onChange={() => setLang(v)} />
+                  {l}
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {step === 1 && (
         <div className="stack">
-          <div
-            className={"drop" + (over ? " over" : "")}
-            onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-            onDragLeave={() => setOver(false)}
-            onDrop={onDrop}
-          >
-            <p style={{ fontWeight: 600, marginBottom: 6 }}>Drop files or folders here</p>
-            <p className="small muted" style={{ marginBottom: 14 }}>PDF, Word, PowerPoint, Excel, CSV, Markdown, text, HTML, images, zip. Folders are read recursively.</p>
-            <div className="row" style={{ justifyContent: "center" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>Choose files</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => dirRef.current?.click()} disabled={uploading}>Choose a folder</button>
-              {uploading && <span className="spin" />}
-            </div>
-            <input ref={fileRef} type="file" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
-            <input ref={dirRef} type="file" multiple hidden {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => e.target.files && addFiles(e.target.files)} />
-          </div>
+          <DropZone onFiles={addFiles} busy={uploading} />
+          <OneDriveBox getDeckId={ensureDeck} link={link} onImported={(src, l) => { setSources(src.length ? src : sources); setLink(l); }} />
           <div className="card tight stack">
             <div className="row between"><b className="small">Paste text</b><span className="small muted">Notes, an email, a clause you copied.</span></div>
             <input type="text" value={pasteName} onChange={(e) => setPasteName(e.target.value)} placeholder="Name this source" />
@@ -228,7 +220,7 @@ export default function NewDeck() {
 
       {step === 3 && (
         <div className="stack">
-          <div className="card stack">
+          {!auto && <div className="card stack">
             <h3>Length and theme</h3>
             <div className="grid c2">
               <label className="f">
@@ -237,15 +229,24 @@ export default function NewDeck() {
                   {LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}
                 </select>
               </label>
-              <label className="f">
-                Theme <span className="h">Change any colour or font later in the editor.</span>
-                <select value={themeId} onChange={(e) => setThemeId(e.target.value)}>
-                  {THEME_PRESETS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </label>
             </div>
-          </div>
+          </div>}
           <div className="card stack">
+            <div className="row between">
+              <h3>Design</h3>
+              <a href="/designs" className="small">Add a reference design</a>
+            </div>
+            <ThemeCards
+              width={190}
+              lang={lang}
+              options={[...designs.map((d) => ({ key: d.id, name: d.name, theme: d.theme, mine: true, hint: d.notes })), ...THEME_PRESETS.map((t) => ({ key: t.id, name: t.name, theme: t }))]}
+              isOn={(o) => (o.mine ? designId === o.key : !designId && themeId === o.key)}
+              onPick={(o) => (o.mine ? setDesignId(o.key) : (setDesignId(undefined), setThemeId(o.key)))}
+            />
+            <span className="small muted">Your designs also carry notes the writer follows (title length, text per slide). Colours and fonts can be changed later in the editor.</span>
+          </div>
+          {auto && <p className="small muted">Auto chooses the length and the layouts from your material, and uses your uploaded pictures if there are any. Untick Auto on the first step to choose them yourself.</p>}
+          {!auto && <div className="card stack">
             <h3>Features</h3>
             <div className="grid c2">
               {(Object.keys(FEATURE_LABELS) as (keyof Features)[]).map((k) => (
@@ -265,33 +266,51 @@ export default function NewDeck() {
                 </select>
               </label>
             )}
-          </div>
+          </div>}
         </div>
       )}
 
-      {step === 4 && (
-        <div className="card stack">
-          <div className="row">
-            {job?.status !== "failed" && <span className="spin" />}
-            <h3>{job?.status === "failed" ? "Generation failed" : "Writing the deck"}</h3>
-          </div>
-          <div className="log">{(job?.progress ?? ["Starting"]).join("\n")}</div>
-          {job?.status === "failed" && (
+      {step === 4 && (() => {
+        const failed = job?.status === "failed" || !!startError;
+        const why = failed ? explainFailure(startError || job?.error || "") : null;
+        return (
+          <div className="card stack">
             <div className="row">
-              <button className="btn btn-ghost" onClick={() => setStep(3)}>Back</button>
-              {deckId && <button className="btn btn-quiet" onClick={() => nav(`/deck/${deckId}`)}>Open the empty deck anyway</button>}
+              {!failed && <span className="spin" />}
+              <h3>{failed ? "The deck was not written" : "Writing the deck"}</h3>
             </div>
-          )}
-        </div>
-      )}
+            {why && (
+              <div className="banner danger" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                <b>{why.what}</b>
+                <span>{why.todo}</span>
+              </div>
+            )}
+            {(job?.progress?.length || !failed) && <div className="log">{(job?.progress ?? ["Starting"]).join("\n")}</div>}
+            {failed && why?.anyway && <p className="small muted">Pictures pulled from OneDrive are never read; they are slide pictures. This is only about pictures you uploaded as sources.</p>}
+            {failed && (
+              <div className="row">
+                <button className="btn btn-primary" onClick={() => start()}>Try again</button>
+                {why?.anyway && <button className="btn btn-ghost" onClick={() => start(true)}>Write anyway (pictures as slide pictures only)</button>}
+                {why?.settings && <Link className="btn btn-ghost" to="/settings" target="_blank">Open Settings</Link>}
+                <button className="btn btn-ghost" onClick={() => setStep(auto ? 0 : 3)}>Change the choices</button>
+                {deckId && <button className="btn btn-quiet" onClick={() => nav(`/deck/${deckId}`)}>Open the deck</button>}
+              </div>
+            )}
+            {failed && <p className="small muted">Your brief, sources and choices are kept. Try again uses them exactly as they are.</p>}
+          </div>
+        );
+      })()}
 
       {step < 4 && (
         <div className="row between" style={{ marginTop: 20 }}>
-          <button className="btn btn-quiet" onClick={() => setStep((s) => Math.max(0, s - 1) as Step)} disabled={step === 0}>Back</button>
+          <button className="btn btn-quiet" onClick={back} disabled={step === 0}>Back</button>
           {step < 3 ? (
-            <button className="btn btn-primary" onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext}>Continue</button>
+            <span className="row">
+              {briefHint && <span className="small muted">{briefHint}</span>}
+              <button className="btn btn-primary" onClick={next} disabled={!canNext}>Continue</button>
+            </span>
           ) : (
-            <button className="btn btn-primary" onClick={start}>Generate {slides} slides</button>
+            <button className="btn btn-primary" onClick={() => start()}>{auto ? "Generate (AI decides)" : `Generate ${slides} slides`}</button>
           )}
         </div>
       )}

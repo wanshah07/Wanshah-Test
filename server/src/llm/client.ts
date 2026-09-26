@@ -12,9 +12,24 @@ export interface LlmAuth {
 }
 
 export class LlmError extends Error {
+  /** The start of what the model actually sent, when that is why the call failed. */
+  raw?: string;
   constructor(message: string, public status = 0, public code = "llm_error") {
     super(message);
   }
+}
+
+/** How much of a model's reply is kept for the log when it cannot be used. */
+export const RAW_KEEP = 500;
+
+export function rawSnippet(text: string): string {
+  const t = String(text ?? "").replace(/\s+/g, " ").trim();
+  return t.length > RAW_KEEP ? `${t.slice(0, RAW_KEEP)}…` : t;
+}
+
+/** The JSON rules, written into the instructions for every call. */
+export function jsonRules(schema: Record<string, unknown>): string {
+  return `OUTPUT FORMAT: answer with one JSON object and nothing else: no prose, no code fences, no comments. It must match this JSON Schema exactly, every listed property present, null where a value is unknown:\n${JSON.stringify(schema)}`;
 }
 
 export function hostOf(baseUrl: string): string {
@@ -95,10 +110,13 @@ const SCHEMA_REFUSED = /response_format|json_schema|strict|structured output|sch
 const MAX_COMPLETION_REFUSED = /max_completion_tokens/i;
 const TEMPERATURE_REFUSED = /temperature/i;
 
+/** OpenAI chat content parts, for a message that carries pictures. */
+export type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+
 export interface ChatJsonArgs {
   auth: LlmAuth;
   system: string;
-  user: string;
+  user: string | ContentPart[];
   schemaName: string;
   schema: Record<string, unknown>;
   maxTokens?: number;
@@ -112,10 +130,10 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
   let tokenKey: "max_completion_tokens" | "max_tokens" = "max_completion_tokens";
   let sendTemperature = !/^(o\d|gpt-5)/.test(a.auth.model);
   for (let round = 0; round < 4; round++) {
-    const system =
-      mode === "schema"
-        ? a.system
-        : `${a.system}\n\nAnswer with one JSON object and nothing else. It must match this JSON Schema exactly, every listed property present, null where a value is unknown:\n${JSON.stringify(a.schema)}`;
+    // The rules are written into the instructions on every call, not only set
+    // as response_format: gateways and models that ignore the request setting
+    // still read the instructions.
+    const system = `${a.system}\n\n${jsonRules(a.schema)}`;
     const body: Record<string, unknown> = {
       model: a.auth.model,
       messages: [
@@ -148,17 +166,23 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
     const choice = (json.choices as { message: { content?: string; refusal?: string }; finish_reason?: string }[] | undefined)?.[0];
     if (!choice) throw new LlmError("The model returned no choices");
     if (choice.message.refusal) throw new LlmError(`The model declined: ${choice.message.refusal}`, 0, "refusal");
-    if (choice.finish_reason === "length") throw new LlmError("The answer was cut off by the token limit. Ask for fewer slides or fewer sources.", 0, "length");
+    if (choice.finish_reason === "length") {
+      const e = new LlmError("The answer was cut off by the token limit. Ask for fewer slides or fewer sources.", 0, "length");
+      e.raw = rawSnippet(choice.message.content ?? "");
+      throw e;
+    }
     try {
       return extractJson(choice.message.content ?? "") as T;
     } catch {
-      throw new LlmError("The model answered with something that is not JSON", 0, "parse");
+      const e = new LlmError("The model answered with something that is not JSON", 0, "parse");
+      e.raw = rawSnippet(choice.message.content ?? "");
+      throw e;
     }
   }
   throw new LlmError("The endpoint refused every request shape tried", 400, "unsupported");
 }
 
-export async function chatText(auth: LlmAuth, system: string, user: string, maxTokens = 4000): Promise<string> {
+export async function chatText(auth: LlmAuth, system: string, user: string | ContentPart[], maxTokens = 4000, timeoutMs = 240000): Promise<string> {
   const body: Record<string, unknown> = {
     model: auth.model,
     messages: [
@@ -170,7 +194,7 @@ export async function chatText(auth: LlmAuth, system: string, user: string, maxT
   if (!/^(o\d|gpt-5)/.test(auth.model)) body.temperature = 0.2;
   let json: Record<string, unknown>;
   try {
-    json = await call(auth, "/chat/completions", body, 240000);
+    json = await call(auth, "/chat/completions", body, timeoutMs);
   } catch (e) {
     if (!(e instanceof LlmError) || e.status !== 400) throw e;
     delete body.temperature;
@@ -178,7 +202,7 @@ export async function chatText(auth: LlmAuth, system: string, user: string, maxT
       body.max_tokens = body.max_completion_tokens;
       delete body.max_completion_tokens;
     }
-    json = await call(auth, "/chat/completions", body, 240000);
+    json = await call(auth, "/chat/completions", body, timeoutMs);
   }
   const choice = (json.choices as { message: { content?: string } }[] | undefined)?.[0];
   return choice?.message.content ?? "";

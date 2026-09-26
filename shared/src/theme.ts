@@ -119,21 +119,85 @@ export function themePreset(id: string): Theme {
   return JSON.parse(JSON.stringify(t)) as Theme;
 }
 
+/** Google Fonts family specs for the fonts Slidecraft can load in a browser. */
+const GOOGLE: Record<string, string> = {
+  Fraunces: "Fraunces:opsz,wght@9..144,400;500;600;700",
+  Inter: "Inter:wght@300;400;500;600;700",
+  "Playfair Display": "Playfair+Display:wght@400;600;700",
+  Lora: "Lora:wght@400;500;600;700",
+  "Source Serif 4": "Source+Serif+4:opsz,wght@8..60,400;600;700",
+  "IBM Plex Sans": "IBM+Plex+Sans:wght@300;400;500;600;700",
+  Manrope: "Manrope:wght@300;400;500;600;700;800",
+  "DM Sans": "DM+Sans:opsz,wght@9..40,400;500;600;700",
+  Poppins: "Poppins:wght@300;400;500;600;700",
+  Montserrat: "Montserrat:wght@300;400;500;600;700",
+  Roboto: "Roboto:wght@300;400;500;700",
+  "Open Sans": "Open+Sans:wght@300;400;500;600;700",
+  Lato: "Lato:wght@300;400;700",
+  Raleway: "Raleway:wght@300;400;500;600;700",
+  Nunito: "Nunito:wght@300;400;600;700",
+  "Nunito Sans": "Nunito+Sans:wght@300;400;600;700",
+  Merriweather: "Merriweather:wght@300;400;700",
+  "Work Sans": "Work+Sans:wght@300;400;500;600;700",
+  "Plus Jakarta Sans": "Plus+Jakarta+Sans:wght@300;400;500;600;700",
+  Outfit: "Outfit:wght@300;400;500;600;700",
+  Carlito: "Carlito:wght@400;700",
+  Caladea: "Caladea:wght@400;700",
+  Arimo: "Arimo:wght@400;500;600;700",
+  Tinos: "Tinos:wght@400;700",
+  Cousine: "Cousine:wght@400;700",
+};
+
+/**
+ * Office and system fonts a reference deck often uses, with the free font a
+ * browser loads in their place. Carlito, Caladea, Arimo, Tinos and Cousine
+ * have the same widths as the fonts they stand in for, so text wraps the same.
+ * The theme keeps the real name, so the PPTX export asks PowerPoint for it.
+ */
+export const WEB_EQUIVALENT: Record<string, string> = {
+  Calibri: "Carlito",
+  "Calibri Light": "Carlito",
+  Cambria: "Caladea",
+  Arial: "Arimo",
+  Helvetica: "Arimo",
+  "Helvetica Neue": "Arimo",
+  "Liberation Sans": "Arimo",
+  "Times New Roman": "Tinos",
+  Times: "Tinos",
+  "Courier New": "Cousine",
+  Aptos: "Inter",
+  "Aptos Display": "Inter",
+  "Segoe UI": "Inter",
+  Verdana: "Arimo",
+  Tahoma: "Arimo",
+  "Century Gothic": "Montserrat",
+  "Gill Sans": "Lato",
+  "Gill Sans MT": "Lato",
+  Garamond: "Lora",
+  "Book Antiqua": "Lora",
+  "Palatino Linotype": "Lora",
+};
+
+/** Every font name Slidecraft recognises, for matching a name read out of a file. */
+export function knownFonts(): string[] {
+  return Array.from(new Set([...Object.keys(GOOGLE), ...Object.keys(WEB_EQUIVALENT), ...FONT_CHOICES]));
+}
+
+function webFont(name: string): string {
+  return GOOGLE[name] ? name : WEB_EQUIVALENT[name] ?? name;
+}
+
+/** CSS font-family value: the theme's font first, then the free stand-in a browser can load. */
+export function fontStack(name: string): string {
+  const clean = name.replace(/['"\\;{}]/g, "").trim();
+  const web = webFont(clean);
+  return web !== clean ? `'${clean}','${web}'` : `'${clean}'`;
+}
+
 /** Google Fonts URL for a theme's two families. Returns "" when both are system fonts. */
 export function fontsUrl(theme: Theme): string {
-  const fams = Array.from(new Set([theme.fontDisplay, theme.fontBody].filter(Boolean)));
-  const known: Record<string, string> = {
-    Fraunces: "Fraunces:opsz,wght@9..144,400;500;600;700",
-    Inter: "Inter:wght@300;400;500;600;700",
-    "Playfair Display": "Playfair+Display:wght@400;600;700",
-    Lora: "Lora:wght@400;500;600;700",
-    "Source Serif 4": "Source+Serif+4:opsz,wght@8..60,400;600;700",
-    "IBM Plex Sans": "IBM+Plex+Sans:wght@300;400;500;600;700",
-    Manrope: "Manrope:wght@300;400;500;600;700;800",
-    "DM Sans": "DM+Sans:opsz,wght@9..40,400;500;600;700",
-    Poppins: "Poppins:wght@300;400;500;600;700",
-  };
-  const parts = fams.map((f) => known[f]).filter(Boolean);
+  const fams = Array.from(new Set([theme.fontDisplay, theme.fontBody].filter(Boolean).map(webFont)));
+  const parts = fams.map((f) => GOOGLE[f]).filter(Boolean);
   if (!parts.length) return "";
   return `https://fonts.googleapis.com/css2?${parts.map((p) => "family=" + p).join("&")}&display=swap`;
 }
@@ -148,6 +212,21 @@ export const FONT_CHOICES = [
   "Manrope",
   "DM Sans",
   "Poppins",
+  "Montserrat",
+  "Roboto",
+  "Open Sans",
+  "Lato",
+  "Raleway",
+  "Nunito Sans",
+  "Merriweather",
+  "Work Sans",
+  "Plus Jakarta Sans",
+  "Outfit",
+  "Calibri",
+  "Cambria",
+  "Arial",
+  "Times New Roman",
+  "Aptos",
   "Georgia",
   "system-ui",
 ];

@@ -14,6 +14,8 @@ import { mediaRoutes } from "./routes/media.js";
 import { generateRoutes } from "./routes/generate.js";
 import { exportRoutes } from "./routes/export.js";
 import { settingsRoutes } from "./routes/settings.js";
+import { oneDriveRoutes } from "./routes/onedrive.js";
+import { libraryRoutes } from "./routes/library.js";
 
 export async function buildApp(): Promise<ReturnType<typeof Fastify>> {
   ensureDirs();
@@ -34,6 +36,8 @@ export async function buildApp(): Promise<ReturnType<typeof Fastify>> {
   await app.register(generateRoutes);
   await app.register(exportRoutes);
   await app.register(settingsRoutes);
+  await app.register(oneDriveRoutes);
+  await app.register(libraryRoutes);
 
   if (fs.existsSync(path.join(config.webDist, "index.html"))) {
     await app.register(fastifyStatic, { root: config.webDist, prefix: "/", wildcard: false });

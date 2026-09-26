@@ -71,6 +71,7 @@ export type Layout =
   | "image"
   | "quote"
   | "kpi"
+  | "cards"
   | "closing";
 
 export const LAYOUTS: Layout[] = [
@@ -84,12 +85,23 @@ export const LAYOUTS: Layout[] = [
   "image",
   "quote",
   "kpi",
+  "cards",
   "closing",
 ];
+
+/** One numbered card: a point, an answer, a decision or a step. */
+export interface CardItem {
+  heading: string;
+  detail?: string;
+  /** A short verdict or label: YES, PARTLY, HIGH, 2 MONTHS. */
+  tag?: string;
+}
 
 export interface Slide {
   id: string;
   layout: Layout;
+  /** 1 to 4 words in capitals above the title naming the slide's job, e.g. AT A GLANCE. */
+  kicker?: string;
   title: string;
   subtitle?: string;
   bullets?: string[];
@@ -101,10 +113,31 @@ export interface Slide {
   table?: TableSpec;
   diagram?: DiagramSpec;
   kpi?: KpiItem[];
+  cards?: CardItem[];
   image?: ImageRef;
   quote?: { text: string; by?: string };
   notes?: string;
   citations?: string[];
+  /** The user's sign-off and feedback on this slide. Never sent to the writer as slide content. */
+  review?: SlideReview;
+}
+
+export interface SlideFeedback {
+  text: string;
+  at: string;
+  /** When the writer applied it. Absent while it waits. */
+  appliedAt?: string;
+}
+
+export interface SlideReview {
+  ok: boolean;
+  okAt?: string;
+  feedback: SlideFeedback[];
+}
+
+/** Feedback saved on a slide and not yet applied. */
+export function pendingFeedback(s: Slide): SlideFeedback[] {
+  return (s.review?.feedback ?? []).filter((f) => !f.appliedAt);
 }
 
 export interface ThemeColors {
@@ -155,8 +188,36 @@ export interface Deck {
   theme: Theme;
   slides: Slide[];
   sources: SourceRef[];
+  /** OneDrive folder whose pictures are pulled in before each generation. Written by the server only. */
+  onedrive?: OneDriveLink;
+  /** The choices behind the last generation, so Regenerate starts from them. Written by the server only. */
+  brief?: DeckBrief;
+  /** The saved design the theme came from. Its notes guide the writer while it is set. */
+  designId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DeckBrief {
+  /** Free text typed by the user, without the ticked lines. */
+  text: string;
+  purposes: string[];
+  include: string[];
+  audiences: string[];
+  /** Ids of the user's saved prompts ticked for this deck. */
+  prompts?: string[];
+  slides?: number;
+  imageMode?: "none" | "uploaded" | "generate";
+  features?: Record<string, boolean>;
+  /** The AI chose the angle, audience, length and layouts. */
+  auto?: boolean;
+}
+
+export interface OneDriveLink {
+  /** A path in the signed-in user's OneDrive, or a share link. */
+  folder: string;
+  subfolders: boolean;
+  lastSync?: string;
 }
 
 let counter = 0;
@@ -206,13 +267,20 @@ export function normaliseSlide(raw: Record<string, unknown>): Slide {
       });
     }
   }
-  if (Array.isArray(out.kpi)) {
-    out.kpi = (out.kpi as Record<string, unknown>[]).map((s) => {
-      const o: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(s)) if (v !== null) o[k] = v;
-      return o;
-    });
+  for (const key of ["kpi", "cards"]) {
+    if (!Array.isArray(out[key])) continue;
+    out[key] = (out[key] as unknown[])
+      .filter((s): s is Record<string, unknown> => !!s && typeof s === "object")
+      .map((s) => {
+        const o: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(s)) if (v !== null && v !== "") o[k] = v;
+        return o;
+      })
+      // A card with no heading is an empty box on the slide.
+      .filter((o) => key !== "cards" || (typeof o.heading === "string" && o.heading.trim()));
   }
+  if (typeof out.kicker === "string") out.kicker = out.kicker.trim().slice(0, 60) || undefined;
+  if (!out.kicker) delete out.kicker;
   return out as unknown as Slide;
 }
 
@@ -247,6 +315,13 @@ export function blankSlide(layout: Layout, lang: Lang = "en"): Slide {
       break;
     case "quote":
       s.quote = { text: ms ? "Petikan" : "Quotation", by: "" };
+      break;
+    case "cards":
+      s.cards = [
+        { heading: ms ? "Perkara pertama" : "First point", detail: ms ? "Butiran" : "Detail" },
+        { heading: ms ? "Perkara kedua" : "Second point", detail: ms ? "Butiran" : "Detail" },
+        { heading: ms ? "Perkara ketiga" : "Third point", detail: ms ? "Butiran" : "Detail" },
+      ];
       break;
     case "image":
       s.image = { caption: "" };
