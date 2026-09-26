@@ -330,12 +330,15 @@ export function sanitizeSlide(raw: unknown): Slide {
     const series = (Array.isArray(c.series) ? c.series : [])
       .map((x) => obj(x))
       .filter((x): x is Record<string, unknown> => !!x)
-      .map((x) => ({ name: txt(x.name) ?? "", values: (Array.isArray(x.values) ? x.values : []).map((n) => Number(n)).filter((n) => Number.isFinite(n)) }))
+      // A value that is not a number becomes 0 where it stands, so the values after it keep their categories.
+      .map((x) => ({ name: txt(x.name) ?? "", values: (Array.isArray(x.values) ? x.values : []).map((v) => (v === null || v === "" ? NaN : Number(v))).map((v) => (Number.isFinite(v) ? v : 0)) }))
       .filter((x) => x.values.length);
     if (series.length) {
-      // One category per value: a chart with fewer names than numbers draws off its canvas, and with none PowerPoint will not open the file.
-      const n = Math.max(...series.map((x) => x.values.length));
-      const categories = (txtList(c.categories) ?? []).slice(0, n);
+      // One category per value and one value per category: a chart with fewer names than numbers draws off
+      // its canvas, and with none PowerPoint will not open the file. Blank names keep their place.
+      const cats = Array.isArray(c.categories) ? c.categories.map((x) => txt(x) ?? "") : txtList(c.categories) ?? [];
+      const n = Math.max(cats.length, ...series.map((x) => x.values.length));
+      const categories = cats.slice();
       while (categories.length < n) categories.push(String(categories.length + 1));
       for (const x of series) while (x.values.length < n) x.values.push(0);
       let kind = (CHART_KINDS.includes(String(c.kind)) ? c.kind : "bar") as ChartKind;
@@ -359,9 +362,10 @@ export function sanitizeSlide(raw: unknown): Slide {
       const events = (Array.isArray(d.events) ? d.events : []).map((e) => obj(e)).filter((e): e is Record<string, unknown> => !!e).map((e) => ({ when: txt(e.when) ?? "", label: txt(e.label) ?? "" })).filter((e) => e.when || e.label);
       if (events.length) s.diagram = { kind: "timeline", events };
     } else if (d.kind === "matrix") {
-      const rows = txtList(d.rows) ?? [];
-      const cols = txtList(d.cols) ?? [];
-      if (rows.length && cols.length) {
+      // Blank names keep their place, so every row keeps its own cells.
+      const rows = Array.isArray(d.rows) ? d.rows.map((x) => txt(x) ?? "") : [];
+      const cols = Array.isArray(d.cols) ? d.cols.map((x) => txt(x) ?? "") : [];
+      if (rows.some(Boolean) && cols.some(Boolean)) {
         const cells = rows.map((_, i) => {
           const row = Array.isArray(d.cells) && Array.isArray(d.cells[i]) ? (d.cells[i] as unknown[]).map((x) => txt(x) ?? "") : [];
           return cols.map((__, j) => row[j] ?? "");

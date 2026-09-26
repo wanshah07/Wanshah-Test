@@ -46,6 +46,7 @@ export default function Editor() {
   const [applyJob, setApplyJob] = useState<string | null>(null);
 
   const inFlight = useRef(false);
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
   const flush = useCallback(async () => {
     const d = latest.current;
     if (!d) return;
@@ -56,11 +57,18 @@ export default function Editor() {
       setSaving("saved");
     } catch (e) {
       setSaving("error");
-      toast("Save failed: " + (e as Error).message, true);
+      toast("Save failed: " + (e as Error).message + ". Trying again in a few seconds.", true);
+      // The edit is still only on this screen: try again, and keep the leave-warning on until it lands.
+      if (!saveTimer.current)
+        saveTimer.current = window.setTimeout(() => {
+          saveTimer.current = null;
+          void flushRef.current?.();
+        }, 8000);
     } finally {
       inFlight.current = false;
     }
   }, []);
+  flushRef.current = flush;
 
   const update = useCallback((next: Deck) => {
     setDeck(next);
@@ -147,10 +155,9 @@ export default function Editor() {
   const replaceSlide = (s: Slide, _hits?: SlopHit[]) => {
     const cur = latest.current ?? deck;
     const next = { ...cur, slides: cur.slides.map((x) => (x.id === s.id ? s : x)) };
-    setDeck(next);
-    latest.current = next;
-    // The server already holds this slide; other edits still waiting keep their save.
-    if (!saveTimer.current) setSaving("saved");
+    // Saved again as a whole: an autosave that left while the writer worked may have carried
+    // the old version of this slide, and the server must end up holding what the screen shows.
+    update(next);
   };
   /** Save what is waiting, then go: a download or the present view shows the deck as it is on screen. */
   const openAfterSave = async (url: string, newTab = false) => {

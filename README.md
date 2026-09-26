@@ -23,8 +23,14 @@ single HTML file. Runs on your own machine or server, with your own key.
   same standard is on the Prompts page as the "Deck standard" starter.
 - **Sources.** PDF, Word, PowerPoint, Excel and CSV, Markdown, text, HTML,
   pictures, zips and whole folders. Text is extracted on the server; pictures
-  become media the writer can place. A large pile of sources is condensed to
-  the facts relevant to the brief before the deck is written.
+  become media the writer can place. Figures inside a PDF (charts, photos,
+  posters; not logos or icons) come out as pictures of their own, so the
+  picture reader transcribes them and they can go on slides. A large pile of
+  sources is condensed to the facts relevant to the brief before the deck is
+  written.
+- **Pictures on the slides.** Every uploaded picture the writer did not use
+  goes beside the points of the slide whose words it shares, or on a picture
+  slide of its own before the close; a slide count you fixed is kept.
 - **Angles.** Regulatory briefing, client proposal, training, medical affairs,
   brand pitch, conference talk, internal update, or custom. Each sets the
   tone, a suggested structure and the default features.
@@ -47,6 +53,14 @@ single HTML file. Runs on your own machine or server, with your own key.
   The writer keeps the slide face short and at least half the content slides
   visual (chart, diagram, big numbers, picture, table); a slide with over 90
   words on its face is flagged.
+- **Design pass.** A writer that answers in bullets anyway (some models do,
+  whatever the instructions say) is sent its text slides once more as a
+  designer: redraw them as charts, tables, flow, timeline or matrix maps and
+  number tiles from the sources' own figures. Only a real visual replaces a
+  slide, and a failed pass never costs the deck. Whatever is still text is
+  then redrawn from its own words: points that each carry a figure become
+  number tiles, numbered steps a flow, dated points a timeline, labelled
+  points cards. The run log says what was redrawn.
 - **Themes.** Colours, fonts, radius, slide style, footer and logo per deck,
   with presets. The default preset is the token set of my.facerinna.com
   (Fraunces and Inter, brand `#4898D8` on ink `#1D344E`, 20px radius); the
@@ -247,6 +261,9 @@ time. For an always-on address for a team, use the Docker image on a host.
     npm run check:fit       # over-full slides of every layout in Chromium: nothing spills or is clipped
     npm run check:pptx-fit  # the same slides as .pptx, rendered by LibreOffice Impress: no text off
                             # the slide or on top of other text (needs soffice with Impress)
+    npm run check:web       # the editor, presenter and every page in Chromium, desktop and phone:
+                            # typing in list and number fields, saving before a download, no
+                            # sideways scroll at 390px (CHROMIUM_PATH=/opt/pw-browsers/chromium)
 
 ## Settings reference
 

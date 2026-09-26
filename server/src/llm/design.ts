@@ -169,6 +169,11 @@ export function placePictures(slides: Slide[], pics: Picture[], lang: "en" | "ms
     }
     if (best >= 0 && (bestScore >= 2 || slides.length >= target)) {
       const s = slides[best];
+      // An image slide draws its points beside the picture, not a paragraph: keep the paragraph as a point.
+      if (s.body && !s.bullets?.length) {
+        s.bullets = [s.body];
+        delete s.body;
+      }
       s.layout = "image";
       s.image = { mediaId: pic.mediaId, caption, alt: caption };
     } else {

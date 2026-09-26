@@ -212,3 +212,76 @@ describe("pictures that would take the server down", () => {
     expect(Date.now() - t0).toBeLessThan(500);
   });
 });
+
+describe("second round: what the re-check found", () => {
+  it("keeps feedback typed while a rewrite runs", async () => {
+    const id = await deckWithSlides();
+    gw.delay = 400;
+    const pending = app.inject({ method: "POST", url: `/api/decks/${id}/slides/s1/rewrite`, payload: {} });
+    await new Promise((r) => setTimeout(r, 100));
+    await app.inject({ method: "POST", url: `/api/decks/${id}/slides/s1/feedback`, payload: { text: "NOTE TYPED DURING REWRITE" } });
+    await pending;
+    gw.delay = 0;
+    const s1 = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides[0];
+    expect(s1.title).toBe("Rewritten");
+    expect(s1.review.feedback.map((f: { text: string }) => f.text)).toContain("NOTE TYPED DURING REWRITE");
+  });
+
+  it("does not let a design's theme write markup", async () => {
+    const { themePreset, renderSlideHtml } = await import("@slidecraft/shared");
+    const evil = { ...themePreset(""), colors: { ...themePreset("").colors, brand: '#fff"><img src=x onerror=alert(1)>' } };
+    const d = J(await app.inject({ method: "POST", url: "/api/designs", payload: { name: "evil", theme: evil } }));
+    expect(d.theme.colors.brand).toMatch(/^#[0-9a-f]{3,8}$/i);
+    const listed = J(await app.inject({ method: "GET", url: "/api/designs" })) as unknown as { theme: { colors: { brand: string } } }[];
+    expect(JSON.stringify(listed)).not.toContain("onerror");
+    expect(renderSlideHtml({ id: "a", layout: "bullets", title: "t", bullets: ["x"] }, evil as never, { index: 0, total: 1, mediaUrl: (x: string) => x, lang: "en" })).not.toContain("onerror");
+  });
+
+  it("refuses an Office file that would unpack past the limits", async () => {
+    const docx = new JSZip();
+    docx.file("[Content_Types].xml", "<Types/>");
+    docx.file("word/document.xml", "<w:document>" + "a".repeat(120 * 1024 * 1024) + "</w:document>");
+    const buf = await docx.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    const id = J(await app.inject({ method: "POST", url: "/api/decks", payload: { title: "docx" } })).id as string;
+    const m = multipart([{ name: "bomb.docx", content: buf }]);
+    const t0 = Date.now();
+    const r = J(await app.inject({ method: "POST", url: `/api/decks/${id}/sources`, payload: m.payload, headers: m.headers }));
+    expect(r.added).toEqual([]);
+    expect(r.skipped[0]).toMatch(/bomb\.docx \(a part of this file is too large/);
+    expect(Date.now() - t0).toBeLessThan(5000);
+  });
+
+  it("refuses a picture bomb sent to the design analyser from its header", async () => {
+    const p = new PNG({ width: 1, height: 1 });
+    const buf = Buffer.from(PNG.sync.write(p));
+    buf.writeUInt32BE(14000, 16);
+    buf.writeUInt32BE(14000, 20);
+    const m = multipart([{ name: "huge.png", content: buf, type: "image/png" }]);
+    const t0 = Date.now();
+    const r = await app.inject({ method: "POST", url: "/api/designs/analyse", payload: m.payload, headers: m.headers });
+    expect(r.statusCode).toBeGreaterThanOrEqual(400);
+    expect(r.body).toMatch(/196 megapixels/);
+    expect(Date.now() - t0).toBeLessThan(2000);
+  });
+
+  it("answers 400 to a deck or a picture reader sent with the wrong types", async () => {
+    expect((await app.inject({ method: "POST", url: "/api/decks", payload: { title: 5 } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "PUT", url: "/api/settings/reader", payload: { key: 5 } })).statusCode).toBe(400);
+  });
+
+  it("treats every spelling of a private address as private", async () => {
+    const { privateAddress } = await import("../src/export/fetchPicture.js");
+    for (const ip of ["::ffff:7f00:1", "::ffff:127.0.0.1", "::1", "fe80::1", "fd00::1", "10.1.2.3", "169.254.169.254", "::ffff:a9fe:a9fe"]) expect(privateAddress(ip), ip).toBe(true);
+    for (const ip of ["8.8.8.8", "2606:4700::1111", "::ffff:808:808"]) expect(privateAddress(ip), ip).toBe(false);
+  });
+});
+
+describe("chart and matrix entries keep their places", () => {
+  it("never shifts a value or a row into another's place", async () => {
+    const { sanitizeSlide } = await import("@slidecraft/shared");
+    const c = sanitizeSlide({ id: "c", layout: "chart", title: "t", chart: { kind: "column", categories: ["A", "", "C", "D"], series: [{ name: "s", values: [1, "x", 3] }] } });
+    expect(c.chart).toMatchObject({ categories: ["A", "", "C", "D"], series: [{ values: [1, 0, 3, 0] }] });
+    const m = sanitizeSlide({ id: "m", layout: "diagram", title: "t", diagram: { kind: "matrix", rows: ["r1", "", "r3"], cols: ["c1"], cells: [["1"], ["2"], ["3"]] } });
+    expect(m.diagram).toEqual({ kind: "matrix", rows: ["r1", "", "r3"], cols: ["c1"], cells: [["1"], ["2"], ["3"]] });
+  });
+});

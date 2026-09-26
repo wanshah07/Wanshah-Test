@@ -1,5 +1,5 @@
 import type { Deck, Slide, Theme } from "../deck.js";
-import { fontStack } from "../theme.js";
+import { fontStack, sanitizeTheme } from "../theme.js";
 import { esc, inline } from "./escape.js";
 import { chartSvg } from "./charts.js";
 import { diagramHtml } from "./diagrams.js";
@@ -12,7 +12,8 @@ export interface RenderCtx {
   lang: "en" | "ms";
 }
 
-export function themeVars(t: Theme): string {
+export function themeVars(raw: Theme): string {
+  const t = sanitizeTheme(raw);
   const c = t.colors;
   return [
     `--bg:${c.bg}`,
@@ -87,7 +88,9 @@ function chrome(s: Slide, t: Theme, ctx: RenderCtx): string {
   return out;
 }
 
-export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
+export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): string {
+  // Every theme value goes into markup, whoever saved it (a deck, a design, an old file): only safe values get there.
+  const t = sanitizeTheme(rawTheme);
   const c = t.colors;
   const font = fontStack(t.fontBody);
   let body = "";

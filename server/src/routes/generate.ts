@@ -11,8 +11,12 @@ import { LlmError } from "../llm/client.js";
 
 /** The job writing or updating this deck, if one is running. */
 function runningJob(deckId: string): string | null {
-  const r = getDb().prepare("SELECT id FROM jobs WHERE deck_id = ? AND status IN ('queued','running')").get(deckId) as { id: string } | undefined;
-  return r?.id ?? null;
+  return runningJobKind(deckId)?.id ?? null;
+}
+
+function runningJobKind(deckId: string): { id: string; kind: string } | null {
+  const r = getDb().prepare("SELECT id, kind FROM jobs WHERE deck_id = ? AND status IN ('queued','running')").get(deckId) as { id: string; kind: string } | undefined;
+  return r ?? null;
 }
 
 export async function generateRoutes(app: FastifyInstance): Promise<void> {
@@ -80,7 +84,8 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
     try {
       const s = await rewriteSlide(req.user.id, deck, deck.slides[idx], instruction);
       // Saved into the deck as it is now, so edits made while the writer worked are kept.
-      const done = updateSlide(req.user.id, id, sid, () => s);
+      // Feedback typed while the writer worked stays on the slide; the new content needs a new sign-off.
+      const done = updateSlide(req.user.id, id, sid, (cur) => ({ ...s, ...(cur.review ? { review: { ...cur.review, ok: false } } : {}) }));
       if (!done) return reply.code(409).send({ error: "slide_gone", message: "The slide was deleted while it was being rewritten." });
       return { slide: done.slide, slop: scanSlide(done.slide, done.deck.lang) };
     } catch (e) {
@@ -105,6 +110,9 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
     if (text) review.feedback.push({ text, at: now() });
     const pending = review.feedback.filter((f) => !f.appliedAt);
     if (!pending.length) return reply.code(400).send({ error: "empty", message: "Write what should change first." });
+    // A regeneration replaces every slide: a note written now would vanish with this one.
+    const job = runningJobKind(id);
+    if (job?.kind === "generate") return reply.code(409).send({ error: "already_running", jobId: job.id, message: "The deck is being regenerated and every slide will be replaced. Write your feedback on the new slides when it finishes." });
     const note = text ? review.feedback[review.feedback.length - 1] : null;
     // The note is saved first, against the slide as stored, so nothing typed is ever lost.
     const saved = updateSlide(req.user.id, id, sid, (cur) => ({ ...cur, review: { ok: false, feedback: [...(cur.review?.feedback ?? []), ...(note ? [note] : [])] } }));

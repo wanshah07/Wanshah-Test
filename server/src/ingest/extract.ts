@@ -74,6 +74,18 @@ async function extractZip(buf: Buffer, prefix: string, budget = { left: ZIP_MAX_
   return out;
 }
 
+/** An Office file is a zip: refuse one whose parts would unpack past the limits, before any reader opens it. */
+async function assertZipFits(buf: Buffer): Promise<void> {
+  const zip = await JSZip.loadAsync(buf);
+  let total = 0;
+  for (const f of Object.values(zip.files)) {
+    const n = Number((f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0);
+    if (n > ZIP_MAX_ENTRY) throw new Error("a part of this file is too large to unpack");
+    total += n;
+  }
+  if (total > ZIP_MAX_TOTAL / 2) throw new Error("this file unpacks to more than 100 MB");
+}
+
 /** Unpack one zip entry, giving up as soon as it passes `max` bytes. */
 function unpackCapped(f: JSZip.JSZipObject, max: number): Promise<Buffer | null> {
   return new Promise((resolve) => {
@@ -120,6 +132,7 @@ export async function extractOne(name: string, buf: Buffer, relPath = name): Pro
         figures: figures.map((f, i) => ({ name: `${stem} - p${f.page} figure ${i + 1}.jpg`, relPath: `${relPath.replace(/\.pdf$/i, "")}/p${f.page}-figure-${i + 1}.jpg`, kind: "image" as const, text: "", image: { buf: f.jpg, mime: "image/jpeg" } })),
       };
     }
+    if ([".docx", ".pptx", ".xlsx", ".xlsm"].includes(ext)) await assertZipFits(buf);
     if (ext === ".docx") return { ...base, kind: "docx", text: clean((await mammoth.extractRawText({ buffer: buf })).value) };
     if (ext === ".pptx") return { ...base, kind: "pptx", text: clean(await pptxText(buf)) };
     if ([".xlsx", ".xlsm", ".xls", ".csv", ".tsv"].includes(ext)) return { ...base, kind: "sheet", text: sheetText(buf) };
@@ -174,13 +187,15 @@ const FIG_MIN_H = 160;
 const FIG_MIN_AREA = 90_000;
 const FIG_MAX = 8;
 const FIG_PAGES = 40;
+const FIG_MAX_PIXELS = 40_000_000;
 
 /** The raster pictures embedded in a PDF, as JPEG, in page order, at most FIG_MAX. */
 export async function pdfFigures(buf: Buffer): Promise<{ page: number; jpg: Buffer; width: number; height: number }[]> {
   const spec = "pdfjs-dist/legacy/build/pdf.mjs";
   const pdfjs = await import(spec);
   const jpeg = (await import("jpeg-js")).default;
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false }).promise;
+  // maxImageSize: pdfjs does not even decode a picture bigger than a slide could ever need.
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false, maxImageSize: FIG_MAX_PIXELS }).promise;
   const out: { page: number; jpg: Buffer; width: number; height: number }[] = [];
   const seen = new Set<string>();
   try {
@@ -204,7 +219,7 @@ export async function pdfFigures(buf: Buffer): Promise<{ page: number; jpg: Buff
             res(null);
           }
         });
-        if (!img?.data || img.width < FIG_MIN_W || img.height < FIG_MIN_H || img.width * img.height < FIG_MIN_AREA) continue;
+        if (!img?.data || img.width < FIG_MIN_W || img.height < FIG_MIN_H || img.width * img.height < FIG_MIN_AREA || img.width * img.height > FIG_MAX_PIXELS) continue;
         const key = img.ref ?? `${img.width}x${img.height}:${img.data.length}`;
         if (seen.has(key)) continue;
         seen.add(key);

@@ -87,6 +87,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   // The picture reader: a second endpoint that only reads uploaded pictures.
   app.put("/api/settings/reader", async (req, reply) => {
     const b = (req.body ?? {}) as { key?: string | null; baseUrl?: string | null; model?: string | null };
+    for (const [k, v] of Object.entries(b)) if (v !== undefined && v !== null && typeof v !== "string") return reply.code(400).send({ error: "invalid", message: `${k} must be text` });
     try {
       saveReader(req.user.id, { key: b.key, baseUrl: b.baseUrl, model: b.model });
     } catch (e) {

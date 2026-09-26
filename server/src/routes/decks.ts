@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { LAYOUTS, newId, sanitizeSlide, sanitizeTheme, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
+import { angleById, LAYOUTS, newId, sanitizeSlide, sanitizeTheme, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
 import { getDb, now } from "../db.js";
 import { loadDeck, saveDeck } from "../store.js";
 import { newDeck } from "../llm/generate.js";
@@ -29,10 +29,12 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  app.post("/api/decks", async (req) => {
-    const b = (req.body ?? {}) as { title?: string; lang?: string; angle?: string; themeId?: string; designId?: string };
+  app.post("/api/decks", async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    for (const k of ["title", "lang", "angle", "themeId", "designId"]) if (b[k] !== undefined && b[k] !== null && typeof b[k] !== "string") return reply.code(400).send({ error: "invalid", message: `${k} must be text` });
+    const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string) : undefined);
     const s = readSettings(req.user.id);
-    return newDeck(req.user.id, b.title ?? "", b.lang === "ms" ? "ms" : "en", b.angle ?? "custom", b.themeId ?? s.default_theme ?? "facerinna", b.designId);
+    return newDeck(req.user.id, (str("title") ?? "").slice(0, 300), str("lang") === "ms" ? "ms" : "en", angleById(str("angle") ?? "custom").id, str("themeId") ?? s.default_theme ?? "facerinna", str("designId"));
   });
 
   app.get("/api/decks/:id", async (req, reply) => {
