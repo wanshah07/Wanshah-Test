@@ -92,7 +92,7 @@ export default function NewDeck() {
     setSources((x) => x.filter((y) => y.id !== s.id));
   };
 
-  const start = async () => {
+  const start = async (allowUnreadPictures = false) => {
     setJob(null);
     setStartError("");
     setStep(4);
@@ -104,7 +104,7 @@ export default function NewDeck() {
         if (designId) await api.applyDesign(id, designId);
         else await api.applyPreset(id, themeId);
       }
-      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
+      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
         try {
           const j = await api.job(jobId);
@@ -266,9 +266,11 @@ export default function NewDeck() {
               </div>
             )}
             {(job?.progress?.length || !failed) && <div className="log">{(job?.progress ?? ["Starting"]).join("\n")}</div>}
+            {failed && why?.anyway && <p className="small muted">Pictures pulled from OneDrive are never read; they are slide pictures. This is only about pictures you uploaded as sources.</p>}
             {failed && (
               <div className="row">
-                <button className="btn btn-primary" onClick={start}>Try again</button>
+                <button className="btn btn-primary" onClick={() => start()}>Try again</button>
+                {why?.anyway && <button className="btn btn-ghost" onClick={() => start(true)}>Write anyway (pictures as slide pictures only)</button>}
                 {why?.settings && <Link className="btn btn-ghost" to="/settings" target="_blank">Open Settings</Link>}
                 <button className="btn btn-ghost" onClick={() => setStep(3)}>Change the choices</button>
                 {deckId && <button className="btn btn-quiet" onClick={() => nav(`/deck/${deckId}`)}>Open the deck</button>}
@@ -288,7 +290,7 @@ export default function NewDeck() {
               <button className="btn btn-primary" onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext}>Continue</button>
             </span>
           ) : (
-            <button className="btn btn-primary" onClick={start}>Generate {slides} slides</button>
+            <button className="btn btn-primary" onClick={() => start()}>Generate {slides} slides</button>
           )}
         </div>
       )}

@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { listSourceRefs, loadDeck, saveDeck } from "../store.js";
-import { browse, disconnect, importFolder, normaliseFolder, OneDriveError, pollLogin, saveOneDriveSettings, startLogin, status, summarise } from "../onedrive.js";
+import { browse, composioAccounts, composioKey, disconnect, importFolder, normaliseFolder, OneDriveError, pollLogin, saveOneDriveSettings, startLogin, status, summarise } from "../onedrive.js";
 
 function fail(reply: FastifyReply, e: unknown) {
-  if (e instanceof OneDriveError) return reply.code(e.code === "unreachable" ? 502 : 400).send({ error: e.code, message: e.message });
+  if (e instanceof OneDriveError) return reply.code(e.code === "unreachable" || e.code === "composio_error" ? 502 : 400).send({ error: e.code, message: e.message });
   throw e;
 }
 
@@ -11,9 +11,16 @@ export async function oneDriveRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/onedrive", async (req) => status(req.user.id));
 
   app.put("/api/onedrive", async (req, reply) => {
-    const b = (req.body ?? {}) as { clientId?: string | null; defaultFolder?: string | null };
+    const b = (req.body ?? {}) as { clientId?: string | null; defaultFolder?: string | null; provider?: string; composioKey?: string | null; composioAccount?: string | null; composioAccountLabel?: string | null };
     try {
-      saveOneDriveSettings(req.user.id, { clientId: b.clientId, defaultFolder: b.defaultFolder === undefined || b.defaultFolder === null ? b.defaultFolder : normaliseFolder(b.defaultFolder) });
+      saveOneDriveSettings(req.user.id, {
+        clientId: b.clientId,
+        defaultFolder: b.defaultFolder === undefined || b.defaultFolder === null ? b.defaultFolder : normaliseFolder(b.defaultFolder),
+        provider: b.provider,
+        composioKey: b.composioKey,
+        composioAccount: b.composioAccount,
+        composioAccountLabel: b.composioAccountLabel,
+      });
     } catch (e) {
       return fail(reply, e);
     }
@@ -23,6 +30,19 @@ export async function oneDriveRoutes(app: FastifyInstance): Promise<void> {
   app.delete("/api/onedrive", async (req) => {
     disconnect(req.user.id);
     return status(req.user.id);
+  });
+
+  // The OneDrive accounts a Composio key can use: the typed key, or the saved one.
+  app.post("/api/onedrive/composio/accounts", async (req, reply) => {
+    const typed = String((req.body as { key?: string } | undefined)?.key ?? "").trim();
+    const key = typed || composioKey(req.user.id);
+    if (!key) return reply.code(400).send({ error: "no_key", message: "Paste the Composio API key first." });
+    try {
+      const accounts = await composioAccounts(key);
+      return { accounts };
+    } catch (e) {
+      return fail(reply, e);
+    }
   });
 
   app.post("/api/onedrive/login", async (req, reply) => {

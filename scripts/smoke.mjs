@@ -88,20 +88,26 @@ try {
   await page.locator(".pickcard", { hasText: "Reference slide" }).click();
   check("my design can be picked as a picture card", (await page.locator(".pickcard.on", { hasText: "Reference slide" }).count()) === 1);
   // The first attempt fails the way a silent endpoint does; Try again must recover without re-entering anything.
-  let failOnce = true;
+  // First call: a silent endpoint. Second: a model that cannot read an uploaded
+  // picture. Third must carry the user's choice to write anyway.
+  let genCalls = 0;
+  let allowSent = false;
   await page.route("**/api/decks/*/generate", async (route) => {
-    if (failOnce) {
-      failOnce = false;
-      return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "timeout", message: "api.mireld.my did not answer within 240 s" }) });
-    }
+    genCalls++;
+    if (genCalls === 1) return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "timeout", message: "api.mireld.my did not answer within 240 s" }) });
+    if (genCalls === 2) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: "pictures_unreadable", message: "The writer model (m1) cannot read pictures. 1 picture source (scan.png) would be used only as slide pictures; any text, table or figure inside them would not reach the deck.", pictures: ["scan.png"] }) });
+    allowSent = JSON.parse(route.request().postData() || "{}").allowUnreadPictures === true;
     return route.continue();
   });
   await page.click("button:has-text('Generate')");
   await page.locator("text=The writer endpoint did not answer in time.").waitFor({ timeout: 10000 }).catch(() => {});
   check("a failure says what went wrong in plain words", (await page.locator("text=The writer endpoint did not answer in time.").count()) === 1);
   await page.click("button:has-text('Try again')");
+  await page.locator("button:has-text('Write anyway')").waitFor({ timeout: 10000 }).catch(() => {});
+  check("unreadable pictures stop the writer and offer a choice", (await page.locator("text=cannot read pictures").count()) >= 1 && (await page.locator("button:has-text('Write anyway')").count()) === 1);
+  await page.click("button:has-text('Write anyway')");
   await page.waitForURL(/\/deck\//, { timeout: 30000 });
-  check("Try again recovers with the same choices", true);
+  check("Try again and Write anyway recover with the same choices", allowSent);
   await page.unroute("**/api/decks/*/generate");
   await page.waitForSelector(".thumb", { timeout: 10000 });
   const thumbs = await page.locator(".thumb").count();
@@ -181,6 +187,10 @@ try {
   await page.locator("h2", { hasText: "OneDrive pictures" }).waitFor({ timeout: 10000 }).catch(() => {});
   check("settings page renders", await page.locator("h1", { hasText: "Settings" }).isVisible());
   check("settings offers OneDrive", await page.locator("h2", { hasText: "OneDrive pictures" }).isVisible());
+  await page.click(".chip:has-text('Composio')");
+  await page.locator("text=Composio API key").waitFor({ timeout: 5000 }).catch(() => {});
+  check("OneDrive can go through Composio", (await page.locator("text=Composio API key").count()) === 1 && (await page.locator("button:has-text('Find my OneDrive accounts')").count()) === 1);
+  check("settings says whether the writer reads pictures", (await page.locator("text=Reads pictures:").count()) === 1);
   // Inside another page (VS Code's preview pane), say so and offer a real tab.
   await page.setContent(`<iframe src="http://localhost:${PORT}/" style="width:1200px;height:700px"></iframe>`);
   const inner = page.frameLocator("iframe");

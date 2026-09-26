@@ -309,14 +309,14 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       setBusy(false);
     }
   };
-  const run = async () => {
+  const run = async (allowUnreadPictures = false) => {
     if (prompt.trim().length < 10) {
       toast("Tick what the deck is for, or type a few words", true);
       return;
     }
     try {
       const audience = composeAudience(brief.audiences, brief.audienceText) || deck.audience;
-      const { jobId } = await api.generate(deck.id, { prompt, title: deck.title, lang: deck.lang, angle, audience, slides, features, imageMode, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
+      const { jobId } = await api.generate(deck.id, { prompt, title: deck.title, lang: deck.lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
         const j = await api.job(jobId);
         setJob(j);
@@ -329,7 +329,9 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       };
       tick();
     } catch (e) {
-      toast((e as Error).message, true);
+      // A refusal before the job starts (pictures the model cannot read, no key)
+      // is shown in the same panel as a failed job, with its choices.
+      setJob({ id: "", deckId: deck.id, status: "failed", progress: [], error: (e as Error).message, result: null });
     }
   };
   const running = job && (job.status === "queued" || job.status === "running");
@@ -368,11 +370,11 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
         </select>
       )}
       {deck.slides.length > 0 ? (
-        <ConfirmButton className="btn btn-primary" confirm={`Click again: replace all ${deck.slides.length} slides`} onConfirm={run} disabled={!!running}>
+        <ConfirmButton className="btn btn-primary" confirm={`Click again: replace all ${deck.slides.length} slides`} onConfirm={() => run()} disabled={!!running}>
           {running ? <span className="spin" /> : "Regenerate deck"}
         </ConfirmButton>
       ) : (
-        <button className="btn btn-primary" onClick={run} disabled={!!running}>{running ? <span className="spin" /> : "Generate deck"}</button>
+        <button className="btn btn-primary" onClick={() => run()} disabled={!!running}>{running ? <span className="spin" /> : "Generate deck"}</button>
       )}
       {job?.status === "failed" && (() => {
         const why = explainFailure(job.error || "");
@@ -381,13 +383,14 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
             <b>{why.what}</b>
             <span>{why.todo}</span>
             <span className="row" style={{ gap: 6 }}>
-              <button className="btn btn-primary btn-xs" onClick={run}>Try again</button>
+              <button className="btn btn-primary btn-xs" onClick={() => run()}>Try again</button>
+              {why.anyway && <button className="btn btn-ghost btn-xs" onClick={() => run(true)}>Write anyway</button>}
               {why.settings && <Link className="btn btn-ghost btn-xs" to="/settings" target="_blank">Open Settings</Link>}
             </span>
           </div>
         );
       })()}
-      {job && <div className="log">{job.progress.join("\n")}</div>}
+      {job && job.progress.length > 0 && <div className="log">{job.progress.join("\n")}</div>}
     </div>
   );
 }

@@ -42,10 +42,17 @@ export interface SourceRow {
   chars: number;
   text: string;
   media_id: string | null;
+  /** Set for a picture pulled from OneDrive: a slide picture, not a document. */
+  remote_id: string | null;
 }
 
 export function listSources(deckId: string): SourceRow[] {
-  return getDb().prepare("SELECT id, name, rel_path, kind, chars, text, media_id FROM sources WHERE deck_id = ? ORDER BY created_at").all(deckId) as unknown as SourceRow[];
+  return getDb().prepare("SELECT id, name, rel_path, kind, chars, text, media_id, remote_id FROM sources WHERE deck_id = ? ORDER BY created_at").all(deckId) as unknown as SourceRow[];
+}
+
+/** Pictures uploaded as sources whose content nobody has read yet. OneDrive pictures are slide pictures and are left out. */
+export function unreadPictures(rows: SourceRow[]): SourceRow[] {
+  return rows.filter((r) => r.kind === "image" && !r.remote_id && !r.text);
 }
 
 export function addSource(userId: string, deckId: string, s: { name: string; relPath?: string; kind: string; bytes: number; text: string; mediaId?: string }): SourceRef {

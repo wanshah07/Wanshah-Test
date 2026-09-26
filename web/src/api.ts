@@ -64,11 +64,15 @@ export interface Settings {
   model: string;
   imageModel: string;
   defaults: { model: string; imageModel: string };
+  /** Whether the writer model reads pictures, as last checked. */
+  vision: "yes" | "no" | "unknown";
   appTheme: "light" | "dark" | "system";
   defaultTheme: string;
 }
 
 export interface OneDriveStatus {
+  provider: "microsoft" | "composio";
+  composio: { key: string; account: string; accountLabel: string };
   clientId: string;
   clientIdFrom: "settings" | "server" | "none";
   connected: boolean;
@@ -151,8 +155,9 @@ export const api = {
   settings: () => req<Settings>("GET", "/api/settings"),
   saveSettings: (b: Partial<{ openaiKey: string | null; model: string; imageModel: string; appTheme: string; defaultTheme: string; baseUrl: string | null }>) => req<{ ok: true }>("PUT", "/api/settings", b),
   oneDrive: () => req<OneDriveStatus>("GET", "/api/onedrive"),
-  saveOneDrive: (b: { clientId?: string | null; defaultFolder?: string | null }) => req<OneDriveStatus>("PUT", "/api/onedrive", b),
+  saveOneDrive: (b: { clientId?: string | null; defaultFolder?: string | null; provider?: "microsoft" | "composio"; composioKey?: string | null; composioAccount?: string | null; composioAccountLabel?: string | null }) => req<OneDriveStatus>("PUT", "/api/onedrive", b),
   disconnectOneDrive: () => req<OneDriveStatus>("DELETE", "/api/onedrive"),
+  composioAccounts: (key?: string) => req<{ accounts: { id: string; label: string; status: string }[] }>("POST", "/api/onedrive/composio/accounts", { key }),
   oneDriveLogin: () => req<NonNullable<OneDriveStatus["pending"]>>("POST", "/api/onedrive/login"),
   oneDrivePoll: () => req<{ state: "waiting" | "connected" | "expired" | "declined" | "none"; account?: string; message?: string }>("POST", "/api/onedrive/login/poll"),
   oneDriveBrowse: (folder: string) => req<{ name: string; folders: string[]; pictures: number }>("GET", `/api/onedrive/browse?folder=${encodeURIComponent(folder)}`),
@@ -176,7 +181,7 @@ export const api = {
   feedback: (deckId: string, sid: string, text: string, apply: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/feedback`, { text, apply }),
   slideOk: (deckId: string, sid: string, ok: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/ok`, { ok }),
   applyAllFeedback: (deckId: string) => req<{ jobId: string }>("POST", `/api/decks/${deckId}/feedback/apply`),
-  testKey: (openaiKey?: string, baseUrl?: string) => req<{ ok: boolean; message: string; models?: string[] }>("POST", "/api/settings/test-key", { openaiKey, baseUrl }),
+  testKey: (openaiKey?: string, baseUrl?: string, model?: string) => req<{ ok: boolean; message: string; models?: string[]; vision?: string }>("POST", "/api/settings/test-key", { openaiKey, baseUrl, model }),
 };
 
 export function mediaUrl(id: string): string {

@@ -102,7 +102,8 @@ export function userPrompt(p: GenerateParams, sources: { name: string; kind: str
   if (sources.length) {
     parts.push(`SOURCES (${sources.length}${condensed ? ", condensed to the facts relevant to the brief" : ""}):`);
     for (const s of sources) {
-      if (s.kind === "image") parts.push(`### Picture available: ${s.name}`);
+      if (s.kind === "image" && s.text && s.text !== "NONE") parts.push(`### Picture: ${s.name} (its content, transcribed from the picture; cite the file name)\n${s.text}`);
+      else if (s.kind === "image") parts.push(`### Picture available: ${s.name}`);
       else parts.push(`### Source: ${s.name} (${s.kind})\n${s.text}`);
     }
   } else {

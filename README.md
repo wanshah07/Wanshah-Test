@@ -55,6 +55,16 @@ single HTML file. Runs on your own machine or server, with your own key.
   apply it now or save it for later. Feedback can be added to a slide that
   was already OK, which reopens it. Apply saved feedback runs every waiting
   note in one go. The editor counts the slides that are OK.
+- **Pictures as sources.** Settings, Test also checks whether the writer
+  model can read pictures, and remembers the answer per endpoint and model.
+  If it can, pictures uploaded as sources are read (text, tables, chart
+  values) before the deck is written, once each. If it cannot, Slidecraft
+  stops before writing and names the pictures; the user can paste their
+  content, change model, or write anyway with them as slide pictures only.
+  Pictures pulled from OneDrive are slide pictures and are never read.
+- **When the writer fails.** The JSON rules are written into the instructions
+  on every call, not only set as a request option, and the first 500
+  characters of a reply that could not be used go into the job log.
 - **Export.** PowerPoint with editable text, native charts, tables and shapes;
   a standalone HTML deck with keyboard navigation, speaker notes and a grid
   view; the JSON spec.
@@ -123,7 +133,20 @@ changed pictures come in; a changed picture replaces the old one on every
 slide that shows it. Nothing in OneDrive is changed: the only permission
 asked for is `Files.Read`.
 
-One-time setup, about ten minutes:
+Two ways to connect, chosen in Settings, OneDrive pictures:
+
+- **Composio.** Uses the OneDrive already connected in a Composio project.
+  Paste that project's API key, press Find my OneDrive accounts, pick the
+  account. No Microsoft setup. The key reaches every app connected in its
+  project, so give Slidecraft a key from a project that holds only OneDrive,
+  or a scoped key limited to reading. Pictures pass through Composio's
+  servers. Folder paths only (no share links).
+- **Microsoft direct.** No third party; needs the one-time registration below.
+
+Either way, a picture whose SHA-256 does not match the one OneDrive reports
+is not stored.
+
+One-time setup for Microsoft direct, about ten minutes:
 
 1. portal.azure.com, Microsoft Entra ID, App registrations, New registration.
    Name it `Slidecraft`. Supported account types: "Accounts in any

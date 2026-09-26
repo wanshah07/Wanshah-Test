@@ -1,8 +1,10 @@
 import { angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themePreset, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
 import { config } from "../config.js";
 import { getDb, now } from "../db.js";
-import { addMedia, listSources, loadDeck, saveDeck, type SourceRow } from "../store.js";
-import { chatJson, chatText, generateImage, LlmError, type LlmAuth } from "./client.js";
+import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, type SourceRow } from "../store.js";
+import { NOTHING, readPicture, visionFor } from "./vision.js";
+import fs from "node:fs";
+import { chatJson, chatText, generateImage, LlmError, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
 import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
 import { DECK_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
@@ -159,6 +161,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         log(jobId, `OneDrive not read (${(e as Error).message}). Using the pictures already pulled.`);
       }
     }
+    if (auth) await readUploadedPictures(jobId, userId, deckId, auth);
     const rows = listSources(deckId);
     log(jobId, `${rows.length} source${rows.length === 1 ? "" : "s"}, ${p.slides} slides, angle ${angleById(p.angle).name}, ${p.lang === "ms" ? "Bahasa Malaysia" : "English"}`);
     const { sources, condensed } = await prepareSources(jobId, auth, p, rows);
@@ -173,7 +176,11 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       );
     }
     const slides = (json.slides ?? []).map((r) => toSlide(r, p.features, p.imageMode));
-    if (!slides.length) throw new Error("The writer returned no slides");
+    if (!slides.length) {
+      const e = new LlmError("The writer returned no slides", 0, "no_slides");
+      e.raw = rawSnippet(JSON.stringify(json));
+      throw e;
+    }
     // Pictures.
     const imageSlides = slides.filter((s) => s.layout === "image");
     if (imageSlides.length && p.imageMode === "uploaded") {
@@ -212,6 +219,11 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     setJob(jobId, { status: "done", result: { deckId } });
   } catch (e) {
     const msg = e instanceof LlmError ? `${e.message}` : (e as Error).message;
+    // What the model actually sent, so a failure can be diagnosed from the log.
+    if (e instanceof LlmError && e.raw !== undefined) {
+      log(jobId, `Model reply (first ${RAW_KEEP} characters): ${e.raw || "(empty)"}`);
+      console.warn(`[slidecraft] job ${jobId}: ${msg}. Reply began: ${e.raw}`);
+    }
     log(jobId, `Failed: ${msg}`);
     setJob(jobId, { status: "failed", error: msg });
   }
@@ -296,4 +308,40 @@ export async function runApplyFeedback(jobId: string, userId: string, deckId: st
     log(jobId, `Failed: ${(e as Error).message}`);
     setJob(jobId, { status: "failed", error: (e as Error).message });
   }
+}
+
+const READ_LIMIT = 12;
+const READ_MAX_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Pictures uploaded as sources are read by the writer model when it can see
+ * pictures, and their content becomes source text. When it cannot, the log
+ * says what that means; the route has already made the user choose.
+ */
+export async function readUploadedPictures(jobId: string, userId: string, deckId: string, auth: LlmAuth): Promise<void> {
+  const pics = unreadPictures(listSources(deckId));
+  if (!pics.length) return;
+  const v = await visionFor(userId, auth);
+  if (v !== "yes") {
+    log(jobId, `${pics.length} picture source${pics.length === 1 ? "" : "s"} used only as slide pictures: ${v === "no" ? `${auth.model} cannot read pictures` : "could not check whether the writer model reads pictures"}, so text inside them does not reach the deck.`);
+    return;
+  }
+  let n = 0;
+  for (const r of pics.slice(0, READ_LIMIT)) {
+    const m = r.media_id ? getMedia(userId, r.media_id) : null;
+    if (!m || !fs.existsSync(m.path)) continue;
+    if (m.bytes > READ_MAX_BYTES || m.mime === "image/svg+xml") {
+      log(jobId, `Picture ${r.rel_path || r.name} not read: ${m.mime === "image/svg+xml" ? "SVG is not sent to the model" : "larger than 8 MB"}.`);
+      continue;
+    }
+    n++;
+    log(jobId, `Reading picture ${n}: ${r.rel_path || r.name}`);
+    try {
+      const text = await readPicture(auth, r.rel_path || r.name, fs.readFileSync(m.path), m.mime);
+      getDb().prepare("UPDATE sources SET text = ?, chars = ? WHERE id = ?").run(text, text === NOTHING ? 0 : text.length, r.id);
+    } catch (e) {
+      log(jobId, `Picture ${r.rel_path || r.name} could not be read: ${(e as Error).message}`);
+    }
+  }
+  if (pics.length > READ_LIMIT) log(jobId, `Read the first ${READ_LIMIT} pictures; the other ${pics.length - READ_LIMIT} are used as slide pictures only.`);
 }

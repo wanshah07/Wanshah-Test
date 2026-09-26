@@ -4,10 +4,13 @@ export interface Explained {
   what: string;
   todo: string;
   settings: boolean;
+  /** The user may choose to go on anyway: pictures the writer cannot read. */
+  anyway?: boolean;
 }
 
 export function explainFailure(raw: string): Explained {
   const m = raw || "Unknown error";
+  if (/cannot read pictures|pictures_unreadable/i.test(m)) return { what: m, todo: "Paste the text or table from those pictures as a text source, upload the original PDF or Word file, or pick a writer model that reads pictures (Settings, Test shows which). Or write anyway: the pictures then appear only as slide pictures.", settings: true, anyway: true };
   if (/no (openai )?key|no_key/i.test(m)) return { what: "There is no writer key.", todo: "Add a key in Settings (OpenAI or Mireld), press Test, then try again.", settings: true };
   if (/did not answer|timed? ?out|timeout|silent/i.test(m)) return { what: "The writer endpoint did not answer in time.", todo: "Try again. If it keeps happening, check the endpoint with Test in Settings, or switch provider.", settings: true };
   if (/\b401\b|invalid.*key|incorrect api key|unauthori[sz]ed|missing api key/i.test(m)) return { what: "The writer refused the key.", todo: "Check the key in Settings and press Test. A key saved for one provider does not work on another.", settings: true };

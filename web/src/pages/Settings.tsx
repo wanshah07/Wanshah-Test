@@ -20,6 +20,9 @@ export default function Settings() {
   const [odClient, setOdClient] = useState("");
   const [odFolder, setOdFolder] = useState("");
   const [odMsg, setOdMsg] = useState("");
+  const [czKey, setCzKey] = useState("");
+  const [czBusy, setCzBusy] = useState(false);
+  const [czAccounts, setCzAccounts] = useState<{ id: string; label: string; status: string }[] | null>(null);
   const loadOd = () => api.oneDrive().then((r) => {
     setOd(r);
     setOdClient(r.clientIdFrom === "settings" ? r.clientId : "");
@@ -80,10 +83,12 @@ export default function Settings() {
     setTesting(true);
     setTestMsg("");
     try {
-      const r = await api.testKey(key.trim() || undefined, baseUrl);
+      const r = await api.testKey(key.trim() || undefined, baseUrl, model);
       setTestMsg(r.message);
       setTestOk(r.ok);
       setModels(r.models ?? []);
+      // Only the picture answer changes; reloading everything would drop an unsaved model name.
+      if (r.vision === "yes" || r.vision === "no" || r.vision === "unknown") setS((x) => (x ? { ...x, vision: r.vision as S["vision"] } : x));
     } finally {
       setTesting(false);
     }
@@ -99,9 +104,32 @@ export default function Settings() {
     toast("Default theme set");
   };
 
+  const findAccounts = async () => {
+    setCzBusy(true);
+    setOdMsg("");
+    try {
+      // A newly pasted key is saved first, so the account picked next belongs to it.
+      if (czKey.trim()) {
+        setOd(await api.saveOneDrive({ composioKey: czKey.trim() }));
+        setCzKey("");
+      }
+      const r = await api.composioAccounts();
+      setCzAccounts(r.accounts);
+      const active = r.accounts.filter((a) => a.status.toUpperCase() === "ACTIVE");
+      if (active.length === 1) await pickAccount(active[0]);
+    } catch (e) {
+      setOdMsg((e as Error).message);
+    } finally {
+      setCzBusy(false);
+    }
+  };
+  const pickAccount = async (a: { id: string; label: string }) => {
+    setOd(await api.saveOneDrive({ composioAccount: a.id, composioAccountLabel: a.label }));
+    toast(`OneDrive through Composio: ${a.label}`);
+  };
   const saveOd = async () => {
     try {
-      setOd(await api.saveOneDrive({ clientId: odClient.trim() || null, defaultFolder: odFolder }));
+      setOd(await api.saveOneDrive(od?.provider === "composio" ? { defaultFolder: odFolder } : { clientId: odClient.trim() || null, defaultFolder: odFolder }));
       toast("OneDrive settings saved");
     } catch (e) {
       toast((e as Error).message, true);
@@ -166,6 +194,10 @@ export default function Settings() {
           <button className="btn btn-ghost" onClick={test} disabled={testing}>{testing ? "Testing" : "Test"}</button>
           {s.key.own && <button className="btn btn-quiet" onClick={clearKey}>Remove my key</button>}
         </div>
+        <p className="small muted">
+          Reads pictures: <b>{s.vision === "yes" ? "yes" : s.vision === "no" ? "no" : "not checked yet"}</b>
+          {s.vision === "no" ? ". Pictures you upload as sources are used only as slide pictures, and you are asked before a deck is written." : s.vision === "yes" ? ". Pictures you upload as sources are read before a deck is written." : ". Press Test to check."}
+        </p>
         {testMsg && <div className={"banner " + (testOk ? "info" : "danger")}>{testMsg}</div>}
         {models.length > 0 && (
           <p className="small muted">
@@ -177,36 +209,79 @@ export default function Settings() {
 
       <section className="card stack">
         <h2>OneDrive pictures</h2>
-        <p className="small">Pull pictures from a OneDrive folder into a deck. Slidecraft only reads (Files.Read); it never changes anything in OneDrive. The sign-in is stored encrypted.</p>
+        <p className="small">Pull pictures from a OneDrive folder into a deck. Slidecraft only reads; it never changes anything in OneDrive. Keys and sign-ins are stored encrypted.</p>
         {od && (
           <>
-            <div className="grid c2">
-              <label className="f">
-                Microsoft app client ID <span className="h">{od.clientIdFrom === "server" ? "Set on the server (MS_CLIENT_ID). Fill this only to use a different one." : "Application (client) ID from your app registration. See README, OneDrive."}</span>
-                <input type="text" value={odClient} onChange={(e) => setOdClient(e.target.value)} placeholder={od.clientIdFrom === "server" ? od.clientId : "1a2b3c4d-…"} autoComplete="off" />
-              </label>
-              <label className="f">
-                Default folder <span className="h">Filled in for every new deck. A path, or a OneDrive share link.</span>
-                <input type="text" value={odFolder} onChange={(e) => setOdFolder(e.target.value)} placeholder="e.g. 40. HERMES/photos" />
-              </label>
+            <div>
+              <b className="small">Connect through</b>
+              <div className="chips">
+                {([["composio", "Composio", "Uses the OneDrive you already connected in Composio. No Microsoft setup."], ["microsoft", "Microsoft direct", "Signs in to Microsoft yourself. Needs an Azure app registration once; no third party."]] as const).map(([v, l, h]) => (
+                  <label key={v} className={"chip" + (od.provider === v ? " on" : "")} title={h}>
+                    <input type="radio" name="odprov" checked={od.provider === v} onChange={() => api.saveOneDrive({ provider: v }).then(setOd)} />
+                    {l}
+                  </label>
+                ))}
+              </div>
             </div>
-            <div className="row">
-              <button className="btn btn-ghost" onClick={saveOd}>Save</button>
-              {od.connected ? (
-                <>
-                  <span className="pill ok">Connected{od.account ? `: ${od.account}` : ""}</span>
-                  <button className="btn btn-quiet" onClick={disconnectOd}>Disconnect</button>
-                </>
-              ) : (
-                <button className="btn btn-primary" onClick={connectOd} disabled={!od.clientId || !!od.pending}>Connect OneDrive</button>
-              )}
-            </div>
-            {!od.connected && !od.clientId && <p className="small muted">Save a client ID first, then Connect.</p>}
-            {od.pending && !od.connected && (
-              <div className="banner info" style={{ flexDirection: "column", alignItems: "flex-start" }}>
-                <span>1. Open <a href={od.pending.verificationUri} target="_blank" rel="noreferrer"><b>{od.pending.verificationUri}</b></a></span>
-                <span>2. Enter this code: <b style={{ fontSize: 20, letterSpacing: 2 }}>{od.pending.userCode}</b></span>
-                <span>3. Sign in with the Microsoft account that owns the folder and accept. This page updates by itself.</span>
+            <label className="f">
+              Default folder <span className="h">Filled in for every new deck.{od.provider === "microsoft" ? " A path, or a OneDrive share link." : " A path, e.g. 40. HERMES/photos."}</span>
+              <input type="text" value={odFolder} onChange={(e) => setOdFolder(e.target.value)} placeholder="e.g. 40. HERMES/photos" />
+            </label>
+            {od.provider === "composio" ? (
+              <div className="stack">
+                <label className="f">
+                  Composio API key <span className="h">{od.composio.key ? `Saved: ${od.composio.key}. Paste a new one to replace it.` : "From a Composio project that has OneDrive connected. Safest: a project with only OneDrive in it, or a scoped key limited to reading."}</span>
+                  <input type="password" value={czKey} onChange={(e) => setCzKey(e.target.value)} placeholder="Paste the key" autoComplete="off" />
+                </label>
+                <div className="row">
+                  <button className="btn btn-ghost" onClick={findAccounts} disabled={czBusy || (!czKey.trim() && !od.composio.key)}>{czBusy ? <span className="spin" /> : "Find my OneDrive accounts"}</button>
+                  <button className="btn btn-ghost" onClick={saveOd}>Save folder</button>
+                  {od.connected && (
+                    <>
+                      <span className="pill ok">Connected: {od.account}</span>
+                      <button className="btn btn-quiet" onClick={disconnectOd}>Remove key</button>
+                    </>
+                  )}
+                </div>
+                {czAccounts && czAccounts.length === 0 && <div className="banner warn">This key's Composio project has no OneDrive connection. Connect OneDrive in that project on composio.dev, then try again.</div>}
+                {czAccounts && czAccounts.length > 0 && (
+                  <div>
+                    <b className="small">Pick the OneDrive account</b>
+                    <div className="chips">
+                      {czAccounts.map((a) => (
+                        <button key={a.id} className={"chip" + (od.composio.account === a.id ? " on" : "")} onClick={() => pickAccount(a)}>
+                          {a.label} <span className="muted">({a.status.toLowerCase() || "unknown"})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="stack">
+                <label className="f">
+                  Microsoft app client ID <span className="h">{od.clientIdFrom === "server" ? "Set on the server (MS_CLIENT_ID). Fill this only to use a different one." : "Application (client) ID from your app registration. See README, OneDrive."}</span>
+                  <input type="text" value={odClient} onChange={(e) => setOdClient(e.target.value)} placeholder={od.clientIdFrom === "server" ? od.clientId : "1a2b3c4d-…"} autoComplete="off" />
+                </label>
+                <div className="row">
+                  <button className="btn btn-ghost" onClick={saveOd}>Save</button>
+                  {od.connected ? (
+                    <>
+                      <span className="pill ok">Connected{od.account ? `: ${od.account}` : ""}</span>
+                      <button className="btn btn-quiet" onClick={disconnectOd}>Disconnect</button>
+                    </>
+                  ) : (
+                    <button className="btn btn-primary" onClick={connectOd} disabled={!od.clientId || !!od.pending}>Connect OneDrive</button>
+                  )}
+                </div>
+                {!od.connected && !od.clientId && <p className="small muted">Save a client ID first, then Connect.</p>}
+                {od.pending && !od.connected && (
+                  <div className="banner info" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                    <span>1. Open <a href={od.pending.verificationUri} target="_blank" rel="noreferrer"><b>{od.pending.verificationUri}</b></a></span>
+                    <span>2. Enter this code: <b style={{ fontSize: 20, letterSpacing: 2 }}>{od.pending.userCode}</b></span>
+                    <span>3. Sign in with the Microsoft account that owns the folder and accept. This page updates by itself.</span>
+                  </div>
+                )}
               </div>
             )}
             {odMsg && <div className="banner danger">{odMsg}</div>}
