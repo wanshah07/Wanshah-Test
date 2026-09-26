@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -134,6 +134,13 @@ beforeAll(async () => {
           { layout: "bullets", title: "What is B5?", explanation: { summary: "Panthenol, a form of vitamin B5", whyItMatters: "Holds water in the skin" } },
           { layout: "kpi", title: "In numbers", kpi: null, figures: [{ label: "Panthenol", value: "5%" }, { label: "Uses a day", value: "2" }] },
           { layout: "diagram", title: "How to use", diagram: { kind: "flow", stages: ["Cleanse", "Apply B5", "Moisturise"] }, notes: "Walk through the routine." },
+        ] }));
+      }
+      if (gw.deckCards > 0) {
+        gw.deckCards--;
+        return reply(JSON.stringify({ title: "B5", subtitle: null, slides: [
+          { layout: "bullets", title: "Three benefits", benefits: [{ title: "Calms", description: "Soothes redness after cleansing" }, { title: "Repairs", description: "Supports the skin barrier" }, { title: "Hydrates", description: "Holds water in the skin" }] },
+          { layout: "bullets", title: "Wrong types", subtitle: { a: "Plain words", b: "for everyone" }, bullets: ["One", { text: "Two" }], citations: "Label, 2026", quote: "It just works", extra: { deep: [1, 2] } },
         ] }));
       }
       if (gw.deckTitlesOnly > 0) {
@@ -307,13 +314,30 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
   it("puts content the model filed under unknown names on the slide instead of leaving a bare title", async () => {
     gw.deckStray = 2;
     const id = await newDeck("stray");
-    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5" } }));
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5", features: { kpis: true } } }));
     expect((await waitJob(jobId)).status).toBe("done");
     const slides = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(slides[1].bullets).toEqual(["Panthenol, a form of vitamin B5", "Holds water in the skin"]);
-    expect(slides[2].bullets).toEqual(["Panthenol — 5%", "Uses a day — 2"]);
-    expect(slides[3].bullets).toEqual(["Cleanse", "Apply B5", "Moisturise"]);
-    expect(slides[3].bullets.join(" ")).not.toMatch(/Walk through/);
+    // Figures and a process in the model's own words become the real visuals, not text.
+    expect(slides[2].layout).toBe("kpi");
+    expect(slides[2].kpi).toEqual([{ label: "Panthenol", value: "5%" }, { label: "Uses a day", value: "2" }]);
+    expect(slides[3].layout).toBe("diagram");
+    expect(slides[3].diagram).toEqual({ kind: "flow", steps: [{ label: "Cleanse" }, { label: "Apply B5" }, { label: "Moisturise" }] });
+    expect(slides[3].notes).toBe("Walk through the routine.");
+  });
+
+  it("turns titled points into cards, and never hands the editor a field it cannot draw", async () => {
+    gw.deckCards = 2;
+    const id = await newDeck("cards");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5" } }));
+    expect((await waitJob(jobId)).status).toBe("done");
+    const slides = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(slides[0].layout).toBe("cards");
+    expect(slides[0].cards).toEqual([{ heading: "Calms", detail: "Soothes redness after cleansing" }, { heading: "Repairs", detail: "Supports the skin barrier" }, { heading: "Hydrates", detail: "Holds water in the skin" }]);
+    expect(slides[1].subtitle).toBe("Plain words, for everyone");
+    expect(slides[1].citations).toEqual(["Label, 2026"]);
+    expect(slides[1].quote).toEqual({ text: "It just works" });
+    expect(Object.keys(slides[1]).sort()).toEqual(["bullets", "citations", "id", "layout", "quote", "subtitle", "title"]);
   });
 
   it("fails clearly when the content slides are titles with nothing under them, and says what the writer sent", async () => {

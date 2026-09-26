@@ -214,28 +214,98 @@ const firstStr = (o: Record<string, unknown>, keys: string[]): string | undefine
   return undefined;
 };
 const asText = (v: unknown): string =>
-  typeof v === "string" ? v : v && typeof v === "object" ? String(firstStr(v as Record<string, unknown>, ["text", "point", "label", "title", "heading", "value"]) ?? Object.values(v as object).filter((x) => typeof x === "string").join(" — ")) : String(v ?? "");
+  typeof v === "string" ? v : v && typeof v === "object" ? String(firstStr(v as Record<string, unknown>, ["text", "point", "label", "title", "heading", "value"]) ?? Object.values(v as object).filter((x) => typeof x === "string").join(": ")) : String(v ?? "");
 
 /**
  * A model that ignored the schema still wrote slides, under names of its own
  * (heading, content, points, speakerNotes). Map those onto the schema's names,
  * never overwriting a field the model did fill correctly.
  */
+/** Nothing there yet: a field the model filled in any shape is left for the sanitizer to read. */
+const empty = (v: unknown): boolean => v === undefined || v === null || (typeof v === "string" && !v.trim());
+
 export function coerceSlideShape(raw: Record<string, unknown>): Record<string, unknown> {
   const inner = raw.content && typeof raw.content === "object" && !Array.isArray(raw.content) ? (raw.content as Record<string, unknown>) : {};
   const o: Record<string, unknown> = { ...inner, ...raw };
   const out: Record<string, unknown> = { ...raw };
-  if (typeof out.title !== "string" || !out.title.trim()) out.title = firstStr(o, ["title", "heading", "slideTitle", "slide_title", "headline", "name", "header"]) ?? "";
-  if (typeof out.kicker !== "string") out.kicker = firstStr(o, ["eyebrow", "label", "tag", "section"]) ?? null;
-  if (typeof out.subtitle !== "string") out.subtitle = firstStr(o, ["subheading", "sub_title", "subTitle", "tagline"]) ?? null;
-  if (typeof out.body !== "string" || !out.body.trim()) out.body = firstStr(o, ["body", "text", "content", "description", "summary", "message", "paragraph", "keyMessage", "key_message"]) ?? null;
+  if (empty(out.title)) out.title = firstStr(o, ["title", "heading", "slideTitle", "slide_title", "headline", "name", "header"]) ?? "";
+  if (empty(out.kicker)) out.kicker = firstStr(o, ["eyebrow", "label", "tag", "section"]) ?? null;
+  if (empty(out.subtitle)) out.subtitle = firstStr(o, ["subheading", "sub_title", "subTitle", "tagline"]) ?? null;
+  if (empty(out.body)) out.body = firstStr(o, ["body", "text", "content", "description", "summary", "message", "paragraph", "keyMessage", "key_message"]) ?? null;
   if (!Array.isArray(out.bullets) || !out.bullets.length) {
     const list = ["bullets", "points", "bullet_points", "bulletPoints", "keyPoints", "key_points", "items", "content", "list"].map((k) => o[k]).find((v) => Array.isArray(v) && v.length);
     out.bullets = list ? (list as unknown[]).map(asText).filter((x) => x.trim()) : [];
   } else out.bullets = (out.bullets as unknown[]).map(asText).filter((x) => x.trim());
-  if (typeof out.notes !== "string") out.notes = firstStr(o, ["speakerNotes", "speaker_notes", "presenterNotes", "narration", "script"]) ?? null;
+  if (empty(out.notes)) out.notes = firstStr(o, ["speakerNotes", "speaker_notes", "presenterNotes", "narration", "script"]) ?? null;
+  addVisuals(out, o);
   if (typeof out.layout !== "string") out.layout = firstStr(o, ["type", "slideType", "slide_type", "kind"]) ?? null;
   return out;
+}
+
+const VALUE_KEY = /^(value|figure|number|stat|amount|percent|percentage|count)$/i;
+const LABEL_KEYS = ["label", "name", "metric", "title", "heading", "what"];
+const DETAIL_KEYS = ["detail", "description", "text", "explanation", "body", "summary", "desc"];
+const listOfObjects = (v: unknown): Record<string, unknown>[] | null =>
+  Array.isArray(v) && v.length >= 2 && v.every((x) => x && typeof x === "object" && !Array.isArray(x)) ? (v as Record<string, unknown>[]) : null;
+
+/**
+ * A model that ignored the schema still often drew the visual, in words of its own: figures as
+ * [{name, value}], a process as "stages", cards as [{title, description}]. Turn those into the
+ * slide's real visual instead of flattening them into text.
+ */
+function addVisuals(out: Record<string, unknown>, o: Record<string, unknown>): void {
+  const has = (k: string) => Array.isArray(out[k]) ? (out[k] as unknown[]).length > 0 : !!out[k] && typeof out[k] === "object";
+  const entries = Object.entries(o);
+  // Figures → number tiles.
+  if (!has("kpi")) {
+    for (const [, v] of entries) {
+      const list = listOfObjects(v);
+      if (!list || list.length > 6) continue;
+      if (!list.every((x) => Object.keys(x).some((k) => VALUE_KEY.test(k)))) continue;
+      out.kpi = list.map((x) => {
+        const vk = Object.keys(x).find((k) => VALUE_KEY.test(k))!;
+        return { label: firstStr(x, LABEL_KEYS) ?? "", value: String(x[vk] ?? ""), note: firstStr(x, ["note", ...DETAIL_KEYS]) ?? null };
+      });
+      if (out.layout !== "kpi" && !(Array.isArray(out.bullets) && out.bullets.length)) out.layout = "kpi";
+      break;
+    }
+  }
+  // A process or a timeline → a diagram.
+  const d = out.diagram && typeof out.diagram === "object" ? (out.diagram as Record<string, unknown>) : null;
+  const stepsIn = (src: Record<string, unknown>) => ["steps", "stages", "process", "flow", "phases", "procedure", "sequence"].map((k) => src[k]).find((v) => Array.isArray(v) && v.length >= 2) as unknown[] | undefined;
+  const eventsIn = (src: Record<string, unknown>) => ["events", "timeline", "milestones"].map((k) => src[k]).find((v) => Array.isArray(v) && v.length >= 2) as unknown[] | undefined;
+  const hasDiagram = d && ((Array.isArray(d.steps) && d.steps.length) || (Array.isArray(d.events) && d.events.length) || (Array.isArray(d.rows) && d.rows.length));
+  if (!hasDiagram) {
+    const events = (d && eventsIn(d)) || eventsIn(o);
+    const steps = (d && stepsIn(d)) || stepsIn(o);
+    if (events && events.every((e) => e && typeof e === "object" && firstStr(e as Record<string, unknown>, ["when", "date", "year", "time"]))) {
+      out.diagram = { kind: "timeline", events: events.map((e) => ({ when: firstStr(e as Record<string, unknown>, ["when", "date", "year", "time"]) ?? "", label: firstStr(e as Record<string, unknown>, ["label", "event", ...LABEL_KEYS, ...DETAIL_KEYS]) ?? "" })) };
+    } else if (steps) {
+      out.diagram = { kind: "flow", steps: steps.map((x) => (typeof x === "string" ? { label: x } : x && typeof x === "object" ? { label: firstStr(x as Record<string, unknown>, ["label", "step", "stage", ...LABEL_KEYS]) ?? "", detail: firstStr(x as Record<string, unknown>, DETAIL_KEYS) ?? null } : { label: String(x) })) };
+    }
+    if (out.diagram && out.layout !== "diagram" && !(Array.isArray(out.bullets) && out.bullets.length)) out.layout = "diagram";
+  }
+  // Titled points → cards.
+  if (!has("cards") && (out.layout === "cards" || !has("kpi"))) {
+    for (const [k, v] of entries) {
+      if (["kpi", "diagram", "citations", "sources", "chart", "table"].includes(k)) continue;
+      const list = listOfObjects(v);
+      if (!list || list.length > 6) continue;
+      if (!list.every((x) => firstStr(x, ["heading", "title", "name", "point"]) && firstStr(x, DETAIL_KEYS))) continue;
+      out.cards = list.map((x) => ({ heading: firstStr(x, ["heading", "title", "name", "point"])!, detail: firstStr(x, DETAIL_KEYS) ?? null, tag: firstStr(x, ["tag", "badge", "status"]) ?? null }));
+      if (!(Array.isArray(out.bullets) && out.bullets.length) || out.layout === "cards") {
+        out.layout = "cards";
+        out.bullets = [];
+      }
+      break;
+    }
+  }
+  // A table under other names.
+  const t = out.table && typeof out.table === "object" ? (out.table as Record<string, unknown>) : null;
+  if (t && !Array.isArray(t.header)) {
+    const header = ["headers", "columns", "cols", "head"].map((k) => t[k]).find(Array.isArray);
+    if (header) out.table = { ...t, header };
+  }
 }
 
 /** A slide with nothing on its face: no title, no body, no bullets, nothing drawn. */
@@ -272,7 +342,7 @@ export function harvestText(raw: unknown, max = 6): string[] {
     const labelled = strEntries.some(([k]) => LABEL_KEY.test(k)) || Object.values(o).some((x) => typeof x === "number");
     if (depth > 0 && labelled && strs.length >= 1 && strs.length <= 3 && strs.join(" ").length <= 160) {
       // A small record ({label, value, note}) reads as one line.
-      const line = strs.join(" — ");
+      const line = strs.join(": ");
       const num = Object.values(o).find((x) => typeof x === "number");
       const full = num !== undefined && !line.includes(String(num)) ? `${line}: ${num}` : line;
       if (!out.includes(full)) out.push(full);
@@ -306,7 +376,7 @@ function toSlide(raw: Record<string, unknown>, features: Features, imageMode: st
 }
 
 function finishSlide(s: Slide, raw: Record<string, unknown>, features: Features, imageMode: string): Slide {
-  s.diagram = coerceDiagram(raw.diagram);
+  s.diagram = coerceDiagram(raw.diagram) ?? s.diagram;
   if (s.layout === "diagram" && !s.diagram) s.layout = "bullets";
   if (s.layout === "chart" && (!s.chart || !s.chart.series?.length)) s.layout = "bullets";
   if (s.layout === "table" && !s.table?.header?.length) s.layout = "bullets";

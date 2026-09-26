@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Shell } from "./components/Shell";
 import { ToastHost } from "./components/Toast";
 import Login from "./pages/Login";
@@ -11,21 +12,24 @@ import Designs from "./pages/Designs";
 import Prompts from "./pages/Prompts";
 
 export default function App() {
+  const loc = useLocation();
   return (
     <>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/deck/:id/present" element={<Present />} />
-        <Route element={<Shell />}>
-          <Route path="/" element={<Decks />} />
-          <Route path="/new" element={<NewDeck />} />
-          <Route path="/deck/:id" element={<Editor />} />
-          <Route path="/designs" element={<Designs />} />
-          <Route path="/prompts" element={<Prompts />} />
-          <Route path="/settings" element={<Settings />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <ErrorBoundary resetKey={loc.pathname}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/deck/:id/present" element={<Present />} />
+          <Route element={<Shell />}>
+            <Route path="/" element={<Decks />} />
+            <Route path="/new" element={<NewDeck />} />
+            <Route path="/deck/:id" element={<Editor />} />
+            <Route path="/designs" element={<Designs />} />
+            <Route path="/prompts" element={<Prompts />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ErrorBoundary>
       <ToastHost />
     </>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { fitSlide, renderSlideHtml, SLIDE_CSS, type FitResult, type Slide, type Theme } from "@slidecraft/shared";
+import { fitSlide, renderSlideHtml, sanitizeSlide, SLIDE_CSS, type FitResult, type Slide, type Theme } from "@slidecraft/shared";
 import { mediaUrl } from "../api";
 
 let cssInjected = false;
@@ -26,7 +26,14 @@ export function SlideFrame({ slide, theme, index, total, lang, className, fixedW
     setScale(el.clientWidth / 1920);
     return () => ro.disconnect();
   }, [fixedWidth]);
-  const html = useMemo(() => renderSlideHtml(slide, theme, { index, total, mediaUrl, lang }), [slide, theme, index, total, lang]);
+  const html = useMemo(() => {
+    try {
+      return renderSlideHtml(sanitizeSlide(slide), theme, { index, total, mediaUrl, lang });
+    } catch (e) {
+      // One slide that cannot be drawn must never take the editor down with it.
+      return `<div class="sc-slide" style="width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;background:#fff4f4;color:#8a1c1c;font:40px sans-serif;padding:80px;text-align:center">This slide could not be drawn: ${String((e as Error).message).replace(/[<>&]/g, "")}. Edit it on the right, or rewrite it.</div>`;
+    }
+  }, [slide, theme, index, total, lang]);
   const inner = useRef<HTMLDivElement>(null);
   // Shrink the text until nothing overflows, now and again once web fonts have loaded.
   useLayoutEffect(() => {

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Deck, SourceRef } from "@slidecraft/shared";
+import { sanitizeSlide, type Deck, type SourceRef } from "@slidecraft/shared";
 import { getDb, now, uid } from "./db.js";
 import { config } from "./config.js";
 
@@ -8,6 +8,8 @@ export function loadDeck(userId: string, id: string): Deck | null {
   const row = getDb().prepare("SELECT doc FROM decks WHERE id = ? AND user_id = ?").get(id, userId) as { doc: string } | undefined;
   if (!row) return null;
   const deck = JSON.parse(row.doc) as Deck;
+  // A slide saved in a shape the renderer cannot draw would blank the whole editor.
+  deck.slides = (Array.isArray(deck.slides) ? deck.slides : []).map((x) => sanitizeSlide(x));
   deck.sources = listSourceRefs(id);
   return deck;
 }
