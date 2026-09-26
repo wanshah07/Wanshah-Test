@@ -14,6 +14,7 @@ interface Behaviour {
   silent?: boolean;
   /** Gemini: a list-shaped error, with a reason that never says "schema". */
   gemini?: boolean;
+  geminiModels?: boolean;
   badModel?: boolean;
 }
 
@@ -32,7 +33,8 @@ beforeAll(async () => {
       if (behaviour.silent) return; // accept, never answer
       if (req.url === "/v1/models") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ data: [{ id: "claude-sonnet" }, { id: "gpt-4.1" }, { id: "llama-3" }] }));
+        if (behaviour.geminiModels) res.end(JSON.stringify({ object: "list", data: ["models/gemini-2.5-flash", "models/gemini-2.5-flash-preview-image", "models/imagen-4.0-generate-001", "models/text-embedding-004", "models/gemini-2.5-flash-preview-tts", "models/gemini-2.5-pro"].map((id) => ({ id, object: "model" })) }));
+        else         res.end(JSON.stringify({ data: [{ id: "claude-sonnet" }, { id: "gpt-4.1" }, { id: "llama-3" }] }));
         return;
       }
       const body = raw ? JSON.parse(raw) : {};
@@ -67,6 +69,14 @@ const auth = (): LlmAuth => ({ apiKey: "k", model: "claude-sonnet", imageModel: 
 const args = () => ({ auth: auth(), system: "sys", user: "u", schemaName: "t", schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] } });
 
 describe("gateway compatibility", () => {
+  it("lists only models that can write, with Gemini's models/ prefix removed, and picture models apart", async () => {
+    behaviour = { geminiModels: true };
+    const r = await checkKey("k", base);
+    behaviour = {};
+    expect(r.models).toEqual(["gemini-2.5-flash", "gemini-2.5-pro"]);
+    expect(r.imageModels).toEqual(["gemini-2.5-flash-preview-image", "imagen-4.0-generate-001"]);
+  });
+
   it("falls back to plain JSON when Gemini refuses the strict schema in its own words", async () => {
     behaviour = { gemini: true };
     seen.length = 0;

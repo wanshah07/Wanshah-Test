@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
 import { maskKey } from "../crypto.js";
-import { checkKey, hostOf } from "../llm/client.js";
+import { checkKey, hostOf, NOT_A_WRITER } from "../llm/client.js";
 import { baseUrlFor, normaliseBase, PROVIDERS, readSettings, resolveAuth, userKey, writeSettings } from "../settings.js";
 import { knownVision, visionFor } from "../llm/vision.js";
 
@@ -69,6 +69,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     // Also find out, and remember, whether the writer model can read pictures.
     const st = readSettings(req.user.id);
     const model = (b as { model?: string }).model?.trim() || st.openai_model || config.openaiModel;
+    if (NOT_A_WRITER.test(model)) return { ...r, vision: "unknown", message: `${r.message} The writer model ${model} makes pictures or speech, not text, so it cannot write a deck: pick one of the writer models below, save it, and press Test again.` };
     if (r.models && r.models.length && !r.models.includes(model)) return { ...r, vision: "unknown", message: `${r.message} The writer model ${model} is not in this list: pick one below, save it, and press Test again.` };
     const vision = await visionFor(req.user.id, { apiKey: key, baseUrl, model, imageModel: st.openai_image_model || config.openaiImageModel }, true);
     const words = vision === "yes" ? `${model} reads pictures: uploaded pictures are read before a deck is written.` : vision === "no" ? `${model} cannot read pictures: uploaded pictures are used only as slide pictures, and you are warned before a deck is written.` : `Could not check whether ${model} reads pictures.`;

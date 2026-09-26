@@ -248,7 +248,10 @@ export async function generateImage(auth: LlmAuth, prompt: string, size = "1536x
   return Buffer.from(b64, "base64");
 }
 
-export async function checkKey(apiKey: string, baseUrl: string, timeoutMs = 20000): Promise<{ ok: boolean; message: string; models?: string[] }> {
+/** Models that make pictures, speech or embeddings rather than text. */
+export const NOT_A_WRITER = /image|imagen|dall-e|tts|embed|live|audio|veo|aqa|robotics|computer-use|lyria|whisper|moderation|transcribe/i;
+
+export async function checkKey(apiKey: string, baseUrl: string, timeoutMs = 20000): Promise<{ ok: boolean; message: string; models?: string[]; imageModels?: string[] }> {
   const host = hostOf(baseUrl);
   try {
     const res = await fetch(`${baseUrl}/models`, { headers: { authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(timeoutMs) });
@@ -256,10 +259,13 @@ export async function checkKey(apiKey: string, baseUrl: string, timeoutMs = 2000
       return { ok: false, message: `${host} answered ${res.status}: ${errorOf(await res.json().catch(() => ({}))).message || res.statusText}` };
     }
     const j = (await res.json()) as { data?: { id: string }[] };
-    const all = (j.data ?? []).map((m) => m.id).sort();
+    // Gemini lists "models/gemini-…"; the chat call takes the bare name.
+    const all = [...new Set((j.data ?? []).map((m) => m.id.replace(/^models\//, "")))].sort();
     const isOpenAi = host === "api.openai.com";
-    const ids = isOpenAi ? all.filter((id) => /^(gpt|o\d|chatgpt)/.test(id)) : all;
-    return { ok: true, message: `Key accepted by ${host}. ${ids.length} models visible.`, models: ids };
+    // Picture, speech and embedding models cannot write a deck; they are listed apart.
+    const writers = (isOpenAi ? all.filter((id) => /^(gpt|o\d|chatgpt)/.test(id)) : all).filter((id) => !NOT_A_WRITER.test(id));
+    const imageModels = all.filter((id) => /imagen|image|dall-e/i.test(id));
+    return { ok: true, message: `Key accepted by ${host}. ${writers.length} writer models visible.`, models: writers, imageModels };
   } catch (e) {
     const name = (e as Error).name;
     if (name === "TimeoutError" || name === "AbortError") return { ok: false, message: `${host} sent no answer within ${Math.round(timeoutMs / 1000)} s. The server running Slidecraft cannot use this endpoint.` };

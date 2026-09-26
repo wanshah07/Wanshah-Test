@@ -233,6 +233,12 @@ describe("picture generation", () => {
     expect(gw.imageBodies.map((b) => b.response_format)).toEqual(["b64_json", undefined]);
   });
 
+  it("Test says a picture model cannot be the writer", async () => {
+    const t = J(await app.inject({ method: "POST", url: "/api/settings/test-key", payload: { model: "gemini-2.5-flash-preview-image" } }));
+    expect(t.message).toMatch(/gemini-2\.5-flash-preview-image makes pictures or speech, not text, so it cannot write a deck/);
+    expect(t.vision).toBe("unknown");
+  });
+
   it("offers Google Gemini as a named endpoint", async () => {
     const s = J(await app.inject({ method: "GET", url: "/api/settings" }));
     expect(s.providers).toContainEqual({ id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" });
