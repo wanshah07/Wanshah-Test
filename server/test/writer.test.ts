@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -82,6 +82,12 @@ beforeAll(async () => {
         const text = String(user.find((p: { type: string }) => p.type === "text")?.text ?? "");
         if (/What colour/.test(text)) {
           gw.probes++;
+          // A thinking model: the thinking eats the first ~500 tokens, and a smaller cap leaves no answer.
+          const cap = Number(body.max_completion_tokens ?? body.max_tokens ?? 0);
+          if (gw.silent || (gw.thinking && cap < 500)) {
+            res.writeHead(200, { "content-type": "application/json" });
+            return res.end(JSON.stringify({ choices: [{ message: { content: "" }, finish_reason: "length" }] }));
+          }
           return reply("Red");
         }
         gw.reads++;
@@ -270,6 +276,22 @@ describe("pictures the writer may not be able to read", () => {
     expect(t.vision).toBe("yes");
     expect(t.message).toMatch(/writer-1 reads pictures/);
     expect(J(await app.inject({ method: "GET", url: "/api/settings" })).vision).toBe("yes");
+  });
+
+  it("gives a thinking model room to answer the picture check", async () => {
+    gw.thinking = true;
+    const t = J(await app.inject({ method: "POST", url: "/api/settings/test-key", payload: {} }));
+    gw.thinking = false;
+    expect(t.vision).toBe("yes");
+  });
+
+  it("does not read a silent answer as 'cannot read pictures'", async () => {
+    gw.silent = true;
+    const t = J(await app.inject({ method: "POST", url: "/api/settings/test-key", payload: {} }));
+    gw.silent = false;
+    expect(t.vision).toBe("unknown");
+    // Put the remembered answer back for the tests below.
+    expect(J(await app.inject({ method: "POST", url: "/api/settings/test-key", payload: {} })).vision).toBe("yes");
   });
 
   it("reads an uploaded picture once and gives its content to the writer", async () => {

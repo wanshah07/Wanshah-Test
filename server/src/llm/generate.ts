@@ -415,10 +415,12 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
   const pics = unreadPictures(listSources(deckId));
   if (!pics.length) return;
   const v = await visionFor(userId, auth);
-  if (v !== "yes") {
-    log(jobId, `${pics.length} picture source${pics.length === 1 ? "" : "s"} used only as slide pictures: ${v === "no" ? `${auth.model} cannot read pictures` : "could not check whether the writer model reads pictures"}, so text inside them does not reach the deck.`);
+  if (v === "no") {
+    log(jobId, `${pics.length} picture source${pics.length === 1 ? "" : "s"} used only as slide pictures: ${auth.model} cannot read pictures, so text inside them does not reach the deck.`);
     return;
   }
+  // Unconfirmed is not a no: try, and a picture the model refuses is logged and left as a slide picture.
+  if (v === "unknown") log(jobId, `Could not confirm that ${auth.model} reads pictures; trying anyway.`);
   let n = 0;
   for (const r of pics.slice(0, READ_LIMIT)) {
     const m = r.media_id ? getMedia(userId, r.media_id) : null;
