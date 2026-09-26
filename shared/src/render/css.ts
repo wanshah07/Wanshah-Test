@@ -78,11 +78,11 @@ const RAW_CSS = `
 .sc-slide .sc-placeholder{flex:1;border:3px dashed var(--line);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;
   text-align:center;padding:60px;color:var(--muted);font-size:28px;background:color-mix(in srgb,var(--surface) 60%,transparent)}
 .sc-slide .sc-dek{font-size:30px;color:var(--ink2);margin-top:-12px;max-width:1600px;line-height:1.35}
-.sc-slide .sc-cards{display:grid;grid-template-columns:repeat(var(--cols,3),1fr);gap:28px;flex:1;min-height:0;align-content:start}
-.sc-slide .sc-card{background:var(--surface);border:2px solid var(--line);border-radius:var(--radius);padding:30px 34px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden;
+.sc-slide .sc-cards{display:grid;grid-template-columns:repeat(var(--cols,3),1fr);gap:calc(28px * var(--k, 1));flex:1;min-height:0;align-content:start}
+.sc-slide .sc-card{background:var(--surface);border:2px solid var(--line);border-radius:var(--radius);padding:calc(30px * var(--k, 1)) calc(34px * var(--k, 1));display:flex;flex-direction:column;gap:calc(12px * var(--k, 1));min-height:0;overflow:hidden;
   box-shadow:0 6px 24px rgba(23,50,79,.05);border-top:8px solid var(--brand)}
 .sc-slide .sc-card .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.sc-slide .sc-card .no{width:52px;height:52px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:28px;display:grid;place-items:center;flex:none}
+.sc-slide .sc-card .no{width:calc(52px * var(--k, 1));height:calc(52px * var(--k, 1));border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:28px;display:grid;place-items:center;flex:none}
 .sc-slide .sc-card .hd{font-family:var(--font-display);font-weight:600;font-size:34px;line-height:1.2;color:var(--ink)}
 .sc-slide .sc-card .dt{font-size:26px;color:var(--ink2);line-height:1.4}
 .sc-slide .sc-badge{display:inline-block;padding:4px 14px;border-radius:999px;font-size:20px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}

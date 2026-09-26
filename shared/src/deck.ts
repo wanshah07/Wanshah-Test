@@ -287,8 +287,11 @@ export function normaliseSlide(raw: Record<string, unknown>): Slide {
 const CHART_KINDS = ["bar", "column", "line", "area", "pie", "doughnut"];
 
 /** Text from whatever a model put there: a string, a number, or a small record of strings. */
+// Characters XML 1.0 forbids: a PPTX carrying one will not open in PowerPoint.
+const XML_BAD = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+
 function txt(v: unknown): string | undefined {
-  if (typeof v === "string") return v.trim() || undefined;
+  if (typeof v === "string") return v.replace(XML_BAD, "").trim() || undefined;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   if (v && typeof v === "object" && !Array.isArray(v)) {
     const parts = Object.values(v as object).filter((x) => typeof x === "string" || typeof x === "number").map(String);
@@ -329,13 +332,26 @@ export function sanitizeSlide(raw: unknown): Slide {
       .filter((x): x is Record<string, unknown> => !!x)
       .map((x) => ({ name: txt(x.name) ?? "", values: (Array.isArray(x.values) ? x.values : []).map((n) => Number(n)).filter((n) => Number.isFinite(n)) }))
       .filter((x) => x.values.length);
-    if (series.length) s.chart = { kind: (CHART_KINDS.includes(String(c.kind)) ? c.kind : "bar") as ChartKind, categories: txtList(c.categories) ?? [], series, ...(txt(c.unit) ? { unit: txt(c.unit) } : {}), ...(txt(c.source) ? { source: txt(c.source) } : {}) };
+    if (series.length) {
+      // One category per value: a chart with fewer names than numbers draws off its canvas, and with none PowerPoint will not open the file.
+      const n = Math.max(...series.map((x) => x.values.length));
+      const categories = (txtList(c.categories) ?? []).slice(0, n);
+      while (categories.length < n) categories.push(String(categories.length + 1));
+      for (const x of series) while (x.values.length < n) x.values.push(0);
+      let kind = (CHART_KINDS.includes(String(c.kind)) ? c.kind : "bar") as ChartKind;
+      // A share cannot be negative: a pie of signed values is a column chart.
+      if ((kind === "pie" || kind === "doughnut") && series.some((x) => x.values.some((v) => v < 0))) kind = "column";
+      s.chart = { kind, categories, series, ...(txt(c.unit) ? { unit: txt(c.unit) } : {}), ...(txt(c.source) ? { source: txt(c.source) } : {}) };
+    }
   }
   const t = obj(r.table);
   if (t) {
     const rows = (Array.isArray(t.rows) ? t.rows : []).map((row) => (Array.isArray(row) ? row.map((x) => txt(x) ?? "") : txt(row) ? [txt(row)!] : [])).filter((row) => row.length);
-    const header = txtList(t.header) ?? [];
-    if (header.length || rows.length) s.table = { header, rows, ...(txt(t.source) ? { source: txt(t.source) } : {}) };
+    const header = Array.isArray(t.header) ? t.header.map((x) => txt(x) ?? "") : txtList(t.header) ?? [];
+    // Every row as wide as the widest: a ragged table is a file PowerPoint has to repair.
+    const cols = Math.max(header.length, ...rows.map((r) => r.length), 0);
+    const pad = (r: string[]) => [...r, ...Array(Math.max(0, cols - r.length)).fill("")];
+    if (cols && (header.some(Boolean) || rows.length)) s.table = { header: pad(header), rows: rows.map(pad), ...(txt(t.source) ? { source: txt(t.source) } : {}) };
   }
   const d = obj(r.diagram);
   if (d) {
@@ -345,7 +361,13 @@ export function sanitizeSlide(raw: unknown): Slide {
     } else if (d.kind === "matrix") {
       const rows = txtList(d.rows) ?? [];
       const cols = txtList(d.cols) ?? [];
-      if (rows.length && cols.length) s.diagram = { kind: "matrix", rows, cols, cells: (Array.isArray(d.cells) ? d.cells : []).map((row) => (Array.isArray(row) ? row.map((x) => txt(x) ?? "") : [])) };
+      if (rows.length && cols.length) {
+        const cells = rows.map((_, i) => {
+          const row = Array.isArray(d.cells) && Array.isArray(d.cells[i]) ? (d.cells[i] as unknown[]).map((x) => txt(x) ?? "") : [];
+          return cols.map((__, j) => row[j] ?? "");
+        });
+        s.diagram = { kind: "matrix", rows, cols, cells };
+      }
     } else {
       const steps = (Array.isArray(d.steps) ? d.steps : [])
         .map((x) => (typeof x === "string" ? { label: x } : obj(x) ? { label: txt(obj(x)!.label) ?? "", ...(txt(obj(x)!.detail) ? { detail: txt(obj(x)!.detail) } : {}) } : null))

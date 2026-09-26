@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import PptxGenJSImport from "pptxgenjs";
-import { seriesPalette, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type Slide, type Theme } from "@slidecraft/shared";
+import { sanitizeSlide, sanitizeTheme, seriesPalette, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type Slide, type Theme } from "@slidecraft/shared";
+import { fetchPicture } from "./fetchPicture.js";
 import { getMedia } from "../store.js";
 import { fitFont, textHeightIn } from "./textfit.js";
 
@@ -21,11 +22,14 @@ type ChartName = Parameters<PSlide["addChart"]>[0];
 const PptxGenJS = ((PptxGenJSImport as unknown as { default?: unknown }).default ?? PptxGenJSImport) as PptxCtor;
 
 function hex(c: string): string {
-  return c.replace("#", "").toUpperCase();
+  let h = String(c ?? "").replace("#", "").toUpperCase();
+  if (/^[0-9A-F]{3}$/.test(h)) h = h.replace(/./g, (x) => x + x);
+  if (/^[0-9A-F]{8}$/.test(h)) h = h.slice(0, 6);
+  return /^[0-9A-F]{6}$/.test(h) ? h : "000000";
 }
 
 function plain(s: string): string {
-  return s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1$2").replace(/`([^`]+)`/g, "$1");
+  return String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1$2").replace(/`([^`]+)`/g, "$1");
 }
 
 function fontOk(name: string): string {
@@ -38,6 +42,8 @@ interface Ctx {
   userId: string;
   total: number;
   lang: "en" | "ms";
+  /** Pictures given by address, fetched safely beforehand: address → "mime;base64,…". */
+  urls: Map<string, string>;
 }
 
 function mediaData(userId: string, id: string): string | null {
@@ -82,7 +88,7 @@ const TONE = { good: { bg: "E3F5EA", ink: "0F5A34" }, mid: { bg: "FFF1D6", ink: 
 function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: number, w: number, h: number, c: Ctx): void {
   const col = c.theme.colors;
   const n = items.length;
-  const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : 3;
+  const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : n <= 6 || n === 9 ? 3 : 4;
   const rows = Math.ceil(n / cols);
   const gap = 0.25;
   const cw = (w - gap * (cols - 1)) / cols;
@@ -281,8 +287,8 @@ function diagram(ps: PSlide, d: DiagramSpec, x: number, y: number, w: number, h:
     const text = [["", ...d.cols.map(plain)], ...d.rows.map((r, i) => [plain(r), ...d.cols.map((_, j) => (mark(d.cells[i]?.[j] ?? "") ? "✓" : plain(d.cells[i]?.[j] ?? "")))])];
     const { size: ms, heights } = fitTable(text, colW, h, 12);
     const rows: TableRows = [
-      ["", ...d.cols].map((v) => ({ text: v, options: { bold: true, color: hex(col.brandDeep), fontSize: ms, align: "center" as const } })),
-      ...d.rows.map((r, i) => [{ text: r, options: { bold: true, color: hex(col.ink), fontSize: ms } }, ...d.cols.map((_, j) => {
+      ["", ...d.cols].map((v) => ({ text: plain(v), options: { bold: true, color: hex(col.brandDeep), fontSize: ms, align: "center" as const } })),
+      ...d.rows.map((r, i) => [{ text: plain(r), options: { bold: true, color: hex(col.ink), fontSize: ms } }, ...d.cols.map((_, j) => {
         const v = d.cells[i]?.[j] ?? "";
         const yes = YES_RE.test(v.trim());
         const no = NO_RE.test(v.trim());
@@ -381,10 +387,11 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
       const fh = availH - (s.image?.caption ? 0.45 : 0);
       const data = s.image?.mediaId ? mediaData(c.userId, s.image.mediaId) : null;
       if (data) ps.addImage({ data, x: contentX, y: y0, w: fw, h: fh, sizing: { type: "contain", w: fw, h: fh } });
-      else if (s.image?.url) ps.addImage({ path: s.image.url, x: contentX, y: y0, w: fw, h: fh, sizing: { type: "contain", w: fw, h: fh } });
+      else if (s.image?.url && c.urls.get(s.image.url)) ps.addImage({ data: c.urls.get(s.image.url)!, x: contentX, y: y0, w: fw, h: fh, sizing: { type: "contain", w: fw, h: fh } });
       else {
         ps.addShape(c.pres.ShapeType.roundRect, { x: contentX, y: y0, w: fw, h: fh, fill: { color: hex(col.surface) }, line: { color: hex(col.line), width: 1.5, dashType: "dash" }, rectRadius: 0.15 });
-        ps.addText(s.image?.prompt ? `${c.lang === "ms" ? "Gambar" : "Figure"}: ${s.image.prompt}` : c.lang === "ms" ? "Tiada gambar dipilih" : "No picture chosen", { x: contentX + 0.4, y: y0, w: fw - 0.8, h: fh, fontSize: fitFont(s.image?.prompt ?? "", fw - 0.8, fh, 13, 7), color: hex(col.muted), align: "center", valign: "middle", fontFace: fontOk(t.fontBody), fit: "shrink" });
+        const ph = plain(s.image?.prompt ? `${c.lang === "ms" ? "Gambar" : "Figure"}: ${s.image.prompt}` : c.lang === "ms" ? "Tiada gambar dipilih" : "No picture chosen");
+        ps.addText(ph, { x: contentX + 0.4, y: y0, w: fw - 0.8, h: fh, fontSize: fitFont(ph, fw - 0.8, fh, 13, 7), color: hex(col.muted), align: "center", valign: "middle", fontFace: fontOk(t.fontBody), fit: "shrink" });
       }
       if (side) bullets(ps, s.bullets!, contentX + contentW - side, y0 + 0.2, side, availH - 0.4, c, 14);
       if (s.image?.caption) fitText(ps, s.image.caption, { x: contentX, y: bodyBottom - 0.4, w: contentW, h: 0.35 }, 11, { color: hex(col.muted), fontFace: fontOk(t.fontBody), valign: "top" });
@@ -397,17 +404,24 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     }
     case "kpi": {
       const items = s.kpi ?? [];
-      const n = Math.min(Math.max(items.length, 1), 4);
+      // Every figure is drawn: rows of up to four, as on screen.
+      const perRow = Math.min(Math.max(items.length, 1), 4);
+      const rowsN = Math.max(1, Math.ceil(items.length / 4));
       const gap = 0.3;
-      const tw = (contentW - gap * (n - 1)) / n;
-      const th = Math.min(availH - (s.body ? 0.5 : 0), 2.6);
-      const ty = y0 + (availH - th - (s.body ? 0.5 : 0)) / 2;
-      items.slice(0, 4).forEach((k, j) => {
+      const tw = (contentW - gap * (perRow - 1)) / perRow;
+      const room = availH - (s.body ? 0.5 : 0);
+      const th = Math.min(2.6, (room - gap * (rowsN - 1)) / rowsN);
+      const top = y0 + (room - (th * rowsN + gap * (rowsN - 1))) / 2;
+      items.forEach((k, idx) => {
+        const j = idx % 4;
+        const ty = top + Math.floor(idx / 4) * (th + gap);
         const x = contentX + j * (tw + gap);
         panel(ps, x, ty, tw, th, c);
-        ps.addText(plain(k.value), { x: x + 0.2, y: ty + 0.25, w: tw - 0.4, h: 1.1, fontSize: fitFont(plain(k.value), tw - 0.4, 1.1, 40, 12, { bold: true, maxLines: 1 }), bold: true, color: hex(col.brandDeep), fontFace: fontOk(t.fontDisplay), valign: "middle", fit: "shrink" });
-        ps.addText(plain(k.label), { x: x + 0.2, y: ty + 1.35, w: tw - 0.4, h: 0.6, fontSize: fitFont(plain(k.label), tw - 0.4, 0.6, 13, 7, { bold: true }), bold: true, color: hex(col.ink), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
-        if (k.note) fitText(ps, k.note, { x: x + 0.2, y: ty + 1.9, w: tw - 0.4, h: Math.max(0.25, th - 2) }, 10, { color: hex(col.muted), fontFace: fontOk(t.fontBody), valign: "top" });
+        const vh = Math.min(1.1, th * 0.42);
+        ps.addText(plain(k.value), { x: x + 0.2, y: ty + th * 0.1, w: tw - 0.4, h: vh, fontSize: fitFont(plain(k.value), tw - 0.4, vh, 40, 10, { bold: true, maxLines: 1 }), bold: true, color: hex(col.brandDeep), fontFace: fontOk(t.fontDisplay), valign: "middle", fit: "shrink" });
+        const lh = Math.min(0.6, th * 0.25);
+        ps.addText(plain(k.label), { x: x + 0.2, y: ty + th * 0.1 + vh + 0.05, w: tw - 0.4, h: lh, fontSize: fitFont(plain(k.label), tw - 0.4, lh, 13, 6, { bold: true }), bold: true, color: hex(col.ink), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
+        if (k.note) fitText(ps, k.note, { x: x + 0.2, y: ty + th * 0.1 + vh + lh + 0.1, w: tw - 0.4, h: Math.max(0.2, th - (th * 0.1 + vh + lh + 0.2)) }, 10, { color: hex(col.muted), fontFace: fontOk(t.fontBody), valign: "top" });
       });
       if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
       break;
@@ -423,11 +437,20 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
   chrome(ps, s, i, c);
 }
 
-export async function deckToPptx(deck: Deck, userId: string): Promise<Buffer> {
+export async function deckToPptx(rawDeck: Deck, userId: string): Promise<Buffer> {
+  const deck: Deck = { ...rawDeck, lang: rawDeck.lang === "ms" ? "ms" : "en", theme: sanitizeTheme(rawDeck.theme), slides: (rawDeck.slides ?? []).map((x) => sanitizeSlide(x)) };
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
-  pres.title = deck.title;
-  const ctx: Ctx = { pres, theme: deck.theme, userId, total: deck.slides.length, lang: deck.lang };
+  pres.title = plain(deck.title);
+  // A picture given by address is fetched here, under rules, never handed to pptxgenjs to fetch:
+  // it would read a local path from disk and crash the process on an unreachable host.
+  const urls = new Map<string, string>();
+  const wanted = [...new Set(deck.slides.map((x) => (x.layout === "image" && !x.image?.mediaId ? x.image?.url : undefined)).filter((u): u is string => !!u))].slice(0, 20);
+  await Promise.all(wanted.map(async (u) => {
+    const d = await fetchPicture(u);
+    if (d) urls.set(u, d);
+  }));
+  const ctx: Ctx = { pres, theme: deck.theme, userId, total: deck.slides.length, lang: deck.lang, urls };
   deck.slides.forEach((s, i) => addSlide(deck, s, i, ctx));
   const out = await pres.write({ outputType: "nodebuffer" });
   return Buffer.isBuffer(out) ? out : Buffer.from(out as ArrayBuffer);

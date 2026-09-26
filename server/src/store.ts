@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizeSlide, type Deck, type SourceRef } from "@slidecraft/shared";
+import { sanitizeSlide, sanitizeTheme, type Deck, type SourceRef } from "@slidecraft/shared";
 import { getDb, now, uid } from "./db.js";
 import { config } from "./config.js";
 
@@ -10,6 +10,7 @@ export function loadDeck(userId: string, id: string): Deck | null {
   const deck = JSON.parse(row.doc) as Deck;
   // A slide saved in a shape the renderer cannot draw would blank the whole editor.
   deck.slides = (Array.isArray(deck.slides) ? deck.slides : []).map((x) => sanitizeSlide(x));
+  deck.theme = sanitizeTheme(deck.theme);
   deck.sources = listSourceRefs(id);
   return deck;
 }

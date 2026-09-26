@@ -60,7 +60,8 @@ function cell(v: string): string {
 function cardsHtml(s: Slide): string {
   const items = s.cards ?? [];
   const n = items.length;
-  const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : 3;
+  // Wide grids for many cards, so ten or twelve still read at a useful size.
+  const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : n <= 6 || n === 9 ? 3 : 4;
   return `<div class="sc-cards" style="--cols:${cols}">${items
     .map((c, i) => {
       const tone = c.tag ? verdictTone(c.tag) : "";

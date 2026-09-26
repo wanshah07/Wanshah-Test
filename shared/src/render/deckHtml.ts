@@ -3,12 +3,20 @@ import { esc } from "./escape.js";
 import { SLIDE_CSS } from "./css.js";
 import { renderDeckSlides } from "./html.js";
 import { fitSlide } from "./fit.js";
-import { fontsUrl } from "../theme.js";
+import { fontsUrl, sanitizeTheme } from "../theme.js";
+import { sanitizeSlide } from "../deck.js";
 
 // A self-contained HTML deck: every slide, keyboard and click navigation,
 // speaker notes on N, the fonts linked. Pictures arrive as data URIs from the
 // server so the file opens anywhere with no network beyond the fonts.
-export function renderDeckHtml(deck: Deck, mediaUrl: (id: string) => string): string {
+/** JSON that is safe inside a <script> element: no "</script>", no line separators that end a JS string. */
+function scriptJson(v: unknown): string {
+  return JSON.stringify(v).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+
+export function renderDeckHtml(rawDeck: Deck, mediaUrl: (id: string) => string): string {
+  // The deck as the page will show it: every slide and the theme in the shapes the renderer trusts.
+  const deck: Deck = { ...rawDeck, lang: rawDeck.lang === "ms" ? "ms" : "en", theme: sanitizeTheme(rawDeck.theme), slides: (rawDeck.slides ?? []).map((s) => sanitizeSlide(s)) };
   const slides = renderDeckSlides(deck, mediaUrl);
   const fonts = fontsUrl(deck.theme);
   const notes = deck.slides.map((s) => s.notes ?? "");
@@ -48,7 +56,7 @@ ${SLIDE_CSS}
 <div id="hud"><span id="pos"></span><span>← → navigate · N notes · G grid · F fullscreen</span></div>
 <script>
 (function(){
-  var notes=${JSON.stringify(notes)};
+  var notes=${scriptJson(notes)};
   var frame=document.getElementById('frame'),slides=Array.prototype.slice.call(frame.children);
   var i=0,hud=document.getElementById('hud'),pos=document.getElementById('pos'),nb=document.getElementById('notesBody'),np=document.getElementById('notes'),grid=document.getElementById('grid');
   function fit(){var np2=np.classList.contains('on')?np.offsetWidth:0;var w=window.innerWidth-np2,h=window.innerHeight;var s=Math.min(w/1920,h/1080);frame.style.transform='scale('+s+')';frame.style.marginRight=np2+'px'}

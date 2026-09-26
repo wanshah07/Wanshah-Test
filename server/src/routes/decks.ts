@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { LAYOUTS, newId, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
+import { LAYOUTS, newId, sanitizeSlide, sanitizeTheme, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
 import { getDb, now } from "../db.js";
 import { loadDeck, saveDeck } from "../store.js";
 import { newDeck } from "../llm/generate.js";
@@ -48,7 +48,8 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     if (!validDeck(body) || body.id !== id) return reply.code(400).send({ error: "invalid_deck" });
     // Sources, the OneDrive link and the stored brief are the server's: an editor tab opened
     // before an import must not wipe the link when it autosaves.
-    const next: Deck = { ...body, createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief };
+    // Saved in the shapes the renderer and exporter trust: a colour is a colour, a table is square.
+    const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief };
     if (!next.onedrive) delete next.onedrive;
     if (!next.brief) delete next.brief;
     saveDeck(req.user.id, next);
