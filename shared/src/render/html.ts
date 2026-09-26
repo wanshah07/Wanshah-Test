@@ -2,7 +2,7 @@ import type { Deck, Slide, Theme } from "../deck.js";
 import { fontStack } from "../theme.js";
 import { esc, inline } from "./escape.js";
 import { chartSvg } from "./charts.js";
-import { diagramSvg } from "./diagrams.js";
+import { diagramHtml } from "./diagrams.js";
 
 export interface RenderCtx {
   index: number;
@@ -99,7 +99,7 @@ export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
       body = `${heading(s, s.subtitle ? undefined : sectionKicker(s, ctx))}<div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}`;
       break;
     case "bullets":
-      body = `${heading(s)}<div class="sc-content">${s.body ? `<p class="sc-prose" style="margin-bottom:24px;font-size:32px;color:var(--ink2)">${inline(s.body)}</p>` : ""}${bulletsHtml(s.bullets)}</div>`;
+      body = `${heading(s)}<div class="sc-content">${s.body ? `<p class="sc-prose" style="margin-bottom:24px;font-size:calc(32px * var(--k, 1));color:var(--ink2)">${inline(s.body)}</p>` : ""}${bulletsHtml(s.bullets)}</div>`;
       break;
     case "two-column":
       body = `${heading(s)}<div class="sc-cols"><div class="sc-col">${s.leftHeading ? `<h3>${inline(s.leftHeading)}</h3>` : ""}${bulletsHtml(s.bullets)}</div><div class="sc-col">${s.rightHeading ? `<h3>${inline(s.rightHeading)}</h3>` : ""}${bulletsHtml(s.bulletsRight)}</div></div>`;
@@ -124,8 +124,8 @@ export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
       break;
     }
     case "diagram": {
-      const svg = s.diagram ? diagramSvg(s.diagram, c, 1600, 620, font, t.radius) : placeholder("No diagram", ctx.lang);
-      body = `${heading(s)}<div class="sc-content"><div class="sc-fig">${svg}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:26px">${inline(s.body)}</p>` : ""}</div>`;
+      const dg = s.diagram ? diagramHtml(s.diagram) : placeholder("No diagram", ctx.lang);
+      body = `${heading(s)}<div class="sc-content"><div class="sc-diagram">${dg}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:calc(26px * var(--k, 1))">${inline(s.body)}</p>` : ""}</div>`;
       break;
     }
     case "image": {
@@ -138,7 +138,7 @@ export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
       break;
     }
     case "cards":
-      body = `${heading(s)}<div class="sc-content">${cardsHtml(s)}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:26px">${inline(s.body)}</p>` : ""}`;
+      body = `${heading(s)}<div class="sc-content">${cardsHtml(s)}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:calc(26px * var(--k, 1))">${inline(s.body)}</p>` : ""}`;
       break;
     case "quote":
       body = `${heading(s)}<div class="sc-quote"><p class="q">${inline(s.quote?.text ?? "")}</p>${s.quote?.by ? `<p class="by">${inline(s.quote.by)}</p>` : ""}</div>`;
@@ -147,7 +147,7 @@ export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
       const items = s.kpi ?? [];
       body = `${heading(s)}<div class="sc-kpis" style="--kpi-n:${Math.min(Math.max(items.length, 1), 4)}">${items
         .map((k) => `<div class="sc-kpi"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div>${k.note ? `<div class="n">${inline(k.note)}</div>` : ""}</div>`)
-        .join("")}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:26px">${inline(s.body)}</p>` : ""}`;
+        .join("")}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:calc(26px * var(--k, 1))">${inline(s.body)}</p>` : ""}`;
       break;
     }
     default:

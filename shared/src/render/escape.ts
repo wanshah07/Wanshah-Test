@@ -13,6 +13,5 @@ export function inline(s: string): string {
   t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   t = t.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
   t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
-  t = t.replace(/\[SAHKAN:([^\]]*)\]/g, '<mark class="sahkan">[SAHKAN:$1]</mark>');
   return t;
 }

@@ -46,12 +46,14 @@ interface MsRow {
   cz_key_enc: string | null;
   cz_account: string | null;
   cz_account_label: string | null;
+  /** Composio's user id that owns the connected account; tool calls must name it. */
+  cz_user: string | null;
 }
 
-const EMPTY_ROW: MsRow = { ms_client_id: null, ms_refresh_enc: null, ms_account: null, ms_folder: null, od_provider: null, cz_key_enc: null, cz_account: null, cz_account_label: null };
+const EMPTY_ROW: MsRow = { ms_client_id: null, ms_refresh_enc: null, ms_account: null, ms_folder: null, od_provider: null, cz_key_enc: null, cz_account: null, cz_account_label: null, cz_user: null };
 
 function row(userId: string): MsRow {
-  const r = getDb().prepare("SELECT ms_client_id, ms_refresh_enc, ms_account, ms_folder, od_provider, cz_key_enc, cz_account, cz_account_label FROM settings WHERE user_id = ?").get(userId) as MsRow | undefined;
+  const r = getDb().prepare("SELECT ms_client_id, ms_refresh_enc, ms_account, ms_folder, od_provider, cz_key_enc, cz_account, cz_account_label, cz_user FROM settings WHERE user_id = ?").get(userId) as MsRow | undefined;
   return r ?? EMPTY_ROW;
 }
 
@@ -113,10 +115,12 @@ export function saveOneDriveSettings(userId: string, b: { clientId?: string | nu
     // A new key may belong to another project, where the old account id means nothing.
     patch.cz_account = null;
     patch.cz_account_label = null;
+    patch.cz_user = null;
   }
   if (b.composioAccount !== undefined) {
     patch.cz_account = (b.composioAccount ?? "").trim() || null;
     patch.cz_account_label = (b.composioAccountLabel ?? "").trim() || null;
+    patch.cz_user = null;
   }
   if (b.clientId !== undefined) {
     const id = (b.clientId ?? "").trim();
@@ -129,7 +133,7 @@ export function saveOneDriveSettings(userId: string, b: { clientId?: string | nu
 
 export function disconnect(userId: string): void {
   if (providerFor(userId) === "composio") {
-    write(userId, { cz_key_enc: null, cz_account: null, cz_account_label: null });
+    write(userId, { cz_key_enc: null, cz_account: null, cz_account_label: null, cz_user: null });
     return;
   }
   write(userId, { ms_refresh_enc: null, ms_account: null });
@@ -428,14 +432,35 @@ export async function composioAccounts(key: string): Promise<{ id: string; label
     });
 }
 
+/** The Composio user id a connected account belongs to: Composio refuses a tool call that names the account without it. */
+async function composioOwner(key: string, account: string): Promise<string> {
+  const pick = (a: Record<string, unknown> | undefined) => String(a?.user_id ?? (a?.user as { id?: string } | undefined)?.id ?? "").trim();
+  try {
+    const one = pick(await composioFetch(key, "GET", `/connected_accounts/${encodeURIComponent(account)}`));
+    if (one) return one;
+  } catch (e) {
+    if (e instanceof OneDriveError && e.code === "composio_key") throw e;
+  }
+  const list = await composioFetch(key, "GET", "/connected_accounts?toolkit_slugs=one_drive&limit=50");
+  const found = pick(((list.items as Record<string, unknown>[] | undefined) ?? []).find((a) => a.id === account));
+  if (found) return found;
+  throw new OneDriveError("Composio did not say which user owns the chosen OneDrive account. Press Find my OneDrive accounts and pick it again.", "composio_error");
+}
+
 let composioVersion: "latest" | null = "latest";
 
 /** Runs one Composio tool and returns its data, or throws with Composio's own message. */
 async function composioTool(userId: string, slug: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   const key = composioKey(userId);
-  const account = row(userId).cz_account;
+  const r = row(userId);
+  const account = r.cz_account;
   if (!key || !account) throw new OneDriveError("Composio is not set up. Add the API key and pick the OneDrive account in Settings.", "not_connected");
-  const call = (version: string | null) => composioFetch(key, "POST", `/tools/execute/${slug}`, { connected_account_id: account, arguments: args, ...(version ? { version } : {}) });
+  let owner = r.cz_user;
+  if (!owner) {
+    owner = await composioOwner(key, account);
+    write(userId, { cz_user: owner });
+  }
+  const call = (version: string | null) => composioFetch(key, "POST", `/tools/execute/${slug}`, { connected_account_id: account, user_id: owner, arguments: args, ...(version ? { version } : {}) });
   let j: Record<string, unknown>;
   try {
     j = await call(composioVersion);

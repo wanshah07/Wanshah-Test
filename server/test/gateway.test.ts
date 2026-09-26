@@ -12,6 +12,10 @@ interface Behaviour {
   refuseMaxCompletion?: boolean;
   fenced?: boolean;
   silent?: boolean;
+  /** Gemini: a list-shaped error, with a reason that never says "schema". */
+  gemini?: boolean;
+  geminiModels?: boolean;
+  badModel?: boolean;
 }
 
 let behaviour: Behaviour = {};
@@ -29,7 +33,8 @@ beforeAll(async () => {
       if (behaviour.silent) return; // accept, never answer
       if (req.url === "/v1/models") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ data: [{ id: "claude-sonnet" }, { id: "gpt-4.1" }, { id: "llama-3" }] }));
+        if (behaviour.geminiModels) res.end(JSON.stringify({ object: "list", data: ["models/gemini-2.5-flash", "models/gemini-2.5-flash-preview-image", "models/imagen-4.0-generate-001", "models/text-embedding-004", "models/gemini-2.5-flash-preview-tts", "models/gemini-2.5-pro"].map((id) => ({ id, object: "model" })) }));
+        else         res.end(JSON.stringify({ data: [{ id: "claude-sonnet" }, { id: "gpt-4.1" }, { id: "llama-3" }] }));
         return;
       }
       const body = raw ? JSON.parse(raw) : {};
@@ -38,6 +43,12 @@ beforeAll(async () => {
         res.writeHead(400, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: { message: msg, type: "invalid_request_error" } }));
       };
+      const geminiFail = (msg: string) => {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify([{ error: { code: 400, message: msg, status: "INVALID_ARGUMENT" } }]));
+      };
+      if (behaviour.badModel) return geminiFail("* GenerateContentRequest.model: unexpected model name format");
+      if (behaviour.gemini && body.response_format?.type === "json_schema") return geminiFail('Invalid JSON payload received. Unknown name "additionalProperties" at \'generation_config.response_schema\': Cannot find field.');
       if (behaviour.refuseMaxCompletion && "max_completion_tokens" in body) return fail("Unrecognized request argument supplied: max_completion_tokens");
       if (behaviour.refuseSchema && body.response_format?.type === "json_schema") return fail("response_format json_schema is not supported by this model");
       const content = JSON.stringify({ title: "ok", n: 1 });
@@ -58,6 +69,31 @@ const auth = (): LlmAuth => ({ apiKey: "k", model: "claude-sonnet", imageModel: 
 const args = () => ({ auth: auth(), system: "sys", user: "u", schemaName: "t", schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] } });
 
 describe("gateway compatibility", () => {
+  it("lists only models that can write, with Gemini's models/ prefix removed, and picture models apart", async () => {
+    behaviour = { geminiModels: true };
+    const r = await checkKey("k", base);
+    behaviour = {};
+    expect(r.models).toEqual(["gemini-2.5-flash", "gemini-2.5-pro"]);
+    expect(r.imageModels).toEqual(["gemini-2.5-flash-preview-image", "imagen-4.0-generate-001"]);
+  });
+
+  it("falls back to plain JSON when Gemini refuses the strict schema in its own words", async () => {
+    behaviour = { gemini: true };
+    seen.length = 0;
+    expect(await chatJson(args())).toEqual({ title: "ok", n: 1 });
+    expect(seen.map((b) => (b.response_format as { type: string }).type)).toEqual(["json_schema", "json_object"]);
+    behaviour = {};
+  });
+
+  it("shows Gemini's own reason when it refuses a request", async () => {
+    behaviour = { badModel: true };
+    const e = await chatJson(args()).catch((x) => x);
+    behaviour = {};
+    expect(e).toBeInstanceOf(LlmError);
+    expect(e.message).toMatch(/answered 400: \* GenerateContentRequest\.model: unexpected model name format/);
+    expect(e.code).toBe("INVALID_ARGUMENT");
+  });
+
   it("uses strict json_schema when the endpoint accepts it", async () => {
     behaviour = {};
     seen.length = 0;

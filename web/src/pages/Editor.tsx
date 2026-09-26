@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, sahkanCount, type Deck, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, type Deck, type FitResult, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
 import { api, type Job } from "../api";
 import { SlideFrame } from "../components/SlideFrame";
 import { SlideInspector } from "../components/SlideInspector";
@@ -37,7 +37,7 @@ export default function Editor() {
   }, [id]);
 
   const slop = useMemo(() => (deck ? scanDeck(deck) : {}), [deck]);
-  const sahkan = useMemo(() => (deck ? sahkanCount(deck) : 0), [deck]);
+  const [fit, setFit] = useState<FitResult | null>(null);
   const slopCount = Object.values(slop).reduce((a, h) => a + h.length, 0);
   const okCount = deck ? deck.slides.filter((x) => x.review?.ok).length : 0;
   const waitingCount = deck ? deck.slides.reduce((a, x) => a + pendingFeedback(x).length, 0) : 0;
@@ -172,7 +172,6 @@ export default function Editor() {
           <span className="pill">{ANGLES.find((a) => a.id === deck.angle)?.name ?? deck.angle}</span>
         </div>
         <div className="row">
-          {sahkan > 0 && <span className="pill warn" title="Facts the writer could not source. Search for each, then edit the marker away.">{sahkan} SAHKAN</span>}
           {slopCount > 0 && <span className="pill danger" title="Wording flagged by the de-slop scan">{slopCount} flagged</span>}
           {deck.slides.length > 0 && <span className={"pill" + (okCount === deck.slides.length ? " ok" : "")} title="Slides you have marked OK">{okCount}/{deck.slides.length} OK</span>}
           {waitingCount > 0 && (
@@ -219,9 +218,14 @@ export default function Editor() {
             <>
               <div className="canvasWrap" style={{ padding: 18 }}>
                 <div style={{ width: "100%", maxWidth: 1100 }}>
-                  <SlideFrame slide={slide} theme={deck.theme} index={sel} total={deck.slides.length} lang={deck.lang} />
+                  <SlideFrame slide={slide} theme={deck.theme} index={sel} total={deck.slides.length} lang={deck.lang} onFit={setFit} />
                 </div>
               </div>
+              {fit?.overflow || fit?.tooSmall ? (
+                <div className="banner warn" data-testid="fit-over">This slide has so much text it had to shrink below half size to fit. Shorten it, move detail to the notes, split it in two, or show it as a chart, diagram or picture.</div>
+              ) : fit && fit.scale < 0.85 ? (
+                <p className="small muted" data-testid="fit-shrunk">Text shrunk to {Math.round(fit.scale * 100)}% to fit. Shorter text reads better from the back of the room.</p>
+              ) : null}
               <ReviewBar deckId={deck.id} slide={slide} index={sel} beforeCall={flushNow} onSlide={replaceSlide} />
               {slide.notes && (
                 <div className="card tight small" style={{ whiteSpace: "pre-line" }}>
@@ -246,7 +250,7 @@ export default function Editor() {
           {tab === "slide" && slide && <SlideInspector deckId={deck.id} slide={slide} hits={slop[slide.id] ?? []} lang={deck.lang} theme={deck.theme} onChange={setSlide} onRewrite={rewrite} />}
           {tab === "slide" && !slide && <p className="muted small">No slide selected.</p>}
           {tab === "theme" && <ThemePanel deckId={deck.id} theme={deck.theme} designId={deck.designId} onChange={setTheme} onDesign={(t, designId) => update({ ...deck, theme: t, designId })} />}
-          {tab === "export" && <ExportPanel deck={deck} sahkan={sahkan} slopCount={slopCount} />}
+          {tab === "export" && <ExportPanel deck={deck} slopCount={slopCount} />}
           {tab === "sources" && <SourcesPanel deck={deck} onDeck={(d) => { setDeck(d); latest.current = d; setSel(0); setSaving("saved"); }} />}
         </aside>
       </div>
@@ -263,12 +267,11 @@ export default function Editor() {
   );
 }
 
-function ExportPanel({ deck, sahkan, slopCount }: { deck: Deck; sahkan: number; slopCount: number }) {
+function ExportPanel({ deck, slopCount }: { deck: Deck; slopCount: number }) {
   return (
     <div className="stack">
-      {sahkan > 0 && <div className="banner warn">{sahkan} unresolved [SAHKAN] marker{sahkan === 1 ? "" : "s"}. They print on the slides in yellow until you replace each with the sourced fact.</div>}
       {slopCount > 0 && <div className="banner warn">{slopCount} flagged phrase{slopCount === 1 ? "" : "s"} left. Open each slide's inspector to see them, or rewrite the slide.</div>}
-      {sahkan === 0 && slopCount === 0 && <div className="banner info">No unresolved markers and nothing flagged.</div>}
+      {slopCount === 0 && <div className="banner info">Nothing flagged.</div>}
       <a className="btn btn-primary" href={`/api/decks/${deck.id}/export.pptx`}>PowerPoint (.pptx)</a>
       <p className="small muted">Native text, charts, tables and shapes. Edit anything in PowerPoint or Keynote. Fonts fall back to the machine's if {deck.theme.fontDisplay} or {deck.theme.fontBody} is not installed.</p>
       <a className="btn btn-ghost" href={`/api/decks/${deck.id}/export.html`}>Web deck (.html)</a>

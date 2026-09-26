@@ -16,6 +16,8 @@ export interface SettingsRow {
 export const PROVIDERS: { id: string; name: string; baseUrl: string }[] = [
   { id: "openai", name: "OpenAI", baseUrl: "https://api.openai.com/v1" },
   { id: "mireld", name: "Mireld", baseUrl: "https://api.mireld.my/v1" },
+  // Google's OpenAI-compatible endpoint: reads pictures, follows a JSON schema, has a free tier.
+  { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
 ];
 
 export function normaliseBase(url: string): string {

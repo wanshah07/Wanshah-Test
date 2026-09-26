@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { THEME_PRESETS } from "@slidecraft/shared";
 import { api, type OneDriveStatus, type Settings as S } from "../api";
+import { ReaderCard } from "../components/ReaderCard";
 import { toast } from "../components/Toast";
 import { ThemeCards } from "../components/ThemeCards";
 import { applyAppTheme, type AppTheme } from "../lib/theme";
@@ -14,6 +15,7 @@ export default function Settings() {
   const [testMsg, setTestMsg] = useState("");
   const [testOk, setTestOk] = useState(false);
   const [models, setModels] = useState<string[]>([]);
+  const [imageModels, setImageModels] = useState<string[]>([]);
   const [provider, setProvider] = useState("openai");
   const [baseUrl, setBaseUrl] = useState("");
   const [od, setOd] = useState<OneDriveStatus | null>(null);
@@ -87,6 +89,7 @@ export default function Settings() {
       setTestMsg(r.message);
       setTestOk(r.ok);
       setModels(r.models ?? []);
+      setImageModels(r.imageModels ?? []);
       // Only the picture answer changes; reloading everything would drop an unsaved model name.
       if (r.vision === "yes" || r.vision === "no" || r.vision === "unknown") setS((x) => (x ? { ...x, vision: r.vision as S["vision"] } : x));
     } finally {
@@ -195,7 +198,7 @@ export default function Settings() {
           {s.key.own && <button className="btn btn-quiet" onClick={clearKey}>Remove my key</button>}
         </div>
         <p className="small muted">
-          Reads pictures: <b>{s.vision === "yes" ? "yes" : s.vision === "no" ? "no" : "not checked yet"}</b>
+          {s.reader.complete ? <>Pictures are read by the picture reader below ({s.reader.model}): </> : "Reads pictures: "}<b>{s.vision === "yes" ? "yes" : s.vision === "no" ? "no" : "not checked yet"}</b>
           {s.vision === "no" ? ". Pictures you upload as sources are used only as slide pictures, and you are asked before a deck is written." : s.vision === "yes" ? ". Pictures you upload as sources are read before a deck is written." : ". Press Test to check."}
         </p>
         {testMsg && <div className={"banner " + (testOk ? "info" : "danger")}>{testMsg}</div>}
@@ -205,7 +208,14 @@ export default function Settings() {
             {models.length > 40 ? ` and ${models.length - 40} more` : ""}. Click one to put it in the writer model box below.
           </p>
         )}
+        {imageModels.length > 0 && (
+          <p className="small muted">
+            Picture models (not writers; used only when slide pictures are generated): {imageModels.slice(0, 20).map((m, i) => <span key={m}>{i ? ", " : ""}<a href="#" onClick={(e) => { e.preventDefault(); setImageModel(m); }}>{m}</a></span>)}. Click one to put it in the image model box below.
+          </p>
+        )}
       </section>
+
+      <ReaderCard s={s} onSaved={load} />
 
       <section className="card stack">
         <h2>OneDrive pictures</h2>

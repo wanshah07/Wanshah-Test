@@ -11,6 +11,7 @@ import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
 import { resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
 import { getDesign, promptTexts } from "../library.js";
+import { pictureAuth } from "../reader.js";
 
 export interface Job {
   id: string;
@@ -88,8 +89,36 @@ export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): 
   p.slides = Math.max(6, Math.min(30, Math.round(Number(plan.slides) || 12)));
   if (!p.title && plan.title?.trim()) p.title = plan.title.trim().slice(0, 140);
   const f = plan.features ?? ({} as Plan["features"]);
-  p.features = { ...p.features, charts: !!f.charts, tables: !!f.tables, diagrams: !!f.diagrams, kpis: !!f.kpis, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
+  // Diagrams and big numbers stay available whatever the plan says: they are how a slide carries a
+  // point without a paragraph, and the writer only uses a number tile when the sources give numbers.
+  p.features = { ...p.features, charts: !!f.charts, tables: !!f.tables, diagrams: true, kpis: true, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
   p.imageMode = hasPictures ? "uploaded" : "none";
+}
+
+/** The planner's own message: the brief and a short look at each source, and a clear instruction not to write the deck. */
+export function planUser(p: GenerateParams, sources: { name: string; kind: string; text: string }[]): string {
+  const parts = [
+    "TASK: choose the settings for a slide deck. Do NOT write the deck, its slides or any outline. Answer with the settings JSON only.",
+    `BRIEF: ${p.prompt.trim()}`,
+  ];
+  if (p.title) parts.push(`DECK TITLE: ${p.title}`);
+  if (sources.length) {
+    parts.push(`SOURCES (${sources.length}; the start of each):`);
+    for (const x of sources.slice(0, 30)) parts.push(x.kind === "image" ? `- Picture: ${x.name}` : `- ${x.name} (${x.kind}): ${x.text.slice(0, 1500).replace(/\s+/g, " ")}`);
+  } else parts.push("SOURCES: none.");
+  return parts.join("\n");
+}
+
+/** Settings used when the model will not plan: the form's angle, a length that fits the material, every visual it can fill. */
+export function fallbackPlan(p: GenerateParams, hasNumbers: boolean, sourceCount: number): Plan {
+  return {
+    title: null,
+    angle: p.angle,
+    audience: p.audience || "professional readers",
+    slides: sourceCount >= 4 ? 14 : 10,
+    features: { charts: hasNumbers, tables: true, diagrams: true, kpis: true, sections: sourceCount >= 4, summary: true, qa: false },
+    reason: "Standard settings, because the model did not return a plan.",
+  };
 }
 
 export function mockPlan(p: GenerateParams, hasNumbers: boolean): Plan {
@@ -201,15 +230,27 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         log(jobId, `OneDrive not read (${(e as Error).message}). Using the pictures already pulled.`);
       }
     }
-    if (auth) await readUploadedPictures(jobId, userId, deckId, auth);
+    const reader = config.mockLlm ? null : pictureAuth(userId);
+    if (reader) await readUploadedPictures(jobId, userId, deckId, reader);
     const rows = listSources(deckId);
     const { sources, condensed } = await prepareSources(jobId, auth, p, rows);
     if (p.auto) {
       log(jobId, "Auto: reading the material to choose the angle, audience, length and layouts");
       const hasPictures = rows.some((r) => r.kind === "image" && r.media_id);
-      const plan: Plan = config.mockLlm || !auth
-        ? mockPlan(p, sources.some((x) => /\d{2,}/.test(x.text)))
-        : await chatJson({ auth, system: planSystem(), user: userPrompt(p, sources.map((x) => ({ ...x, text: x.text.slice(0, 12000) })), condensed), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+      const hasNumbers = sources.some((x) => /\d{2,}/.test(x.text));
+      let plan: Plan;
+      if (config.mockLlm || !auth) plan = mockPlan(p, hasNumbers);
+      else {
+        try {
+          plan = await chatJson({ auth, system: planSystem(), user: planUser(p, sources), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+        } catch (e) {
+          // The plan only picks settings; a model that will not give one still gets to write the deck.
+          if (!(e instanceof LlmError) || !["parse", "length", "unsupported"].includes(String(e.code))) throw e;
+          log(jobId, `Auto: the model did not return a plan (${e.message}), so standard settings are used`);
+          if (e.raw !== undefined) log(jobId, `Model reply (first ${RAW_KEEP} characters): ${e.raw || "(empty)"}`);
+          plan = fallbackPlan(p, hasNumbers, sources.length);
+        }
+      }
       applyPlan(p, plan, hasPictures);
       const on = (["charts", "tables", "diagrams", "kpis", "sections"] as const).filter((k) => p.features[k]);
       log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}. ${plan.reason}`);
@@ -328,7 +369,7 @@ export function newDeck(userId: string, title: string, lang: "en" | "ms", angle:
 
 /** The instruction the writer gets for a slide's saved feedback. */
 export function feedbackInstruction(items: string[]): string {
-  return `Apply this feedback from the presenter to the slide. Change what it asks; keep every other fact, citation and [SAHKAN] marker.\n${items.map((t) => `- ${t}`).join("\n")}`;
+  return `Apply this feedback from the presenter to the slide. Change what it asks; keep every other fact and citation.\n${items.map((t) => `- ${t}`).join("\n")}`;
 }
 
 /** Applies every slide's waiting feedback, one slide at a time, as a job. */
@@ -378,10 +419,12 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
   const pics = unreadPictures(listSources(deckId));
   if (!pics.length) return;
   const v = await visionFor(userId, auth);
-  if (v !== "yes") {
-    log(jobId, `${pics.length} picture source${pics.length === 1 ? "" : "s"} used only as slide pictures: ${v === "no" ? `${auth.model} cannot read pictures` : "could not check whether the writer model reads pictures"}, so text inside them does not reach the deck.`);
+  if (v === "no") {
+    log(jobId, `${pics.length} picture source${pics.length === 1 ? "" : "s"} used only as slide pictures: ${auth.model} cannot read pictures, so text inside them does not reach the deck.`);
     return;
   }
+  // Unconfirmed is not a no: try, and a picture the model refuses is logged and left as a slide picture.
+  if (v === "unknown") log(jobId, `Could not confirm that ${auth.model} reads pictures; trying anyway.`);
   let n = 0;
   for (const r of pics.slice(0, READ_LIMIT)) {
     const m = r.media_id ? getMedia(userId, r.media_id) : null;
@@ -391,7 +434,7 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
       continue;
     }
     n++;
-    log(jobId, `Reading picture ${n}: ${r.rel_path || r.name}`);
+    log(jobId, `Reading picture ${n} with ${auth.model}: ${r.rel_path || r.name}`);
     try {
       const text = await readPicture(auth, r.rel_path || r.name, fs.readFileSync(m.path), m.mime);
       getDb().prepare("UPDATE sources SET text = ?, chars = ? WHERE id = ?").run(text, text === NOTHING ? 0 : text.length, r.id);

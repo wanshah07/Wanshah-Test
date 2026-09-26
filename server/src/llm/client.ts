@@ -40,6 +40,24 @@ export function hostOf(baseUrl: string): string {
   }
 }
 
+/**
+ * The endpoint's own reason for refusing. OpenAI sends {error:{message}};
+ * Gemini sends a list, [{error:{message, status}}]; some gateways send a
+ * bare message or plain text.
+ */
+export function errorOf(json: unknown): { message: string; code: string } {
+  const j = (Array.isArray(json) ? json[0] : json) as Record<string, unknown> | undefined;
+  const e = j?.error;
+  if (e && typeof e === "object") {
+    const o = e as { message?: unknown; code?: unknown; status?: unknown };
+    return { message: String(o.message ?? "").slice(0, 400), code: typeof o.code === "string" ? o.code : typeof o.status === "string" ? o.status : "" };
+  }
+  if (typeof e === "string") return { message: e.slice(0, 400), code: "" };
+  if (typeof j?.message === "string") return { message: j.message.slice(0, 400), code: "" };
+  if (typeof j?.raw === "string") return { message: j.raw.replace(/\s+/g, " ").trim().slice(0, 200), code: "" };
+  return { message: "", code: "" };
+}
+
 async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: number): Promise<Record<string, unknown>> {
   const host = hostOf(auth.baseUrl);
   let last: LlmError | null = null;
@@ -61,10 +79,11 @@ async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: numbe
         json = { raw: text };
       }
       if (res.ok) return json;
-      const err = (json.error as { message?: string; code?: string } | undefined) ?? {};
-      last = new LlmError(err.message || `${host} answered ${res.status}`, res.status, err.code || `http_${res.status}`);
+      const err = errorOf(json);
+      last = new LlmError(err.message ? `${host} answered ${res.status}: ${err.message}` : `${host} answered ${res.status}`, res.status, err.code || `http_${res.status}`);
       if (res.status === 429 || res.status >= 500) {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        // A busy model ("high demand", 503) needs longer than a blip to clear.
+        await new Promise((r) => setTimeout(r, (res.status === 503 ? 5000 : 1500) * (attempt + 1)));
         continue;
       }
       throw last;
@@ -106,7 +125,6 @@ export function extractJson(text: string): unknown {
 
 // Gateways that speak the OpenAI protocol differ in what they accept. These
 // are the refusals worth one adjusted retry; anything else is a real error.
-const SCHEMA_REFUSED = /response_format|json_schema|strict|structured output|schema/i;
 const MAX_COMPLETION_REFUSED = /max_completion_tokens/i;
 const TEMPERATURE_REFUSED = /temperature/i;
 
@@ -129,7 +147,9 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
   let mode: "schema" | "object" = "schema";
   let tokenKey: "max_completion_tokens" | "max_tokens" = "max_completion_tokens";
   let sendTemperature = !/^(o\d|gpt-5)/.test(a.auth.model);
-  for (let round = 0; round < 4; round++) {
+  // A reply that is not JSON gets one more turn, with the reply shown back and the rules restated.
+  let followUp: { role: "assistant" | "user"; content: string }[] = [];
+  for (let round = 0; round < 5; round++) {
     // The rules are written into the instructions on every call, not only set
     // as response_format: gateways and models that ignore the request setting
     // still read the instructions.
@@ -139,6 +159,7 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       messages: [
         { role: "system", content: system },
         { role: "user", content: a.user },
+        ...followUp,
       ],
       response_format: mode === "schema" ? { type: "json_schema", json_schema: { name: a.schemaName, strict: true, schema: a.schema } } : { type: "json_object" },
       [tokenKey]: a.maxTokens ?? 16000,
@@ -157,7 +178,9 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
         sendTemperature = false;
         continue;
       }
-      if (mode === "schema" && SCHEMA_REFUSED.test(e.message)) {
+      // Strict schemas are where gateways differ most (Gemini accepts only a subset of JSON Schema),
+      // so any other 400 in schema mode earns one try in plain JSON mode; a real error fails there too.
+      if (mode === "schema") {
         mode = "object";
         continue;
       }
@@ -174,6 +197,13 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
     try {
       return extractJson(choice.message.content ?? "") as T;
     } catch {
+      if (!followUp.length) {
+        followUp = [
+          { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
+          { role: "user", content: "That answer is not JSON, so it cannot be used. Answer again with only the JSON object the OUTPUT FORMAT rules describe: start with { and end with }, no prose, no markdown fences." },
+        ];
+        continue;
+      }
       const e = new LlmError("The model answered with something that is not JSON", 0, "parse");
       e.raw = rawSnippet(choice.message.content ?? "");
       throw e;
@@ -211,26 +241,32 @@ export async function chatText(auth: LlmAuth, system: string, user: string | Con
 /** Returns PNG bytes. */
 export async function generateImage(auth: LlmAuth, prompt: string, size = "1536x1024"): Promise<Buffer> {
   const body: Record<string, unknown> = { model: auth.imageModel, prompt, n: 1, size };
-  if (/^dall-e/.test(auth.imageModel)) body.response_format = "b64_json";
+  // gpt-image always answers with bytes; DALL-E and Imagen (Gemini) send a link unless asked for bytes.
+  if (/^(dall-e|imagen)/.test(auth.imageModel)) body.response_format = "b64_json";
   const json = await call(auth, "/images/generations", body, 240000);
   const b64 = (json.data as { b64_json?: string }[] | undefined)?.[0]?.b64_json;
   if (!b64) throw new LlmError("The image model returned no picture");
   return Buffer.from(b64, "base64");
 }
 
-export async function checkKey(apiKey: string, baseUrl: string, timeoutMs = 20000): Promise<{ ok: boolean; message: string; models?: string[] }> {
+/** Models that make pictures, speech or embeddings rather than text. */
+export const NOT_A_WRITER = /image|imagen|dall-e|tts|embed|live|audio|veo|aqa|robotics|computer-use|lyria|whisper|moderation|transcribe/i;
+
+export async function checkKey(apiKey: string, baseUrl: string, timeoutMs = 20000): Promise<{ ok: boolean; message: string; models?: string[]; imageModels?: string[] }> {
   const host = hostOf(baseUrl);
   try {
     const res = await fetch(`${baseUrl}/models`, { headers: { authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) {
-      const j = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-      return { ok: false, message: `${host} answered ${res.status}: ${j.error?.message || res.statusText}` };
+      return { ok: false, message: `${host} answered ${res.status}: ${errorOf(await res.json().catch(() => ({}))).message || res.statusText}` };
     }
     const j = (await res.json()) as { data?: { id: string }[] };
-    const all = (j.data ?? []).map((m) => m.id).sort();
+    // Gemini lists "models/gemini-…"; the chat call takes the bare name.
+    const all = [...new Set((j.data ?? []).map((m) => m.id.replace(/^models\//, "")))].sort();
     const isOpenAi = host === "api.openai.com";
-    const ids = isOpenAi ? all.filter((id) => /^(gpt|o\d|chatgpt)/.test(id)) : all;
-    return { ok: true, message: `Key accepted by ${host}. ${ids.length} models visible.`, models: ids };
+    // Picture, speech and embedding models cannot write a deck; they are listed apart.
+    const writers = (isOpenAi ? all.filter((id) => /^(gpt|o\d|chatgpt)/.test(id)) : all).filter((id) => !NOT_A_WRITER.test(id));
+    const imageModels = all.filter((id) => /imagen|image|dall-e/i.test(id));
+    return { ok: true, message: `Key accepted by ${host}. ${writers.length} writer models visible.`, models: writers, imageModels };
   } catch (e) {
     const name = (e as Error).name;
     if (name === "TimeoutError" || name === "AbortError") return { ok: false, message: `${host} sent no answer within ${Math.round(timeoutMs / 1000)} s. The server running Slidecraft cannot use this endpoint.` };

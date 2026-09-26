@@ -29,7 +29,11 @@ export async function probeVision(auth: LlmAuth): Promise<"yes" | "no"> {
     { type: "image_url", image_url: { url: swatch([220, 30, 30]), detail: "low" } },
   ];
   try {
-    const answer = await chatText(auth, "You answer questions about pictures in one word.", user, 20, 45000);
+    // Room to answer: a model that thinks before answering (Gemini 3, o-series) spends
+    // tokens on the thinking, and a 20-token cap left it with nothing to say.
+    const answer = (await chatText(auth, "You answer questions about pictures in one word.", user, 2048, 90000)).trim();
+    // Silence is not an answer: it says nothing about pictures, so it is not a "no".
+    if (!answer) throw new LlmError("The model gave no answer to the picture check", 0, "empty");
     return /\bred\b|merah/i.test(answer) ? "yes" : "no";
   } catch (e) {
     if (e instanceof LlmError && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429 && IMAGE_REFUSED.test(e.message)) return "no";
@@ -37,8 +41,12 @@ export async function probeVision(auth: LlmAuth): Promise<"yes" | "no"> {
   }
 }
 
+// The probe's version is part of what is remembered, so answers from an older,
+// mistaken probe (a 20-token cap read a thinking model's silence as "no") are asked again.
+const PROBE = "v2";
+
 function key(auth: LlmAuth): string {
-  return `${auth.baseUrl}|${auth.model}`;
+  return `${PROBE}|${auth.baseUrl}|${auth.model}`;
 }
 
 export function knownVision(userId: string, auth: LlmAuth): Vision {
@@ -77,6 +85,6 @@ export async function readPicture(auth: LlmAuth, name: string, buf: Buffer, mime
     },
     { type: "image_url", image_url: { url: `data:${mime};base64,${buf.toString("base64")}`, detail: "high" } },
   ];
-  const out = (await chatText(auth, "You transcribe pictures exactly. You never invent content.", user, 3000, 120000)).trim();
+  const out = (await chatText(auth, "You transcribe pictures exactly. You never invent content.", user, 12000, 180000)).trim();
   return out || NOTHING;
 }

@@ -47,7 +47,11 @@ export default function NewDeck() {
   useEffect(() => {
     api.settings().then((s) => setThemeId(s.defaultTheme)).catch(() => {});
     api.designs().then(setDesigns).catch(() => {});
+    // A design added in the other tab shows up on coming back, and the wizard keeps its place.
+    const refresh = () => api.designs().then(setDesigns).catch(() => {});
+    window.addEventListener("focus", refresh);
     defaultPromptIds().then((prompts) => setBrief((b) => ({ ...b, prompts })));
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   // The deck row exists from step 2 so uploads have somewhere to go.
@@ -202,7 +206,7 @@ export default function NewDeck() {
               ))}
             </div>
           )}
-          {sources.length === 0 && <p className="small muted">No sources yet. You can continue without any; every fact the writer is unsure of will carry a [SAHKAN] marker.</p>}
+          {sources.length === 0 && <p className="small muted">No sources yet. You can continue without any; the writer then works from the brief alone and leaves out figures it cannot stand behind.</p>}
         </div>
       )}
 
@@ -234,7 +238,7 @@ export default function NewDeck() {
           <div className="card stack">
             <div className="row between">
               <h3>Design</h3>
-              <a href="/designs" className="small">Add a reference design</a>
+              <a href="/designs" target="_blank" rel="noopener" className="small">Add a reference design (opens in a new tab)</a>
             </div>
             <ThemeCards
               width={190}
@@ -289,6 +293,7 @@ export default function NewDeck() {
             {failed && why?.anyway && <p className="small muted">Pictures pulled from OneDrive are never read; they are slide pictures. This is only about pictures you uploaded as sources.</p>}
             {failed && (
               <div className="row">
+                <button className="btn btn-quiet" onClick={() => setStep(3)}>← Back</button>
                 <button className="btn btn-primary" onClick={() => start()}>Try again</button>
                 {why?.anyway && <button className="btn btn-ghost" onClick={() => start(true)}>Write anyway (pictures as slide pictures only)</button>}
                 {why?.settings && <Link className="btn btn-ghost" to="/settings" target="_blank">Open Settings</Link>}

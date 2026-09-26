@@ -23,9 +23,11 @@ describe("renderSlideHtml", () => {
     expect(html).toContain("Annex III entry 98");
     expect(html).toContain("1 / 3");
   });
-  it("marks SAHKAN markers visibly", () => {
+  it("prints square brackets as plain text, with no marker styling", () => {
     const s: Slide = { id: "a", layout: "bullets", title: "T", bullets: ["fee RM [SAHKAN: NPRA fee]"] };
-    expect(renderSlideHtml(s, theme, ctx)).toContain('<mark class="sahkan">');
+    const html = renderSlideHtml(s, theme, ctx);
+    expect(html).not.toContain("<mark");
+    expect(html).toContain("[SAHKAN: NPRA fee]");
   });
   it("resolves media ids through the context", () => {
     const s: Slide = { id: "a", layout: "image", title: "T", image: { mediaId: "m1" } };
