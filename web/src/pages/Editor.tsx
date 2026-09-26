@@ -9,9 +9,11 @@ import { toast } from "../components/Toast";
 import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { ReviewBar } from "../components/ReviewBar";
+import { LayoutPicker } from "../components/LayoutPicker";
 import { DropZone } from "../components/DropZone";
 import { OneDriveBox } from "../components/OneDriveBox";
 import type { PathedFile } from "../lib/files";
+import { explainFailure } from "../lib/errors";
 
 type Tab = "slide" | "theme" | "export" | "sources";
 const TAB_LABEL: Record<Tab, string> = { slide: "Slide", theme: "Theme", export: "Export", sources: "Files & regenerate" };
@@ -241,7 +243,7 @@ export default function Editor() {
               <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>
             ))}
           </div>
-          {tab === "slide" && slide && <SlideInspector deckId={deck.id} slide={slide} hits={slop[slide.id] ?? []} lang={deck.lang} onChange={setSlide} onRewrite={rewrite} />}
+          {tab === "slide" && slide && <SlideInspector deckId={deck.id} slide={slide} hits={slop[slide.id] ?? []} lang={deck.lang} theme={deck.theme} onChange={setSlide} onRewrite={rewrite} />}
           {tab === "slide" && !slide && <p className="muted small">No slide selected.</p>}
           {tab === "theme" && <ThemePanel deckId={deck.id} theme={deck.theme} designId={deck.designId} onChange={setTheme} onDesign={(t, designId) => update({ ...deck, theme: t, designId })} />}
           {tab === "export" && <ExportPanel deck={deck} sahkan={sahkan} slopCount={slopCount} />}
@@ -251,13 +253,9 @@ export default function Editor() {
 
       {addOpen && (
         <div className="modal-bg" onClick={() => setAddOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ width: "min(900px,94vw)", maxHeight: "88vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginBottom: 12 }}>Add a slide after {sel + 1}</h3>
-            <div className="grid c3">
-              {(["title", "section", "bullets", "two-column", "chart", "table", "diagram", "image", "quote", "kpi", "closing"] as Layout[]).map((l) => (
-                <button key={l} className="btn btn-ghost btn-sm" onClick={() => addSlide(l)}>{l}</button>
-              ))}
-            </div>
+            <LayoutPicker theme={deck.theme} lang={deck.lang} onPick={addSlide} width={170} />
           </div>
         </div>
       )}
@@ -376,6 +374,19 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       ) : (
         <button className="btn btn-primary" onClick={run} disabled={!!running}>{running ? <span className="spin" /> : "Generate deck"}</button>
       )}
+      {job?.status === "failed" && (() => {
+        const why = explainFailure(job.error || "");
+        return (
+          <div className="banner danger" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+            <b>{why.what}</b>
+            <span>{why.todo}</span>
+            <span className="row" style={{ gap: 6 }}>
+              <button className="btn btn-primary btn-xs" onClick={run}>Try again</button>
+              {why.settings && <Link className="btn btn-ghost btn-xs" to="/settings" target="_blank">Open Settings</Link>}
+            </span>
+          </div>
+        );
+      })()}
       {job && <div className="log">{job.progress.join("\n")}</div>}
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { LAYOUTS, type ChartSpec, type DiagramSpec, type Layout, type Slide, type SlopHit, type TableSpec } from "@slidecraft/shared";
+import { type ChartSpec, type DiagramSpec, type Slide, type SlopHit, type TableSpec, type Theme } from "@slidecraft/shared";
+import { fillFor, LAYOUT_NAMES, LayoutPicker } from "./LayoutPicker";
 import { api, type MediaItem } from "../api";
 import { toast } from "./Toast";
 
@@ -8,6 +9,7 @@ interface Props {
   slide: Slide;
   hits: SlopHit[];
   lang: "en" | "ms";
+  theme: Theme;
   onChange: (s: Slide) => void;
   onRewrite: (instruction: string) => Promise<void>;
 }
@@ -181,8 +183,9 @@ function ImagePicker({ deckId, slide, onChange }: { deckId: string; slide: Slide
   );
 }
 
-export function SlideInspector({ deckId, slide, hits, lang, onChange, onRewrite }: Props) {
+export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onRewrite }: Props) {
   const [instr, setInstr] = useState("");
+  const [pickLayout, setPickLayout] = useState(false);
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<Slide>) => onChange({ ...slide, ...patch });
   const rewrite = async () => {
@@ -212,8 +215,14 @@ export function SlideInspector({ deckId, slide, hits, lang, onChange, onRewrite 
       </div>
       <hr />
       <div className="field">
-        <label>Layout</label>
-        <select value={L} onChange={(e) => set({ layout: e.target.value as Layout })}>{LAYOUTS.map((l) => <option key={l}>{l}</option>)}</select>
+        <label>Layout <span className="help">{LAYOUT_NAMES[L]}</span></label>
+        <button className="btn btn-ghost btn-xs" style={{ alignSelf: "flex-start" }} onClick={() => setPickLayout((v) => !v)}>{pickLayout ? "Close" : "Change layout"}</button>
+        {pickLayout && (
+          <>
+            <span className="help">Each picture is this slide in that layout. Content that does not fit a layout stays saved and comes back if you switch again.</span>
+            <LayoutPicker theme={theme} lang={lang} slide={slide} current={L} width={130} onPick={(l) => { set({ ...fillFor(slide, l), layout: l }); setPickLayout(false); }} />
+          </>
+        )}
       </div>
       <Text label="Title" value={slide.title} onChange={(v) => set({ title: v })} rows={2} />
       {(L === "title" || L === "closing" || L === "section") && <Text label="Subtitle" value={slide.subtitle} onChange={(v) => set({ subtitle: v || undefined })} rows={2} />}

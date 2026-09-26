@@ -85,10 +85,24 @@ try {
   await page.click("text=Continue");
   await page.click("text=Training / workshop");
   await page.click("text=Continue");
-  await page.locator(".card.pick", { hasText: "Reference slide" }).click();
-  check("my design can be picked for the deck", (await page.locator(".card.pick.on", { hasText: "Reference slide" }).count()) === 1);
+  await page.locator(".pickcard", { hasText: "Reference slide" }).click();
+  check("my design can be picked as a picture card", (await page.locator(".pickcard.on", { hasText: "Reference slide" }).count()) === 1);
+  // The first attempt fails the way a silent endpoint does; Try again must recover without re-entering anything.
+  let failOnce = true;
+  await page.route("**/api/decks/*/generate", async (route) => {
+    if (failOnce) {
+      failOnce = false;
+      return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "timeout", message: "api.mireld.my did not answer within 240 s" }) });
+    }
+    return route.continue();
+  });
   await page.click("button:has-text('Generate')");
+  await page.locator("text=The writer endpoint did not answer in time.").waitFor({ timeout: 10000 }).catch(() => {});
+  check("a failure says what went wrong in plain words", (await page.locator("text=The writer endpoint did not answer in time.").count()) === 1);
+  await page.click("button:has-text('Try again')");
   await page.waitForURL(/\/deck\//, { timeout: 30000 });
+  check("Try again recovers with the same choices", true);
+  await page.unroute("**/api/decks/*/generate");
   await page.waitForSelector(".thumb", { timeout: 10000 });
   const thumbs = await page.locator(".thumb").count();
   check("editor shows the generated slides", thumbs >= 6);
@@ -97,6 +111,21 @@ try {
     const d = await (await fetch(`http://localhost:${PORT}/api/decks/${id}`)).json();
     check("the deck uses the picked design and the ticked prompt", !!d.deck.designId && (d.deck.brief?.prompts ?? []).length === 1);
   }
+  // Layouts as pictures: change one slide's layout, add a slide from the picture modal.
+  await page.locator(".thumb").nth(3).click();
+  await page.click("button:has-text('Change layout')");
+  check("layouts show as pictures", (await page.locator(".field .pickcard").count()) === 11);
+  await page.locator(".field .pickcard", { hasText: "Table" }).click();
+  await page.waitForTimeout(1200);
+  {
+    const id = page.url().split("/deck/")[1];
+    const d = await (await fetch(`http://localhost:${PORT}/api/decks/${id}`)).json();
+    check("picking a layout picture changes and saves the slide", d.deck.slides[3].layout === "table" && !!d.deck.slides[3].table);
+  }
+  const thumbsBefore = await page.locator(".thumb").count();
+  await page.click("button:has-text('+ Add')");
+  await page.locator(".modal .pickcard", { hasText: "Big numbers" }).click();
+  check("add a slide from a picture", (await page.locator(".thumb").count()) === thumbsBefore + 1);
   // Sign-off and feedback on slides.
   await page.locator(".thumb").nth(1).click();
   await page.click(".review button:has-text('OK ✓')");

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { THEME_PRESETS } from "@slidecraft/shared";
 import { api, type OneDriveStatus, type Settings as S } from "../api";
 import { toast } from "../components/Toast";
+import { ThemeCards } from "../components/ThemeCards";
 import { applyAppTheme, type AppTheme } from "../lib/theme";
 
 export default function Settings() {
@@ -236,13 +237,7 @@ export default function Settings() {
           ))}
         </div>
         <h4 style={{ marginTop: 6 }}>Default slide theme for new decks</h4>
-        <div className="row">
-          {THEME_PRESETS.map((t) => (
-            <button key={t.id} className={"btn btn-ghost btn-sm" + (s.defaultTheme === t.id ? " active" : "")} onClick={() => setDefaultTheme(t.id)}>
-              <span className="swatch" style={{ width: 14, height: 14, background: t.colors.brand, borderRadius: 4 }} /> {t.name}
-            </button>
-          ))}
-        </div>
+        <ThemeCards width={170} options={THEME_PRESETS.map((t) => ({ key: t.id, name: t.name, theme: t }))} isOn={(o) => s.defaultTheme === o.key} onPick={(o) => setDefaultTheme(o.key)} />
       </section>
     </main>
   );

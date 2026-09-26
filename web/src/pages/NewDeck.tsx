@@ -1,23 +1,20 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { ANGLES, blankSlide, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef, type Theme } from "@slidecraft/shared";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Design, type Job } from "../api";
 import { toast } from "../components/Toast";
 import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
-import { SlideFrame } from "../components/SlideFrame";
+import { ThemeCards } from "../components/ThemeCards";
 import { DropZone } from "../components/DropZone";
 import { OneDriveBox } from "../components/OneDriveBox";
 import type { PathedFile } from "../lib/files";
+import { explainFailure } from "../lib/errors";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 const STEPS = ["Brief", "Sources", "Angle", "Features", "Generate"];
 
 function fmtChars(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k chars` : `${n} chars`;
-}
-
-function designSample(t: Theme, lang: "en" | "ms") {
-  return { ...blankSlide("title", lang), title: t.name, subtitle: `${t.fontDisplay} / ${t.fontBody}` };
 }
 
 export default function NewDeck() {
@@ -41,6 +38,7 @@ export default function NewDeck() {
   const [pasteName, setPasteName] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [job, setJob] = useState<Job | null>(null);
+  const [startError, setStartError] = useState("");
   const prompt = composeBrief(brief);
   const audience = composeAudience(brief.audiences, brief.audienceText);
 
@@ -95,30 +93,33 @@ export default function NewDeck() {
   };
 
   const start = async () => {
-    const existed = !!deckId;
-    const id = await ensureDeck();
-    // The deck may have been created at the Sources step, before a design was picked.
-    if (existed) {
-      if (designId) await api.applyDesign(id, designId);
-      else await api.applyPreset(id, themeId);
-    }
+    setJob(null);
+    setStartError("");
     setStep(4);
     try {
+      const existed = !!deckId;
+      const id = await ensureDeck();
+      // The deck may have been created at the Sources step, before a design was picked.
+      if (existed) {
+        if (designId) await api.applyDesign(id, designId);
+        else await api.applyPreset(id, themeId);
+      }
       const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
-        const j = await api.job(jobId);
-        setJob(j);
-        if (j.status === "done") {
-          toast("Deck ready");
-          nav(`/deck/${id}`);
-        } else if (j.status === "failed") {
-          toast(j.error || "Generation failed", true);
-        } else setTimeout(tick, 1500);
+        try {
+          const j = await api.job(jobId);
+          setJob(j);
+          if (j.status === "done") {
+            toast("Deck ready");
+            nav(`/deck/${id}`);
+          } else if (j.status !== "failed") setTimeout(tick, 1500);
+        } catch (e) {
+          setStartError((e as Error).message);
+        }
       };
       tick();
     } catch (e) {
-      toast((e as Error).message, true);
-      setStep(3);
+      setStartError((e as Error).message);
     }
   };
 
@@ -216,20 +217,13 @@ export default function NewDeck() {
               <h3>Design</h3>
               <a href="/designs" className="small">Add a reference design</a>
             </div>
-            <div className="grid auto" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))" }}>
-              {[...designs.map((d) => ({ key: d.id, name: d.name, theme: d.theme, mine: true })), ...THEME_PRESETS.map((t) => ({ key: t.id, name: t.name, theme: t, mine: false }))].map((o) => {
-                const on = o.mine ? designId === o.key : !designId && themeId === o.key;
-                return (
-                  <div key={o.key} className={"card tight pick" + (on ? " on" : "")} onClick={() => (o.mine ? setDesignId(o.key) : (setDesignId(undefined), setThemeId(o.key)))}>
-                    <SlideFrame slide={designSample(o.theme, lang)} theme={o.theme} index={0} total={1} lang={lang} />
-                    <div className="row between small" style={{ marginTop: 6 }}>
-                      <b>{o.name}</b>
-                      {o.mine && <span className="pill brand">mine</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ThemeCards
+              width={190}
+              lang={lang}
+              options={[...designs.map((d) => ({ key: d.id, name: d.name, theme: d.theme, mine: true, hint: d.notes })), ...THEME_PRESETS.map((t) => ({ key: t.id, name: t.name, theme: t }))]}
+              isOn={(o) => (o.mine ? designId === o.key : !designId && themeId === o.key)}
+              onPick={(o) => (o.mine ? setDesignId(o.key) : (setDesignId(undefined), setThemeId(o.key)))}
+            />
             <span className="small muted">Your designs also carry notes the writer follows (title length, text per slide). Colours and fonts can be changed later in the editor.</span>
           </div>
           <div className="card stack">
@@ -256,21 +250,34 @@ export default function NewDeck() {
         </div>
       )}
 
-      {step === 4 && (
-        <div className="card stack">
-          <div className="row">
-            {job?.status !== "failed" && <span className="spin" />}
-            <h3>{job?.status === "failed" ? "Generation failed" : "Writing the deck"}</h3>
-          </div>
-          <div className="log">{(job?.progress ?? ["Starting"]).join("\n")}</div>
-          {job?.status === "failed" && (
+      {step === 4 && (() => {
+        const failed = job?.status === "failed" || !!startError;
+        const why = failed ? explainFailure(startError || job?.error || "") : null;
+        return (
+          <div className="card stack">
             <div className="row">
-              <button className="btn btn-ghost" onClick={() => setStep(3)}>Back</button>
-              {deckId && <button className="btn btn-quiet" onClick={() => nav(`/deck/${deckId}`)}>Open the empty deck anyway</button>}
+              {!failed && <span className="spin" />}
+              <h3>{failed ? "The deck was not written" : "Writing the deck"}</h3>
             </div>
-          )}
-        </div>
-      )}
+            {why && (
+              <div className="banner danger" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                <b>{why.what}</b>
+                <span>{why.todo}</span>
+              </div>
+            )}
+            {(job?.progress?.length || !failed) && <div className="log">{(job?.progress ?? ["Starting"]).join("\n")}</div>}
+            {failed && (
+              <div className="row">
+                <button className="btn btn-primary" onClick={start}>Try again</button>
+                {why?.settings && <Link className="btn btn-ghost" to="/settings" target="_blank">Open Settings</Link>}
+                <button className="btn btn-ghost" onClick={() => setStep(3)}>Change the choices</button>
+                {deckId && <button className="btn btn-quiet" onClick={() => nav(`/deck/${deckId}`)}>Open the deck</button>}
+              </div>
+            )}
+            {failed && <p className="small muted">Your brief, sources and choices are kept. Try again uses them exactly as they are.</p>}
+          </div>
+        );
+      })()}
 
       {step < 4 && (
         <div className="row between" style={{ marginTop: 20 }}>

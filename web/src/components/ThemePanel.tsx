@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { FONT_CHOICES, THEME_PRESETS, themePreset, type Theme, type ThemeColors } from "@slidecraft/shared";
 import { api, type Design, type MediaItem } from "../api";
 import { toast } from "./Toast";
+import { ThemeCards } from "./ThemeCards";
 
 const COLOR_LABELS: Record<keyof ThemeColors, string> = {
   bg: "Background", surface: "Surface", ink: "Text", ink2: "Secondary text", muted: "Muted", line: "Lines", brand: "Brand", brandDeep: "Brand deep", accent: "Accent", gold: "Gold",
@@ -50,15 +51,19 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
   return (
     <div className="stack">
       <div className="field">
-        <label>My designs</label>
-        <div className="row">
-          {designs.map((d) => (
-            <button key={d.id} className={"btn btn-ghost btn-xs" + (designId === d.id ? " active" : "")} onClick={() => applyDesign(d)} title={d.notes || d.name}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: d.theme.colors.brand, display: "inline-block" }} /> {d.name}
-            </button>
-          ))}
-          {designs.length === 0 && <span className="help">None yet. <Link to="/designs">Add a reference design</Link> (PowerPoint, PDF or a screenshot).</span>}
-        </div>
+        <label>Look <span className="help">{designId ? "Your design" : "Preset"}: {theme.name}</span></label>
+        <ThemeCards
+          width={130}
+          options={[...designs.map((d) => ({ key: d.id, name: d.name, theme: d.theme, mine: true, hint: d.notes })), ...THEME_PRESETS.map((t) => ({ key: t.id, name: t.name, theme: t }))]}
+          isOn={(o) => (o.mine ? designId === o.key : !designId && theme.id === o.key)}
+          onPick={(o) => {
+            const d = designs.find((x) => x.id === o.key);
+            if (o.mine && d) applyDesign(d);
+            else applyPreset(o.key);
+          }}
+        />
+        {designs.length === 0 && <span className="help">Your own designs appear here too. <Link to="/designs">Add a reference design</Link> (PowerPoint, PDF or a screenshot).</span>}
+        <span className="help">Choosing a look replaces colours, fonts, radius and style. Footer and logo stay.</span>
         {saveName === null ? (
           <button className="btn btn-quiet btn-xs" style={{ alignSelf: "flex-start" }} onClick={() => setSaveName(theme.name.startsWith("design") ? "" : `${theme.name} (mine)`)}>Save this look as a design</button>
         ) : (
@@ -68,17 +73,6 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
             <button className="btn btn-quiet btn-xs" onClick={() => setSaveName(null)}>Cancel</button>
           </div>
         )}
-      </div>
-      <div className="field">
-        <label>Preset</label>
-        <div className="row">
-          {THEME_PRESETS.map((t) => (
-            <button key={t.id} className={"btn btn-ghost btn-xs" + (theme.id === t.id ? " active" : "")} onClick={() => applyPreset(t.id)} title={t.name}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: t.colors.brand, display: "inline-block" }} /> {t.name}
-            </button>
-          ))}
-        </div>
-        <span className="help">A preset replaces colours, fonts, radius and style. Footer and logo stay.</span>
       </div>
       <div className="field">
         <label>Colours</label>
