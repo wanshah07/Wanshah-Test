@@ -18,7 +18,9 @@
     "start": "node server/dist/index.js",
     "test": "npm run build -w shared && npm test -w shared && npm test -w server",
     "smoke": "node scripts/smoke.mjs",
-    "user:add": "node server/dist/cli/user-add.js"
+    "user:add": "node server/dist/cli/user-add.js",
+    "check:fit": "node scripts/fit-check.mjs",
+    "check:pptx-fit": "node scripts/pptx-fit-check.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

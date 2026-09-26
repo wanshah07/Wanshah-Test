@@ -244,6 +244,9 @@ time. For an always-on address for a team, use the Docker image on a host.
 
     npm test          # shared: scanner and renderers; server: the whole API in mock mode
     npm run smoke     # drives the built app in Chromium: wizard, editor, export, presenter
+    npm run check:fit       # over-full slides of every layout in Chromium: nothing spills or is clipped
+    npm run check:pptx-fit  # the same slides as .pptx, rendered by LibreOffice Impress: no text off
+                            # the slide or on top of other text (needs soffice with Impress)
 
 ## Settings reference
 
