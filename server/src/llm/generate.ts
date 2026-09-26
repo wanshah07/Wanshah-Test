@@ -4,6 +4,7 @@ import { getDb, now } from "../db.js";
 import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, type SourceRow } from "../store.js";
 import { NOTHING, readPicture, visionFor } from "./vision.js";
 import fs from "node:fs";
+import path from "node:path";
 import { chatJson, chatText, generateImage, LlmError, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
 import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
@@ -243,8 +244,68 @@ function isBlank(s: Slide): boolean {
   return !String(s.title ?? "").trim() && !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote;
 }
 
+const NOT_FACE = new Set(["title", "heading", "slidetitle", "slide_title", "headline", "kicker", "eyebrow", "subtitle", "layout", "type", "kind", "slidetype", "notes", "speakernotes", "speaker_notes", "presenternotes", "narration", "script", "citations", "sources", "source", "references", "id", "image", "prompt", "unit", "sourcename"]);
+
+/**
+ * Every piece of text a slide carries outside the fields that name or annotate it, as bullets:
+ * what is left when the model put the content somewhere the schema has no name for, or in a
+ * visual the slide could not draw. A pair like {label, value} becomes one line.
+ */
+const LABEL_KEY = /^(label|name|heading|metric|key|term|step|stage|item|when|date|year)$/i;
+
+export function harvestText(raw: unknown, max = 6): string[] {
+  const out: string[] = [];
+  const walk = (v: unknown, depth: number): void => {
+    if (out.length >= max || depth > 4 || v == null) return;
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t.length >= 3 && !out.includes(t)) out.push(t.length > 160 ? t.slice(0, 157).trimEnd() + "…" : t);
+      return;
+    }
+    if (typeof v === "number") return;
+    if (Array.isArray(v)) return v.forEach((x) => walk(x, depth + 1));
+    if (typeof v !== "object") return;
+    const o = v as Record<string, unknown>;
+    const strEntries = Object.entries(o).filter(([k, x]) => typeof x === "string" && x.trim() && !NOT_FACE.has(k.toLowerCase()));
+    const strs = strEntries.map(([, x]) => (x as string).trim());
+    const rest = Object.entries(o).filter(([k, x]) => typeof x !== "string" && !NOT_FACE.has(k.toLowerCase()));
+    const labelled = strEntries.some(([k]) => LABEL_KEY.test(k)) || Object.values(o).some((x) => typeof x === "number");
+    if (depth > 0 && labelled && strs.length >= 1 && strs.length <= 3 && strs.join(" ").length <= 160) {
+      // A small record ({label, value, note}) reads as one line.
+      const line = strs.join(" — ");
+      const num = Object.values(o).find((x) => typeof x === "number");
+      const full = num !== undefined && !line.includes(String(num)) ? `${line}: ${num}` : line;
+      if (!out.includes(full)) out.push(full);
+    } else strs.forEach((x) => walk(x, depth + 1));
+    rest.forEach(([, x]) => walk(x, depth + 1));
+  };
+  walk(raw, 0);
+  return out.slice(0, max);
+}
+
+const STRUCTURAL = new Set(["title", "section", "closing"]);
+
+/** A content slide that says nothing below its title. */
+export function hasNoFace(s: Slide): boolean {
+  if (STRUCTURAL.has(s.layout)) return false;
+  const r = s as unknown as Record<string, unknown>;
+  return !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !(Array.isArray(r.bulletsRight) && r.bulletsRight.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote && !r.image;
+}
+
 function toSlide(raw: Record<string, unknown>, features: Features, imageMode: string): Slide {
-  const s = normaliseSlide(coerceSlideShape(raw));
+  const s = finishSlide(normaliseSlide(coerceSlideShape(raw)), raw, features, imageMode);
+  if (hasNoFace(s)) {
+    // The content is in the answer, just not where a field reads it: put it on the slide as points.
+    const got = harvestText(raw);
+    if (got.length) {
+      s.layout = "bullets";
+      (s as unknown as Record<string, unknown>).bullets = got;
+    }
+  }
+  return s;
+}
+
+function finishSlide(s: Slide, raw: Record<string, unknown>, features: Features, imageMode: string): Slide {
   s.diagram = coerceDiagram(raw.diagram);
   if (s.layout === "diagram" && !s.diagram) s.layout = "bullets";
   if (s.layout === "chart" && (!s.chart || !s.chart.series?.length)) s.layout = "bullets";
@@ -334,11 +395,31 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     }
     const rawSlides = (Array.isArray(json.slides) ? json.slides : []).filter((r) => r && typeof r === "object") as Record<string, unknown>[];
     const slides = rawSlides.map((r) => toSlide(r, p.features, p.imageMode));
+    // Keep the writer's answer for this deck, so a deck that comes out wrong can be looked into.
+    try {
+      const dir = path.join(config.dataDir, "writer-replies");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${deckId}.json`), JSON.stringify(json, null, 2));
+    } catch {
+      /* diagnostics only */
+    }
+    const content = slides.filter((x) => !STRUCTURAL.has(x.layout));
+    const faceless = content.filter(hasNoFace).length;
     const blank = slides.filter(isBlank).length;
+    if (faceless) {
+      const sample = rawSlides.find((r, i) => hasNoFace(slides[i]));
+      log(jobId, `${faceless} slide${faceless === 1 ? "" : "s"} came back with a title and nothing under it. First one as the writer sent it: ${rawSnippet(JSON.stringify(sample ?? {}))}`);
+    }
     if (slides.length && blank > slides.length / 2) {
       // Better a clear failure than a deck of empty frames that reads as done.
       const keys = [...new Set(rawSlides.flatMap((r) => Object.keys(r)))].slice(0, 20).join(", ");
       const e = new LlmError(`The writer returned ${slides.length} slides but ${blank} have nothing on them (it used the fields: ${keys || "none"})`, 0, "no_slides");
+      e.raw = rawSnippet(JSON.stringify(json));
+      throw e;
+    }
+    if (content.length && faceless > content.length / 2) {
+      const keys = [...new Set(rawSlides.flatMap((r) => Object.keys(r)))].slice(0, 20).join(", ");
+      const e = new LlmError(`The writer returned ${content.length} content slides but ${faceless} have a title and nothing on them (it used the fields: ${keys || "none"})`, 0, "no_slides");
       e.raw = rawSnippet(JSON.stringify(json));
       throw e;
     }

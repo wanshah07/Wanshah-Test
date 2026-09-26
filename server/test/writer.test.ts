@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -125,6 +125,20 @@ beforeAll(async () => {
           { slideTitle: "How to use it", text: "Twice a day after cleansing." },
           { heading: "Who it is for", points: ["Sensitive skin", "After procedures"] },
         ] }));
+      }
+      if (gw.deckStray > 0) {
+        // Content under names no mapping knows, and a diagram in a shape the slide cannot draw.
+        gw.deckStray--;
+        return reply(JSON.stringify({ title: "B5", subtitle: null, slides: [
+          { layout: "title", title: "Facerinna B5", kicker: null, subtitle: "A layman overview" },
+          { layout: "bullets", title: "What is B5?", explanation: { summary: "Panthenol, a form of vitamin B5", whyItMatters: "Holds water in the skin" } },
+          { layout: "kpi", title: "In numbers", kpi: null, figures: [{ label: "Panthenol", value: "5%" }, { label: "Uses a day", value: "2" }] },
+          { layout: "diagram", title: "How to use", diagram: { kind: "flow", stages: ["Cleanse", "Apply B5", "Moisturise"] }, notes: "Walk through the routine." },
+        ] }));
+      }
+      if (gw.deckTitlesOnly > 0) {
+        gw.deckTitlesOnly--;
+        return reply(JSON.stringify({ title: "B5", subtitle: null, slides: [1, 2, 3, 4].map(() => ({ layout: "bullets", kicker: null, title: "What Is Facerinna B5?", subtitle: null, body: null, bullets: [], notes: "Say what it is." })) }));
       }
       if (gw.deckBlank > 0) {
         gw.deckBlank--;
@@ -288,6 +302,28 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     const job = await waitJob(jobId);
     expect(job.status).toBe("failed");
     expect(job.error).toMatch(/returned 3 slides but 3 have nothing on them \(it used the fields: foo\)/);
+  });
+
+  it("puts content the model filed under unknown names on the slide instead of leaving a bare title", async () => {
+    gw.deckStray = 2;
+    const id = await newDeck("stray");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5" } }));
+    expect((await waitJob(jobId)).status).toBe("done");
+    const slides = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(slides[1].bullets).toEqual(["Panthenol, a form of vitamin B5", "Holds water in the skin"]);
+    expect(slides[2].bullets).toEqual(["Panthenol — 5%", "Uses a day — 2"]);
+    expect(slides[3].bullets).toEqual(["Cleanse", "Apply B5", "Moisturise"]);
+    expect(slides[3].bullets.join(" ")).not.toMatch(/Walk through/);
+  });
+
+  it("fails clearly when the content slides are titles with nothing under them, and says what the writer sent", async () => {
+    gw.deckTitlesOnly = 2;
+    const id = await newDeck("titles-only");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5" } }));
+    const job = await waitJob(jobId);
+    expect(job.status).toBe("failed");
+    expect(job.error).toMatch(/4 content slides but 4 have a title and nothing on them/);
+    expect(job.progress.join("\n")).toMatch(/First one as the writer sent it: \{"layout":"bullets"/);
   });
 
   it("leaves the choices alone without Auto", async () => {
