@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckAllText: 0, deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckAllText: 0, designs: 0, designFail: false, designReply: null as null | Record<string, unknown>, designUser: "", deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -103,6 +103,16 @@ beforeAll(async () => {
           return reply("Here is a professional presentation deck built strictly from the provided source material. ### Deck Strategy: Purpose, Audience, and Core Conclusion");
         }
         return reply(JSON.stringify({ title: "Salicylic acid: 2% cap needs 4 SKUs reformulated", angle: "medical-affairs", audience: "dermatologists", slides: 7, features: { charts: false, tables: true, diagrams: false, kpis: true, sections: false, summary: true, qa: true }, reason: "The sources are clinical and carry no series of numbers." }));
+      }
+      if (body.response_format?.json_schema?.name === "design" || /^You are the designer/.test(String(body.messages?.[0]?.content ?? ""))) {
+        // The design pass: tests that do not set one get "nothing to redraw".
+        gw.designs++;
+        gw.designUser = String(user ?? "");
+        if (gw.designFail) {
+          res.writeHead(400, { "content-type": "application/json" });
+          return res.end(JSON.stringify({ error: { message: "The design request was refused." } }));
+        }
+        return reply(JSON.stringify(gw.designReply ?? { slides: [] }));
       }
       gw.systems.push(String(body.messages?.[0]?.content ?? ""));
       gw.formats.push(String(body.response_format?.type ?? ""));
@@ -219,19 +229,19 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(gw.plans).toBe(1);
     expect(gw.planUser).toMatch(/Build the strongest professional deck/);
     const log = job.progress.join("\n");
-    expect(log).toMatch(/Auto: Medical affairs \/ HCP education for dermatologists, 7 slides, using tables, diagrams, kpis\. The sources are clinical/);
+    expect(log).toMatch(/Auto: Medical affairs \/ HCP education for dermatologists, 7 slides, using charts, tables, diagrams, kpis\. The sources are clinical/);
     // The writer is told what the planner chose, not what the form carried.
     const sys = gw.systems.at(-1)!;
     expect(sys).toMatch(/ANGLE: Medical affairs \/ HCP education/);
     expect(sys).toMatch(/AUDIENCE: dermatologists/);
     expect(sys).toMatch(/exactly 7 slides/);
-    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, table, diagram, kpi\./);
+    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, chart, table, diagram, kpi\./);
     expect(gw.users.at(-1)).toMatch(/DECK TITLE \(use it\): Salicylic acid: 2% cap/);
     const deck = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
     expect(deck.angle).toBe("medical-affairs");
     expect(deck.brief).toMatchObject({ auto: true, text: "", slides: 7 });
     // Diagrams and number tiles stay on whatever the plan says: they carry points without paragraphs.
-    expect(deck.brief.features).toMatchObject({ charts: false, diagrams: true, kpis: true, notes: true, citations: true });
+    expect(deck.brief.features).toMatchObject({ charts: true, tables: true, diagrams: true, kpis: true, notes: true, citations: true });
   });
 
   it("writes the deck craft rules into every writer's instructions", () => {
@@ -241,7 +251,7 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(sys).toMatch(/action titles/);
     expect(sys).toMatch(/YES \/ PARTLY \/ NO/);
     expect(sys).toMatch(/- cards: 2 to 6 numbered cards/);
-    expect(sys).toMatch(/BALANCE TEXT WITH VISUALS: .*At least half of the content slides are visual \(table, diagram, kpi\)/);
+    expect(sys).toMatch(/BALANCE TEXT WITH VISUALS: .*At least half of the content slides are visual \(chart, table, diagram, kpi\)/);
     expect(sys).toMatch(/at most 60 words per content slide/);
     expect(sys).not.toMatch(/SAHKAN/);
     expect(sys).toMatch(/Never write placeholders, square-bracket notes or reminders to check something/);
@@ -355,10 +365,43 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5", features: { kpis: true } } }));
     const job = await waitJob(jobId);
     expect(job.status).toBe("done");
-    expect(job.progress.join("\n")).toMatch(/The writer sent too many text slides; \d redrawn from their own words/);
+    expect(job.progress.join("\n")).toMatch(/\d more text slides? redrawn from their own words/);
     const slides = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
     // Two of three visual meets the rule, so the third keeps its bullets.
     expect(slides.map((x) => x.layout)).toEqual(["kpi", "diagram", "bullets"]);
+  });
+
+  it("has the writer redesign a text deck as charts from the sources' figures", async () => {
+    gw.deckAllText = 1;
+    gw.designReply = { slides: [
+      { index: 0, slide: { layout: "chart", kicker: null, title: "Results at week 4", subtitle: null, body: null, bullets: [], leftHeading: null, rightHeading: null, bulletsRight: [], chart: { kind: "column", categories: ["Redness", "Hydration"], series: [{ name: "Change", values: [-32, 18] }], unit: "%", source: "UKM study" }, table: null, diagram: null, kpi: [], cards: [], image: null, quote: null, notes: "Walk through both bars.", citations: ["UKM study"] } },
+      { index: 7, slide: { layout: "chart", title: "Out of range" } },
+      { index: 2, slide: { layout: "bullets", title: "Still text", bullets: ["a"] } },
+    ] };
+    const id = await newDeck("designed");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5", features: { kpis: true, charts: true } } }));
+    const job = await waitJob(jobId);
+    gw.designReply = null;
+    expect(job.status).toBe("done");
+    const log = job.progress.join("\n");
+    expect(log).toMatch(/Designing: most slides are text/);
+    expect(log).toMatch(/Design: 1 slide redrawn as visuals/);
+    expect(gw.designUser).toMatch(/SLIDES TO REDESIGN \(3\)/);
+    const slides = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(slides[0].layout).toBe("chart");
+    expect(slides[0].chart.series[0].values).toEqual([-32, 18]);
+    expect(slides).toHaveLength(3);
+  });
+
+  it("still delivers the deck when the design pass fails", async () => {
+    gw.deckAllText = 1;
+    gw.designFail = true;
+    const id = await newDeck("design-fails");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5", features: { kpis: true } } }));
+    const job = await waitJob(jobId);
+    gw.designFail = false;
+    expect(job.status).toBe("done");
+    expect(job.progress.join("\n")).toMatch(/Design pass skipped: .*The design request was refused/);
   });
 
   it("fails clearly when the content slides are titles with nothing under them, and says what the writer sent", async () => {

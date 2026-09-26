@@ -14,6 +14,7 @@ import { importFolder, summarise } from "../onedrive.js";
 import { getDesign, promptTexts } from "../library.js";
 import { pictureAuth } from "../reader.js";
 import { visualise } from "./visualise.js";
+import { designPass, needsDesign, placePictures } from "./design.js";
 
 export interface Job {
   id: string;
@@ -108,9 +109,9 @@ export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): 
   p.slides = Math.max(6, Math.min(30, Math.round(Number(plan.slides) || 12)));
   if (!p.title && plan.title?.trim()) p.title = plan.title.trim().slice(0, 140);
   const f = plan.features ?? ({} as Plan["features"]);
-  // Diagrams and big numbers stay available whatever the plan says: they are how a slide carries a
+  // Charts, tables, diagrams and big numbers stay available whatever the plan says: they are how a slide carries a
   // point without a paragraph, and the writer only uses a number tile when the sources give numbers.
-  p.features = { ...p.features, charts: !!f.charts, tables: !!f.tables, diagrams: true, kpis: true, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
+  p.features = { ...p.features, charts: true, tables: true, diagrams: true, kpis: true, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
   p.imageMode = hasPictures ? "uploaded" : "none";
 }
 
@@ -466,8 +467,6 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     }
     const rawSlides = (Array.isArray(json.slides) ? json.slides : []).filter((r) => r && typeof r === "object") as Record<string, unknown>[];
     const slides = rawSlides.map((r) => toSlide(r, p.features, p.imageMode));
-    const redrawn = visualise(slides, p.features);
-    if (redrawn) log(jobId, `The writer sent too many text slides; ${redrawn} redrawn from their own words as figures, diagrams or cards`);
     // Keep the writer's answer for this deck, so a deck that comes out wrong can be looked into.
     try {
       const dir = path.join(config.dataDir, "writer-replies");
@@ -501,16 +500,38 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       e.raw = rawSnippet(JSON.stringify(json));
       throw e;
     }
+    // Design: a writer that answered in bullets is asked to redraw its text slides from the sources' own figures.
+    if (!config.mockLlm && auth && needsDesign(slides)) {
+      log(jobId, "Designing: most slides are text, so the writer is asked to redraw them as charts, tables, diagrams and figures");
+      try {
+        const n = await designPass(auth, slides, sources, p.features, p.lang, (r) => toSlide(r, p.features, p.imageMode));
+        log(jobId, n ? `Design: ${n} slide${n === 1 ? "" : "s"} redrawn as visuals` : "Design: the writer found no slide it could redraw honestly");
+      } catch (e) {
+        // The deck is already written; a design pass that fails costs the redesign, never the deck.
+        log(jobId, `Design pass skipped: ${(e as Error).message}`);
+      }
+    }
     // Pictures.
     const imageSlides = slides.filter((s) => s.layout === "image");
+    const pics = rows.filter((r) => r.kind === "image" && r.media_id);
     if (imageSlides.length && p.imageMode === "uploaded") {
-      const pics = rows.filter((r) => r.kind === "image" && r.media_id);
-      let k = 0;
-      for (const s of imageSlides) {
-        const want = String((json.slides.find((r) => r.title === s.title) as { image?: { sourceName?: string } } | undefined)?.image?.sourceName ?? "").toLowerCase();
-        const match = pics.find((r) => want && (r.name.toLowerCase() === want || (r.rel_path ?? "").toLowerCase() === want)) ?? pics[k++ % Math.max(pics.length, 1)];
-        if (match?.media_id) s.image = { ...(s.image ?? {}), mediaId: match.media_id };
+      const taken = new Set<string>();
+      for (const [i, s] of slides.entries()) {
+        if (s.layout !== "image" || s.image?.mediaId) continue;
+        // The file the writer named; slides still line up with the writer's answer here.
+        const want = String((rawSlides[i]?.image as { sourceName?: unknown } | undefined)?.sourceName ?? "").toLowerCase().trim();
+        const byName = (r: SourceRow) => !!want && (r.name.toLowerCase() === want || (r.rel_path ?? "").toLowerCase() === want);
+        // The picture the writer named; else the next one not yet on a slide; never the same picture twice while others wait.
+        const match = pics.find((r) => byName(r)) ?? pics.find((r) => !taken.has(r.media_id!)) ?? null;
+        if (match?.media_id) {
+          s.image = { ...(s.image ?? {}), mediaId: match.media_id };
+          taken.add(match.media_id);
+        }
       }
+    }
+    if (p.imageMode === "uploaded" && p.features.images && pics.length) {
+      const placed = placePictures(slides, pics.map((r) => ({ mediaId: r.media_id!, name: r.rel_path || r.name, text: r.text })), p.lang, 6, p.auto ? Infinity : p.slides);
+      if (placed) log(jobId, `${placed} uploaded picture${placed === 1 ? "" : "s"} the writer did not use put on the slides they belong to`);
     } else if (imageSlides.length && p.imageMode === "generate" && auth) {
       let n = 0;
       for (const s of imageSlides) {
@@ -528,6 +549,9 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         }
       }
     }
+    // Whatever is still text-heavy is redrawn from its own words.
+    const redrawn = visualise(slides, p.features);
+    if (redrawn) log(jobId, `${redrawn} more text slide${redrawn === 1 ? "" : "s"} redrawn from their own words as figures, diagrams or cards`);
     deck.title = json.title || deck.title;
     if (json.subtitle) deck.subtitle = json.subtitle;
     deck.lang = p.lang;

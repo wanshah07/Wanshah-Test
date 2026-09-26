@@ -13,6 +13,14 @@ export interface Extracted {
   text: string;
   /** Present for pictures: the bytes the media store keeps. */
   image?: { buf: Buffer; mime: string };
+  /** Pictures found inside this file (figures in a PDF), each its own source. */
+  figures?: Extracted[];
+}
+
+/** A file and the pictures inside it, as separate sources. */
+function flat(e: Extracted): Extracted[] {
+  const { figures, ...rest } = e;
+  return [rest, ...(figures ?? [])];
 }
 
 const IMAGE_MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml" };
@@ -21,7 +29,7 @@ const SKIP = /(^|\/)(\.git|node_modules|__MACOSX|\.DS_Store|Thumbs\.db)(\/|$)/;
 export async function extractMany(name: string, buf: Buffer, relPath = name): Promise<Extracted[]> {
   const ext = path.extname(name).toLowerCase();
   if (ext === ".zip") return extractZip(buf, relPath.replace(/\.zip$/i, ""));
-  return [await extractOne(name, buf, relPath)];
+  return flat(await extractOne(name, buf, relPath));
 }
 
 async function extractZip(buf: Buffer, prefix: string): Promise<Extracted[]> {
@@ -34,7 +42,7 @@ async function extractZip(buf: Buffer, prefix: string): Promise<Extracted[]> {
     if (path.extname(f.name).toLowerCase() === ".zip") {
       out.push(...(await extractZip(b, rel.replace(/\.zip$/i, ""))));
     } else {
-      out.push(await extractOne(path.basename(f.name), b, rel));
+      out.push(...flat(await extractOne(path.basename(f.name), b, rel)));
     }
   }
   return out;
@@ -44,7 +52,18 @@ export async function extractOne(name: string, buf: Buffer, relPath = name): Pro
   const ext = path.extname(name).toLowerCase();
   const base = { name, relPath };
   try {
-    if (ext === ".pdf") return { ...base, kind: "pdf", text: clean(await pdfText(buf)) };
+    if (ext === ".pdf") {
+      const text = clean(await pdfText(buf));
+      // The figures are a bonus: a PDF whose pictures cannot be read still gives its text.
+      const figures = await pdfFigures(buf).catch(() => []);
+      const stem = name.replace(/\.pdf$/i, "");
+      return {
+        ...base,
+        kind: "pdf",
+        text,
+        figures: figures.map((f, i) => ({ name: `${stem} - p${f.page} figure ${i + 1}.jpg`, relPath: `${relPath.replace(/\.pdf$/i, "")}/p${f.page}-figure-${i + 1}.jpg`, kind: "image" as const, text: "", image: { buf: f.jpg, mime: "image/jpeg" } })),
+      };
+    }
     if (ext === ".docx") return { ...base, kind: "docx", text: clean((await mammoth.extractRawText({ buffer: buf })).value) };
     if (ext === ".pptx") return { ...base, kind: "pptx", text: clean(await pptxText(buf)) };
     if ([".xlsx", ".xlsm", ".xls", ".csv", ".tsv"].includes(ext)) return { ...base, kind: "sheet", text: sheetText(buf) };
@@ -86,6 +105,70 @@ async function pdfText(buf: Buffer): Promise<string> {
   }
   await doc.destroy();
   return pages.join("\n\n");
+}
+
+/** Figures worth a slide: big enough to be a chart, photo or poster, not a logo, icon or rule. */
+const FIG_MIN_W = 240;
+const FIG_MIN_H = 160;
+const FIG_MIN_AREA = 90_000;
+const FIG_MAX = 8;
+const FIG_PAGES = 40;
+
+/** The raster pictures embedded in a PDF, as JPEG, in page order, at most FIG_MAX. */
+export async function pdfFigures(buf: Buffer): Promise<{ page: number; jpg: Buffer; width: number; height: number }[]> {
+  const spec = "pdfjs-dist/legacy/build/pdf.mjs";
+  const pdfjs = await import(spec);
+  const jpeg = (await import("jpeg-js")).default;
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false }).promise;
+  const out: { page: number; jpg: Buffer; width: number; height: number }[] = [];
+  const seen = new Set<string>();
+  try {
+    for (let p = 1; p <= Math.min(doc.numPages, FIG_PAGES) && out.length < FIG_MAX; p++) {
+      const page = await doc.getPage(p);
+      const ops = await page.getOperatorList();
+      for (let i = 0; i < ops.fnArray.length && out.length < FIG_MAX; i++) {
+        if (ops.fnArray[i] !== pdfjs.OPS.paintImageXObject) continue;
+        const id = ops.argsArray[i]?.[0];
+        if (typeof id !== "string") continue;
+        const store = id.startsWith("g_") ? page.commonObjs : page.objs;
+        const img = await new Promise<{ width: number; height: number; kind: number; data?: Uint8Array; ref?: string } | null>((res) => {
+          const t = setTimeout(() => res(null), 5000);
+          try {
+            store.get(id, (v: never) => {
+              clearTimeout(t);
+              res(v);
+            });
+          } catch {
+            clearTimeout(t);
+            res(null);
+          }
+        });
+        if (!img?.data || img.width < FIG_MIN_W || img.height < FIG_MIN_H || img.width * img.height < FIG_MIN_AREA) continue;
+        const key = img.ref ?? `${img.width}x${img.height}:${img.data.length}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        // kind 2 is RGB, kind 3 RGBA; kind 1 (1-bit masks) is line art, not a figure.
+        const n = img.width * img.height;
+        let rgba: Buffer;
+        if (img.kind === 3 && img.data.length >= n * 4) rgba = Buffer.from(img.data.buffer, img.data.byteOffset, n * 4);
+        else if (img.kind === 2 && img.data.length >= n * 3) {
+          rgba = Buffer.alloc(n * 4);
+          for (let k = 0, j = 0; k < n; k++, j += 3) {
+            rgba[k * 4] = img.data[j];
+            rgba[k * 4 + 1] = img.data[j + 1];
+            rgba[k * 4 + 2] = img.data[j + 2];
+            rgba[k * 4 + 3] = 255;
+          }
+        } else continue;
+        const jpg = Buffer.from(jpeg.encode({ width: img.width, height: img.height, data: rgba }, 85).data);
+        out.push({ page: p, jpg, width: img.width, height: img.height });
+      }
+      page.cleanup();
+    }
+  } finally {
+    await doc.destroy();
+  }
+  return out;
 }
 
 async function pptxText(buf: Buffer): Promise<string> {
