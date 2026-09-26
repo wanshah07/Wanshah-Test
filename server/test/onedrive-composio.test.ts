@@ -23,7 +23,7 @@ const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 7, 7, 7, 0xff, 0xd9]);
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const sha = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex").toUpperCase();
 
-const cz = { twin: false, rejectLatest: false, versions: [] as (string | undefined)[], keyOnS3: 0, calls: [] as { slug: string; args: Record<string, unknown> }[] };
+const cz = { twin: false, rejectLatest: false, owners: [] as unknown[], versions: [] as (string | undefined)[], keyOnS3: 0, calls: [] as { slug: string; args: Record<string, unknown> }[] };
 let server: http.Server;
 let base = "";
 
@@ -49,14 +49,19 @@ beforeAll(async () => {
       if (req.headers["x-api-key"] !== KEY) return send(401, { error: { message: "Invalid API key" } });
       if (url.pathname === "/api/v3/connected_accounts") {
         if (cz.twin) return send(200, { items: [{ id: "ca_first111111", status: "ACTIVE", user_id: "pg-test-1", created_at: "2026-09-20T01:00:00Z", toolkit: { slug: "one_drive" } }, { id: "ca_second222222", status: "ACTIVE", user_id: "pg-test-1", created_at: "2026-09-26T09:00:00Z", toolkit: { slug: "one_drive" } }] });
-        return send(200, { items: [{ id: "ca_od", status: "ACTIVE", alias: "Muhammad-Ridzuan", toolkit: { slug: "one_drive" } }, { id: "ca_gm", status: "ACTIVE", toolkit: { slug: "gmail" } }] });
+        return send(200, { items: [{ id: "ca_od", status: "ACTIVE", alias: "Muhammad-Ridzuan", user_id: "pg-test-9", toolkit: { slug: "one_drive" } }, { id: "ca_gm", status: "ACTIVE", toolkit: { slug: "gmail" } }] });
       }
+      if (url.pathname === "/api/v3/connected_accounts/ca_od") return send(200, { id: "ca_od", status: "ACTIVE", user_id: "pg-test-9", toolkit: { slug: "one_drive" } });
       const m = /^\/api\/v3\/tools\/execute\/([A-Z_]+)$/.exec(url.pathname);
       if (!m || req.method !== "POST") return send(404, { error: { message: "no route" } });
       const body = JSON.parse(raw || "{}");
       cz.versions.push(body.version);
       if (cz.rejectLatest && body.version === "latest") return send(400, { error: { message: "Unknown toolkit version: latest" } });
       if (body.connected_account_id !== "ca_od") return send(400, { error: { message: "connected account not found" } });
+      cz.owners.push(body.user_id);
+      // What the real API answered on 26 Sep 2026 when user_id was left out.
+      if (!body.user_id) return send(400, { error: { message: "User ID is required with connected account. Please provide a user ID to identify the connected account." } });
+      if (body.user_id !== "pg-test-9") return send(400, { error: { message: "connected account does not belong to this user" } });
       const a = body.arguments as Record<string, unknown>;
       cz.calls.push({ slug: m[1], args: a });
       if (m[1] === "ONE_DRIVE_LIST_FOLDER_CHILDREN") {
@@ -134,6 +139,11 @@ describe("OneDrive through Composio", () => {
     expect(cz.keyOnS3).toBe(0);
     const dl = cz.calls.find((c) => c.slug === "ONE_DRIVE_DOWNLOAD_FILE")!;
     expect(dl.args).toMatchObject({ item_id: "lab", file_name: "lab-01.jpg.jpg", drive_id: "d1" });
+  });
+
+  it("names the account's owner on every tool call, looked up once", async () => {
+    expect(cz.owners.length).toBeGreaterThan(0);
+    expect(cz.owners.every((o) => o === "pg-test-9")).toBe(true);
   });
 
   it("skips unchanged pictures on the next pull", async () => {
