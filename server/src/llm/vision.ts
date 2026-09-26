@@ -1,6 +1,7 @@
 import { PNG } from "pngjs";
 import { getDb, now } from "../db.js";
 import { chatText, LlmError, type ContentPart, type LlmAuth } from "./client.js";
+import { PICTURE_BUDGET, shrinkPicture } from "./shrink.js";
 
 // Whether the writer model can read pictures, found out once per endpoint and
 // model with a tiny test picture and remembered. A model that can is given the
@@ -77,7 +78,8 @@ export async function visionFor(userId: string, auth: LlmAuth, fresh = false): P
 export const NOTHING = "NONE";
 
 /** What a picture says, as notes a slide writer can cite; NONE for a picture with nothing to read. */
-export async function readPicture(auth: LlmAuth, name: string, buf: Buffer, mime: string): Promise<string> {
+export async function readPicture(auth: LlmAuth, name: string, original: Buffer, originalMime: string, budget = PICTURE_BUDGET): Promise<string> {
+  const { buf, mime } = shrinkPicture(original, originalMime, budget);
   const user: ContentPart[] = [
     {
       type: "text",
@@ -85,6 +87,13 @@ export async function readPicture(auth: LlmAuth, name: string, buf: Buffer, mime
     },
     { type: "image_url", image_url: { url: `data:${mime};base64,${buf.toString("base64")}`, detail: "high" } },
   ];
-  const out = (await chatText(auth, "You transcribe pictures exactly. You never invent content.", user, 12000, 180000)).trim();
+  let out: string;
+  try {
+    out = (await chatText(auth, "You transcribe pictures exactly. You never invent content.", user, 12000, 180000)).trim();
+  } catch (e) {
+    // A gateway with a lower body limit than ours: once more at a quarter of the size.
+    if (e instanceof LlmError && e.status === 413 && budget > 96 * 1024) return readPicture(auth, name, original, originalMime, Math.floor(budget / 4));
+    throw e;
+  }
   return out || NOTHING;
 }
