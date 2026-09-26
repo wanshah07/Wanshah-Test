@@ -58,6 +58,16 @@ export function errorOf(json: unknown): { message: string; code: string } {
   return { message: "", code: "" };
 }
 
+/** Longest wait for a rate limit before giving up and saying so. */
+export const MAX_RATE_WAIT_S = 90;
+
+/** How long a 429 asks to wait, from Retry-After, Google's retryDelay or "retry in N s" in the message. */
+export function retryAfterSeconds(header: string | null, body: string): number | null {
+  if (header && /^\d+(\.\d+)?$/.test(header.trim())) return Number(header);
+  const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(body) ?? /retry in (\d+(?:\.\d+)?)\s*s/i.exec(body);
+  return m ? Number(m[1]) : null;
+}
+
 async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: number): Promise<Record<string, unknown>> {
   const host = hostOf(auth.baseUrl);
   let last: LlmError | null = null;
@@ -81,7 +91,15 @@ async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: numbe
       if (res.ok) return json;
       const err = errorOf(json);
       last = new LlmError(err.message ? `${host} answered ${res.status}: ${err.message}` : `${host} answered ${res.status}`, res.status, err.code || `http_${res.status}`);
-      if (res.status === 429 || res.status >= 500) {
+      if (res.status === 429) {
+        // A rate limit says how long to wait. Wait that long when it is short (a per-minute limit);
+        // a long wait means a daily limit, where retrying now only spends another request.
+        const wait = retryAfterSeconds(res.headers.get("retry-after"), text);
+        if (wait !== null && wait > MAX_RATE_WAIT_S) throw last;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, wait !== null ? (wait + 1) * 1000 : 1500 * (attempt + 1)));
+        continue;
+      }
+      if (res.status >= 500) {
         // A busy model ("high demand", 503) needs longer than a blip to clear.
         await new Promise((r) => setTimeout(r, (res.status === 503 ? 5000 : 1500) * (attempt + 1)));
         continue;

@@ -15,6 +15,9 @@ interface Behaviour {
   /** Gemini: a list-shaped error, with a reason that never says "schema". */
   gemini?: boolean;
   geminiModels?: boolean;
+  /** A rate limit: the number of 429s still to send, and the wait they ask for. */
+  limited?: number;
+  retryIn?: number;
   badModel?: boolean;
 }
 
@@ -47,6 +50,11 @@ beforeAll(async () => {
         res.writeHead(400, { "content-type": "application/json" });
         res.end(JSON.stringify([{ error: { code: 400, message: msg, status: "INVALID_ARGUMENT" } }]));
       };
+      if (behaviour.limited && behaviour.limited > 0) {
+        behaviour.limited--;
+        res.writeHead(429, { "content-type": "application/json" });
+        return res.end(JSON.stringify([{ error: { code: 429, message: `You exceeded your current quota.\nPlease retry in ${behaviour.retryIn}s.`, status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: `${behaviour.retryIn}s` }] } }]));
+      }
       if (behaviour.badModel) return geminiFail("* GenerateContentRequest.model: unexpected model name format");
       if (behaviour.gemini && body.response_format?.type === "json_schema") return geminiFail('Invalid JSON payload received. Unknown name "additionalProperties" at \'generation_config.response_schema\': Cannot find field.');
       if (behaviour.refuseMaxCompletion && "max_completion_tokens" in body) return fail("Unrecognized request argument supplied: max_completion_tokens");
@@ -69,6 +77,25 @@ const auth = (): LlmAuth => ({ apiKey: "k", model: "claude-sonnet", imageModel: 
 const args = () => ({ auth: auth(), system: "sys", user: "u", schemaName: "t", schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] } });
 
 describe("gateway compatibility", () => {
+  it("waits as long as a rate limit asks, then goes on", async () => {
+    behaviour = { limited: 1, retryIn: 0.4 };
+    const t0 = Date.now();
+    expect(await chatJson(args())).toEqual({ title: "ok", n: 1 });
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1300); // 0.4 s asked, plus a second's margin
+    behaviour = {};
+  });
+
+  it("does not sit out a long (daily) limit: it stops and says why", async () => {
+    behaviour = { limited: 5, retryIn: 3600 };
+    const t0 = Date.now();
+    const e = await chatJson(args()).catch((x) => x);
+    behaviour = {};
+    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(e).toBeInstanceOf(LlmError);
+    expect(e.status).toBe(429);
+    expect(e.message).toMatch(/You exceeded your current quota/);
+  });
+
   it("lists only models that can write, with Gemini's models/ prefix removed, and picture models apart", async () => {
     behaviour = { geminiModels: true };
     const r = await checkKey("k", base);
