@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { vision: false, garbage: false, plans: 0, planUser: "", systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -85,11 +85,21 @@ beforeAll(async () => {
       if (body.response_format?.json_schema?.name === "plan") {
         gw.plans++;
         gw.planUser = String(user ?? "");
+        gw.planLastMsgs = body.messages;
+        // What a chatty model sent on 26 Sep 2026: a deck in prose instead of the plan.
+        if (gw.planProse > 0) {
+          gw.planProse--;
+          return reply("Here is a professional presentation deck built strictly from the provided source material. ### Deck Strategy: Purpose, Audience, and Core Conclusion");
+        }
         return reply(JSON.stringify({ title: "Salicylic acid: 2% cap needs 4 SKUs reformulated", angle: "medical-affairs", audience: "dermatologists", slides: 7, features: { charts: false, tables: true, diagrams: false, kpis: true, sections: false, summary: true, qa: true }, reason: "The sources are clinical and carry no series of numbers." }));
       }
       gw.systems.push(String(body.messages?.[0]?.content ?? ""));
       gw.formats.push(String(body.response_format?.type ?? ""));
       gw.users.push(String(user ?? ""));
+      if (gw.deckProse > 0) {
+        gw.deckProse--;
+        return reply("Sure! Here is the deck you asked for, slide by slide.");
+      }
       if (gw.garbage) return reply("Sorry, I can only help with questions about cooking. " + "x".repeat(900));
       reply(JSON.stringify(mockDeckJson({ prompt: "x", lang: "en", angle: "custom", slides: 6, features: DEFAULT_FEATURES, imageMode: "none" }, [])));
     });
@@ -165,6 +175,38 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(sys).toMatch(/action titles/);
     expect(sys).toMatch(/YES \/ PARTLY \/ NO/);
     expect(sys).toMatch(/- cards: 2 to 6 numbered cards/);
+  });
+
+  it("asks the planner for settings only, and gives a chatty model one more turn", async () => {
+    gw.planProse = 1;
+    const before = gw.plans;
+    const id = await newDeck("auto-retry");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "", auto: true } }));
+    const job = await waitJob(jobId);
+    expect(job.status, job.error ?? "").toBe("done");
+    expect(gw.plans - before).toBe(2);
+    expect(gw.planLastMsgs[1].content).toMatch(/^TASK: choose the settings for a slide deck\. Do NOT write the deck/);
+    expect(gw.planLastMsgs.at(-2)).toMatchObject({ role: "assistant" });
+    expect(gw.planLastMsgs.at(-1)!.content).toMatch(/That answer is not JSON/);
+  });
+
+  it("still writes the deck when the model never gives a plan", async () => {
+    gw.planProse = 2;
+    const id = await newDeck("auto-noplan");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "", auto: true, angle: "training" } }));
+    const job = await waitJob(jobId);
+    expect(job.status, job.error ?? "").toBe("done");
+    const log = job.progress.join("\n");
+    expect(log).toMatch(/Auto: the model did not return a plan \(The model answered with something that is not JSON\), so standard settings are used/);
+    expect(log).toMatch(/Here is a professional presentation deck/);
+    expect(gw.systems.at(-1)).toMatch(/exactly 10 slides/);
+  });
+
+  it("recovers the deck itself when the first reply is prose", async () => {
+    gw.deckProse = 1;
+    const id = await newDeck("deck-retry");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
+    expect((await waitJob(jobId)).status).toBe("done");
   });
 
   it("leaves the choices alone without Auto", async () => {

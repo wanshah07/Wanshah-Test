@@ -45,12 +45,16 @@ export function BriefPicker({ value, onChange, compact }: { value: BriefValue; o
   const set = (patch: Partial<BriefValue>) => onChange({ ...value, ...patch });
   const [saved, setSaved] = useState<SavedPrompt[]>([]);
   useEffect(() => {
-    api.prompts().then(setSaved).catch(() => {});
+    const load = () => api.prompts().then(setSaved).catch(() => {});
+    load();
+    // Prompts added in the other tab show up on coming back.
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
   }, []);
   return (
     <div className="stack">
       <div>
-        <b className="small">Your saved prompts</b> <span className="small muted">{saved.length ? "Tick the ones this deck should follow." : ""} <Link to="/prompts">{saved.length ? "Manage" : "Add your own instructions for every deck"}</Link></span>
+        <b className="small">Your saved prompts</b> <span className="small muted">{saved.length ? "Tick the ones this deck should follow." : ""} <Link to="/prompts" target="_blank" rel="noopener">{saved.length ? "Manage" : "Add your own instructions for every deck"}</Link></span>
         {saved.length > 0 && <Chips list={saved.map((p) => ({ id: p.id, label: p.name, line: p.text }))} value={value.prompts} onChange={(prompts) => set({ prompts })} />}
       </div>
       <div>

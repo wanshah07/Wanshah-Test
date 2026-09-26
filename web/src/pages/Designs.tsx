@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { blankSlide } from "@slidecraft/shared";
 import { api, mediaUrl, type Design } from "../api";
+import { BackButton } from "../components/BackButton";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { DropZone } from "../components/DropZone";
 import { SlideFrame } from "../components/SlideFrame";
@@ -43,6 +44,7 @@ export default function Designs() {
   return (
     <main className="page stack" style={{ maxWidth: 1000 }}>
       <div>
+        <BackButton />
         <h1>Designs</h1>
         <p className="muted">Drop a deck or a picture of slides whose look you want. Slidecraft reads the colours, fonts and how much goes on a slide, and the writer follows it for any deck you use it on.</p>
       </div>

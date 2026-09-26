@@ -92,6 +92,32 @@ export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): 
   p.imageMode = hasPictures ? "uploaded" : "none";
 }
 
+/** The planner's own message: the brief and a short look at each source, and a clear instruction not to write the deck. */
+export function planUser(p: GenerateParams, sources: { name: string; kind: string; text: string }[]): string {
+  const parts = [
+    "TASK: choose the settings for a slide deck. Do NOT write the deck, its slides or any outline. Answer with the settings JSON only.",
+    `BRIEF: ${p.prompt.trim()}`,
+  ];
+  if (p.title) parts.push(`DECK TITLE: ${p.title}`);
+  if (sources.length) {
+    parts.push(`SOURCES (${sources.length}; the start of each):`);
+    for (const x of sources.slice(0, 30)) parts.push(x.kind === "image" ? `- Picture: ${x.name}` : `- ${x.name} (${x.kind}): ${x.text.slice(0, 1500).replace(/\s+/g, " ")}`);
+  } else parts.push("SOURCES: none.");
+  return parts.join("\n");
+}
+
+/** Settings used when the model will not plan: the form's angle, a length that fits the material, every visual it can fill. */
+export function fallbackPlan(p: GenerateParams, hasNumbers: boolean, sourceCount: number): Plan {
+  return {
+    title: null,
+    angle: p.angle,
+    audience: p.audience || "professional readers",
+    slides: sourceCount >= 4 ? 14 : 10,
+    features: { charts: hasNumbers, tables: true, diagrams: true, kpis: hasNumbers, sections: sourceCount >= 4, summary: true, qa: false },
+    reason: "Standard settings, because the model did not return a plan.",
+  };
+}
+
 export function mockPlan(p: GenerateParams, hasNumbers: boolean): Plan {
   return { title: null, angle: "regulatory-briefing", audience: "management and product teams", slides: 12, features: { charts: hasNumbers, tables: true, diagrams: true, kpis: true, sections: true, summary: true, qa: false }, reason: `Stand-in plan for: ${p.prompt.slice(0, 60)}` };
 }
@@ -207,9 +233,20 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     if (p.auto) {
       log(jobId, "Auto: reading the material to choose the angle, audience, length and layouts");
       const hasPictures = rows.some((r) => r.kind === "image" && r.media_id);
-      const plan: Plan = config.mockLlm || !auth
-        ? mockPlan(p, sources.some((x) => /\d{2,}/.test(x.text)))
-        : await chatJson({ auth, system: planSystem(), user: userPrompt(p, sources.map((x) => ({ ...x, text: x.text.slice(0, 12000) })), condensed), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+      const hasNumbers = sources.some((x) => /\d{2,}/.test(x.text));
+      let plan: Plan;
+      if (config.mockLlm || !auth) plan = mockPlan(p, hasNumbers);
+      else {
+        try {
+          plan = await chatJson({ auth, system: planSystem(), user: planUser(p, sources), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+        } catch (e) {
+          // The plan only picks settings; a model that will not give one still gets to write the deck.
+          if (!(e instanceof LlmError) || !["parse", "length", "unsupported"].includes(String(e.code))) throw e;
+          log(jobId, `Auto: the model did not return a plan (${e.message}), so standard settings are used`);
+          if (e.raw !== undefined) log(jobId, `Model reply (first ${RAW_KEEP} characters): ${e.raw || "(empty)"}`);
+          plan = fallbackPlan(p, hasNumbers, sources.length);
+        }
+      }
       applyPlan(p, plan, hasPictures);
       const on = (["charts", "tables", "diagrams", "kpis", "sections"] as const).filter((k) => p.features[k]);
       log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}. ${plan.reason}`);

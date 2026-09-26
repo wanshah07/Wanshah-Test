@@ -129,7 +129,9 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
   let mode: "schema" | "object" = "schema";
   let tokenKey: "max_completion_tokens" | "max_tokens" = "max_completion_tokens";
   let sendTemperature = !/^(o\d|gpt-5)/.test(a.auth.model);
-  for (let round = 0; round < 4; round++) {
+  // A reply that is not JSON gets one more turn, with the reply shown back and the rules restated.
+  let followUp: { role: "assistant" | "user"; content: string }[] = [];
+  for (let round = 0; round < 5; round++) {
     // The rules are written into the instructions on every call, not only set
     // as response_format: gateways and models that ignore the request setting
     // still read the instructions.
@@ -139,6 +141,7 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       messages: [
         { role: "system", content: system },
         { role: "user", content: a.user },
+        ...followUp,
       ],
       response_format: mode === "schema" ? { type: "json_schema", json_schema: { name: a.schemaName, strict: true, schema: a.schema } } : { type: "json_object" },
       [tokenKey]: a.maxTokens ?? 16000,
@@ -174,6 +177,13 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
     try {
       return extractJson(choice.message.content ?? "") as T;
     } catch {
+      if (!followUp.length) {
+        followUp = [
+          { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
+          { role: "user", content: "That answer is not JSON, so it cannot be used. Answer again with only the JSON object the OUTPUT FORMAT rules describe: start with { and end with }, no prose, no markdown fences." },
+        ];
+        continue;
+      }
       const e = new LlmError("The model answered with something that is not JSON", 0, "parse");
       e.raw = rawSnippet(choice.message.content ?? "");
       throw e;
