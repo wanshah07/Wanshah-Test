@@ -234,8 +234,9 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       }
       throw e;
     }
-    const choice = (json.choices as { message: { content?: string; refusal?: string }; finish_reason?: string }[] | undefined)?.[0];
-    if (!choice) throw new LlmError("The model returned no choices");
+    const first = (json.choices as { message?: { content?: string; refusal?: string }; finish_reason?: string }[] | undefined)?.[0];
+    if (!first) throw new LlmError("The model returned no choices");
+    const choice = { ...first, message: first.message ?? {} };
     if (choice.message.refusal) throw new LlmError(`The model declined: ${choice.message.refusal}`, 0, "refusal");
     if (choice.finish_reason === "length") {
       const e = new LlmError("The answer was cut off by the token limit. Ask for fewer slides or fewer sources.", 0, "length");
@@ -252,7 +253,15 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       // Valid JSON in a shape of the model's own (a brief, an outline) is as unusable as prose,
       // and it happens most in plain JSON mode, where the schema is only in the instructions.
       const missing = missingKeys(parsed, a.schema);
-      if (!missing.length || followUp.length) return parsed as T;
+      if (!missing.length) return parsed as T;
+      if (followUp.length) {
+        // Still the wrong shape after being asked again: an object is handed on for the caller to
+        // salvage, anything else (null, a list, a number) is a failure the caller can report.
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as T;
+        const e = new LlmError("The model answered with JSON that is not the object asked for", 0, "parse");
+        e.raw = rawSnippet(choice.message.content ?? "");
+        throw e;
+      }
       const keys = Object.keys((a.schema.properties as Record<string, unknown>) ?? {});
       const had = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? Object.keys(parsed as object) : [];
       followUp = [

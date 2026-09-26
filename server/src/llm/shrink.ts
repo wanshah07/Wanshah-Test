@@ -14,10 +14,36 @@ interface Raster {
   data: Buffer | Uint8Array; // RGBA
 }
 
+/** Pixels a picture may have before it is decoded: a small file of one colour can claim billions. */
+export const MAX_PIXELS = 40_000_000;
+
+/** Width and height from the file header, without decoding it. */
+export function pictureSize(buf: Buffer): { width: number; height: number } | null {
+  if (buf.length >= 24 && buf.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))) return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  if (buf.length >= 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < buf.length) {
+      if (buf[i] !== 0xff) {
+        i++;
+        continue;
+      }
+      const marker = buf[i + 1];
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+        i += 2;
+        continue;
+      }
+      const len = buf.readUInt16BE(i + 2);
+      if ((marker >= 0xc0 && marker <= 0xcf) && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
 function decode(buf: Buffer, mime: string): Raster | null {
   try {
     if (/png/i.test(mime) || buf.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))) return PNG.sync.read(buf);
-    if (/jpe?g/i.test(mime) || (buf[0] === 0xff && buf[1] === 0xd8)) return jpeg.decode(buf, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 1024 });
+    if (/jpe?g/i.test(mime) || (buf[0] === 0xff && buf[1] === 0xd8)) return jpeg.decode(buf, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 512, maxResolutionInMP: MAX_PIXELS / 1e6 });
   } catch {
     /* not a picture we can decode: sent as it is */
   }
@@ -75,9 +101,12 @@ function onWhite(r: Raster): Raster {
  */
 export function shrinkPicture(buf: Buffer, mime: string, budget = PICTURE_BUDGET): { buf: Buffer; mime: string; shrunk: boolean } {
   if (buf.length <= budget) return { buf, mime, shrunk: false };
+  const size = pictureSize(buf);
+  if (size && size.width * size.height > MAX_PIXELS) throw new Error(`the picture is ${Math.round((size.width * size.height) / 1e6)} megapixels, more than the ${MAX_PIXELS / 1e6} that can be read; export it smaller`);
   const raw = decode(buf, mime);
   if (!raw) return { buf, mime, shrunk: false };
-  const flat = onWhite(raw);
+  // Shrink first, then flatten: the full-size copy is never made twice.
+  const flat = onWhite(resize(raw, 2400));
   // Encoding is the slow part, so each try aims straight at the budget: JPEG size
   // scales roughly with pixel count, so the side shrinks by the square root of the overshoot.
   let side = Math.min(2400, Math.max(raw.width, raw.height));

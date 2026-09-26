@@ -1,7 +1,7 @@
 import { ANGLES, angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themePreset, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
 import { config } from "../config.js";
 import { getDb, now } from "../db.js";
-import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, type SourceRow } from "../store.js";
+import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, updateDeck, updateSlide, type SourceRow } from "../store.js";
 import { NOTHING, readPicture, visionFor } from "./vision.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -408,8 +408,9 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       try {
         const r = await importFolder(userId, deckId, deck.onedrive.folder, deck.onedrive.subfolders, (l) => log(jobId, l));
         log(jobId, summarise(r));
-        deck.onedrive.lastSync = now();
-        saveDeck(userId, deck);
+        updateDeck(userId, deckId, (d) => {
+          if (d.onedrive) d.onedrive.lastSync = now();
+        });
       } catch (e) {
         // A OneDrive outage costs the fresh pull, never the deck.
         log(jobId, `OneDrive not read (${(e as Error).message}). Using the pictures already pulled.`);
@@ -552,13 +553,16 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     // Whatever is still text-heavy is redrawn from its own words.
     const redrawn = visualise(slides, p.features);
     if (redrawn) log(jobId, `${redrawn} more text slide${redrawn === 1 ? "" : "s"} redrawn from their own words as figures, diagrams or cards`);
-    deck.title = json.title || deck.title;
-    if (json.subtitle) deck.subtitle = json.subtitle;
-    deck.lang = p.lang;
-    deck.angle = p.angle;
-    deck.audience = p.audience;
-    deck.slides = slides;
-    saveDeck(userId, deck);
+    // Written into the deck as it is now: a theme, design or brief changed while the writer worked is kept.
+    const saved = updateDeck(userId, deckId, (d) => {
+      d.title = json.title || d.title;
+      if (json.subtitle) d.subtitle = json.subtitle;
+      d.lang = p.lang;
+      d.angle = p.angle;
+      d.audience = p.audience;
+      d.slides = slides;
+    });
+    if (!saved) throw new Error("The deck was deleted while it was being written.");
     log(jobId, `Done: ${slides.length} slides`);
     setJob(jobId, { status: "done", result: { deckId } });
   } catch (e) {
@@ -590,9 +594,16 @@ export async function rewriteSlide(userId: string, deck: Deck, slide: Slide, ins
   const designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : undefined;
   const out = await chatJson<Record<string, unknown>>({ auth, system: rewriteSystem({ lang: deck.lang, angle: deck.angle, house, designNotes }), user, schemaName: "slide", schema: SLIDE_SCHEMA, maxTokens: 4000 });
   const s = toSlide({ ...out, id }, DEFAULT_FEATURES, "uploaded");
+  // A reply with nothing on the slide must never replace the user's slide.
+  if (!String(s.title ?? "").trim() || hasNoFace(s)) {
+    const e = new LlmError("The writer's rewrite came back empty, so the slide was left as it was. Try again, or rewrite with a clearer instruction.", 0, "no_slides");
+    e.raw = rawSnippet(JSON.stringify(out));
+    throw e;
+  }
   // Keep a picture the rewrite could not know about.
   if (slide.image?.mediaId && s.layout === "image") s.image = { ...(s.image ?? {}), mediaId: slide.image.mediaId };
-  if (review) s.review = review;
+  // New content needs a new sign-off.
+  if (review) s.review = { ...review, ok: false };
   return s;
 }
 
@@ -636,11 +647,12 @@ export async function runApplyFeedback(jobId: string, userId: string, deckId: st
       if (!slide) continue;
       log(jobId, `Slide ${i + 1}: ${slide.title.slice(0, 60)}`);
       try {
-        const s = await rewriteSlide(userId, cur, slide, feedbackInstruction(pending.map((f) => f.text)));
+        const sent = (slide.review?.feedback ?? []).filter((f) => !f.appliedAt);
+        const s = await rewriteSlide(userId, cur, slide, feedbackInstruction(sent.map((f) => f.text)));
         const at = now();
-        s.review = { ok: false, feedback: (slide.review?.feedback ?? []).map((f) => (f.appliedAt ? f : { ...f, appliedAt: at })) };
-        cur.slides = cur.slides.map((x) => (x.id === s.id ? s : x));
-        saveDeck(userId, cur);
+        // Saved against the slide as it is now: feedback added while the writer worked stays waiting.
+        const done = updateSlide(userId, deckId, s.id, (now_) => ({ ...s, review: { ok: false, feedback: (now_.review?.feedback ?? []).map((f) => (!f.appliedAt && sent.some((x) => x.at === f.at && x.text === f.text) ? { ...f, appliedAt: at } : f)) } }));
+        if (!done) log(jobId, `Slide ${i + 1} was deleted while it was being rewritten; nothing saved`);
       } catch (e) {
         failed++;
         log(jobId, `Slide ${i + 1} failed: ${(e as Error).message}`);

@@ -65,7 +65,8 @@ export default function Settings() {
   const saveEndpoint = async () => {
     try {
       await api.saveSettings({ baseUrl });
-      toast("Endpoint saved");
+      // The server forgets a saved key when the endpoint changes: a key is only ever sent where it was saved.
+      toast(s.key.own ? "Endpoint saved. The saved key belonged to the old endpoint and was removed: paste the key for this one." : "Endpoint saved");
       load();
     } catch (e) {
       toast((e as Error).message, true);

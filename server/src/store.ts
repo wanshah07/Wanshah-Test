@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizeSlide, sanitizeTheme, type Deck, type SourceRef } from "@slidecraft/shared";
+import { sanitizeSlide, sanitizeTheme, type Slide, type Deck, type SourceRef } from "@slidecraft/shared";
 import { getDb, now, uid } from "./db.js";
 import { config } from "./config.js";
 
@@ -12,6 +12,31 @@ export function loadDeck(userId: string, id: string): Deck | null {
   deck.slides = (Array.isArray(deck.slides) ? deck.slides : []).map((x) => sanitizeSlide(x));
   deck.theme = sanitizeTheme(deck.theme);
   deck.sources = listSourceRefs(id);
+  return deck;
+}
+
+/**
+ * Change one slide in the deck as it is stored NOW, not as it was when a slow
+ * model call began: everything else saved meanwhile (other slides, the theme,
+ * the title, new feedback) is kept. Null when the deck or the slide is gone.
+ */
+export function updateSlide(userId: string, deckId: string, slideId: string, change: (cur: Slide) => Slide): { deck: Deck; slide: Slide } | null {
+  const deck = loadDeck(userId, deckId);
+  if (!deck) return null;
+  const i = deck.slides.findIndex((x) => x.id === slideId);
+  if (i < 0) return null;
+  const slide = { ...change(deck.slides[i]), id: slideId };
+  deck.slides[i] = slide;
+  saveDeck(userId, deck);
+  return { deck, slide };
+}
+
+/** Change a deck as it is stored now (see updateSlide). */
+export function updateDeck(userId: string, deckId: string, change: (cur: Deck) => void): Deck | null {
+  const deck = loadDeck(userId, deckId);
+  if (!deck) return null;
+  change(deck);
+  saveDeck(userId, deck);
   return deck;
 }
 

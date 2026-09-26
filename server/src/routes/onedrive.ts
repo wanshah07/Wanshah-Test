@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { listSourceRefs, loadDeck, saveDeck } from "../store.js";
+import { listSourceRefs, loadDeck, saveDeck, updateDeck } from "../store.js";
 import { browse, composioAccounts, composioKey, disconnect, importFolder, normaliseFolder, OneDriveError, pollLogin, saveOneDriveSettings, startLogin, status, summarise } from "../onedrive.js";
 
 function fail(reply: FastifyReply, e: unknown) {
@@ -12,6 +12,7 @@ export async function oneDriveRoutes(app: FastifyInstance): Promise<void> {
 
   app.put("/api/onedrive", async (req, reply) => {
     const b = (req.body ?? {}) as { clientId?: string | null; defaultFolder?: string | null; provider?: string; composioKey?: string | null; composioAccount?: string | null; composioAccountLabel?: string | null };
+    for (const [k, v] of Object.entries(b)) if (v !== undefined && v !== null && typeof v !== "string") return reply.code(400).send({ error: "invalid", message: `${k} must be text` });
     try {
       saveOneDriveSettings(req.user.id, {
         clientId: b.clientId,
@@ -76,14 +77,16 @@ export async function oneDriveRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     const deck = loadDeck(req.user.id, id);
     if (!deck) return reply.code(404).send({ error: "not_found" });
-    const b = (req.body ?? {}) as { folder?: string; subfolders?: boolean };
-    const folder = normaliseFolder(b.folder ?? deck.onedrive?.folder ?? status(req.user.id).defaultFolder);
-    const subfolders = b.subfolders ?? deck.onedrive?.subfolders ?? false;
+    const b = (req.body ?? {}) as { folder?: unknown; subfolders?: unknown };
+    if ((b.folder !== undefined && typeof b.folder !== "string") || (b.subfolders !== undefined && typeof b.subfolders !== "boolean")) return reply.code(400).send({ error: "invalid", message: "folder must be text and subfolders true or false" });
+    const folder = normaliseFolder((b.folder as string | undefined) ?? deck.onedrive?.folder ?? status(req.user.id).defaultFolder);
+    const subfolders = (b.subfolders as boolean | undefined) ?? deck.onedrive?.subfolders ?? false;
     try {
       const report = await importFolder(req.user.id, id, folder, subfolders);
-      deck.onedrive = { folder, subfolders, lastSync: new Date().toISOString() };
-      saveDeck(req.user.id, deck);
-      return { report, summary: summarise(report), link: deck.onedrive, sources: listSourceRefs(id) };
+      // Linked on the deck as it is now: edits saved during the import are kept.
+      const link = { folder, subfolders, lastSync: new Date().toISOString() };
+      if (!updateDeck(req.user.id, id, (d) => void (d.onedrive = link))) return reply.code(404).send({ error: "not_found" });
+      return { report, summary: summarise(report), link, sources: listSourceRefs(id) };
     } catch (e) {
       return fail(reply, e);
     }

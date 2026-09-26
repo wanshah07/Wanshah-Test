@@ -68,7 +68,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return { ok: false, message: (e as Error).message };
     }
     const typed = (b.openaiKey ?? "").trim();
-    const key = typed || userKey(req.user.id) || (baseUrl === config.openaiBase ? config.openaiKey : "");
+    // The saved key goes only to the endpoint it was saved with; a different endpoint is tested with the key typed for it.
+    const saved = baseUrl === baseUrlFor(req.user.id) ? userKey(req.user.id) : "";
+    const key = typed || saved || (baseUrl === config.openaiBase ? config.openaiKey : "");
     if (!key) return { ok: false, message: `No key to test against ${hostOf(baseUrl)}.` };
     const r = await checkKey(key, baseUrl);
     if (!r.ok) return r;

@@ -1,3 +1,4 @@
+import { safeDecode } from "./sources.js";
 import type { FastifyInstance } from "fastify";
 import type { Theme } from "@slidecraft/shared";
 import { config } from "../config.js";
@@ -23,7 +24,7 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
     const files: RefFile[] = [];
     let name = "";
     for await (const part of req.parts()) {
-      if (part.type === "file") files.push({ name: decodeURIComponent(part.filename), buf: await part.toBuffer() });
+      if (part.type === "file") files.push({ name: safeDecode(part.filename), buf: await part.toBuffer() });
       else if (part.fieldname === "name") name = String(part.value ?? "").trim();
     }
     const label = name || files[0]?.name.replace(/\.[^.]+$/, "") || "Reference design";

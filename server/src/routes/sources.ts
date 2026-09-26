@@ -3,6 +3,15 @@ import { extractMany } from "../ingest/extract.js";
 import { addMedia, addSource, listSourceRefs, loadDeck } from "../store.js";
 import { getDb } from "../db.js";
 
+/** A file name as sent: percent-decoded when it is valid, as it came when it is not ("100% sure.txt"). */
+export function safeDecode(name: string): string {
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
 export async function sourceRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/decks/:id/sources", async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -19,15 +28,15 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
     const skipped: string[] = [];
     for await (const part of req.files()) {
       const buf = await part.toBuffer();
-      const relPath = decodeURIComponent(part.filename);
+      const relPath = safeDecode(part.filename);
       const name = relPath.split("/").pop() || relPath;
       const items = await extractMany(name, buf, relPath);
       for (const it of items) {
         if (it.kind === "image" && it.image) {
           const m = addMedia(req.user.id, id, it.name, it.image.mime, it.image.buf, "upload");
           added.push(addSource(req.user.id, id, { name: it.name, relPath: it.relPath, kind: "image", bytes: it.image.buf.length, text: "", mediaId: m.id }));
-        } else if (it.kind === "unknown" && !it.text) {
-          skipped.push(it.relPath);
+        } else if (it.kind === "unknown") {
+          skipped.push(it.error ? `${it.relPath} (${it.error})` : it.relPath);
         } else {
           added.push(addSource(req.user.id, id, { name: it.name, relPath: it.relPath, kind: it.kind, bytes: buf.length, text: it.text }));
         }
@@ -39,10 +48,11 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/decks/:id/sources/text", async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!loadDeck(req.user.id, id)) return reply.code(404).send({ error: "not_found" });
-    const body = req.body as { name?: string; text?: string };
-    const text = (body.text ?? "").trim();
+    const body = (req.body ?? {}) as { name?: unknown; text?: unknown };
+    if (typeof body.text !== "string" || (body.name !== undefined && typeof body.name !== "string")) return reply.code(400).send({ error: "invalid", message: "text and name must be text" });
+    const text = body.text.trim().slice(0, 2_000_000);
     if (!text) return reply.code(400).send({ error: "empty" });
-    return addSource(req.user.id, id, { name: body.name?.trim() || "Pasted text", kind: "text", bytes: Buffer.byteLength(text), text });
+    return addSource(req.user.id, id, { name: (body.name as string | undefined)?.trim().slice(0, 200) || "Pasted text", kind: "text", bytes: Buffer.byteLength(text), text });
   });
 
   app.get("/api/sources/:sid", async (req, reply) => {

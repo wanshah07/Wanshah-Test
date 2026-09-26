@@ -1,5 +1,6 @@
 import path from "node:path";
 import JSZip from "jszip";
+import { sniffPicture } from "./sniff.js";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 
@@ -15,6 +16,8 @@ export interface Extracted {
   image?: { buf: Buffer; mime: string };
   /** Pictures found inside this file (figures in a PDF), each its own source. */
   figures?: Extracted[];
+  /** Why the file could not be read, when it could not. */
+  error?: string;
 }
 
 /** A file and the pictures inside it, as separate sources. */
@@ -28,24 +31,77 @@ const SKIP = /(^|\/)(\.git|node_modules|__MACOSX|\.DS_Store|Thumbs\.db)(\/|$)/;
 
 export async function extractMany(name: string, buf: Buffer, relPath = name): Promise<Extracted[]> {
   const ext = path.extname(name).toLowerCase();
-  if (ext === ".zip") return extractZip(buf, relPath.replace(/\.zip$/i, ""));
-  return flat(await extractOne(name, buf, relPath));
+  const all = ext === ".zip" ? await extractZip(buf, relPath.replace(/\.zip$/i, "")) : flat(await extractOne(name, buf, relPath));
+  for (const e of all) if (e.text.length > TEXT_MAX) e.text = e.text.slice(0, TEXT_MAX);
+  return all;
 }
 
-async function extractZip(buf: Buffer, prefix: string): Promise<Extracted[]> {
+/** A zip may not unpack past these: a small archive of repeated bytes can otherwise fill memory. */
+const ZIP_MAX_TOTAL = 200 * 1024 * 1024;
+const ZIP_MAX_ENTRY = 60 * 1024 * 1024;
+const ZIP_MAX_FILES = 500;
+const ZIP_MAX_DEPTH = 3;
+/** Text kept from one file: more than any writer can take in. */
+const TEXT_MAX = 2_000_000;
+
+async function extractZip(buf: Buffer, prefix: string, budget = { left: ZIP_MAX_TOTAL, files: ZIP_MAX_FILES }, depth = 0): Promise<Extracted[]> {
   const zip = await JSZip.loadAsync(buf);
   const out: Extracted[] = [];
   const entries = Object.values(zip.files).filter((f) => !f.dir && !SKIP.test(f.name));
   for (const f of entries) {
-    const b = Buffer.from(await f.async("uint8array"));
     const rel = `${prefix}/${f.name}`;
+    // The size the entry claims, checked before unpacking; then the real size, as it unpacks.
+    const claimed = Number((f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0);
+    if (budget.files <= 0 || claimed > ZIP_MAX_ENTRY || claimed > budget.left) {
+      out.push({ name: path.basename(f.name), relPath: rel, kind: "unknown", text: "", error: "too large to unpack, or the archive holds too much" });
+      continue;
+    }
+    const b = await unpackCapped(f, Math.min(ZIP_MAX_ENTRY, budget.left));
+    if (!b) {
+      out.push({ name: path.basename(f.name), relPath: rel, kind: "unknown", text: "", error: "too large to unpack" });
+      budget.left = 0;
+      continue;
+    }
+    budget.left -= b.length;
+    budget.files--;
     if (path.extname(f.name).toLowerCase() === ".zip") {
-      out.push(...(await extractZip(b, rel.replace(/\.zip$/i, ""))));
+      if (depth + 1 >= ZIP_MAX_DEPTH) out.push({ name: path.basename(f.name), relPath: rel, kind: "unknown", text: "", error: "zip nested too deep" });
+      else out.push(...(await extractZip(b, rel.replace(/\.zip$/i, ""), budget, depth + 1)));
     } else {
       out.push(...flat(await extractOne(path.basename(f.name), b, rel)));
     }
   }
   return out;
+}
+
+/** Unpack one zip entry, giving up as soon as it passes `max` bytes. */
+function unpackCapped(f: JSZip.JSZipObject, max: number): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let done = false;
+    const stream = (f as unknown as { internalStream: (t: string) => { on: (e: string, cb: (x?: unknown) => void) => unknown; resume: () => void; pause: () => void } }).internalStream("uint8array");
+    stream.on("data", (d) => {
+      if (done) return;
+      size += (d as Uint8Array).length;
+      if (size > max) {
+        done = true;
+        stream.pause();
+        resolve(null);
+        return;
+      }
+      chunks.push(Buffer.from(d as Uint8Array));
+    });
+    stream.on("error", () => {
+      if (!done) resolve(null);
+      done = true;
+    });
+    stream.on("end", () => {
+      if (!done) resolve(Buffer.concat(chunks));
+      done = true;
+    });
+    stream.resume();
+  });
 }
 
 export async function extractOne(name: string, buf: Buffer, relPath = name): Promise<Extracted> {
@@ -69,13 +125,18 @@ export async function extractOne(name: string, buf: Buffer, relPath = name): Pro
     if ([".xlsx", ".xlsm", ".xls", ".csv", ".tsv"].includes(ext)) return { ...base, kind: "sheet", text: sheetText(buf) };
     if ([".html", ".htm"].includes(ext)) return { ...base, kind: "html", text: clean(htmlToText(buf.toString("utf8"))) };
     if ([".md", ".txt", ".json", ".yaml", ".yml", ".rtf", ".xml"].includes(ext)) return { ...base, kind: "text", text: clean(buf.toString("utf8")) };
-    if (IMAGE_MIME[ext]) return { ...base, kind: "image", text: "", image: { buf, mime: IMAGE_MIME[ext] } };
+    if (IMAGE_MIME[ext]) {
+      // Trust the bytes, not the name: a renamed file is not a picture.
+      const mime = sniffPicture(buf);
+      return mime ? { ...base, kind: "image", text: "", image: { buf, mime } } : { ...base, kind: "unknown", text: "", error: "not a readable picture" };
+    }
     // Unknown extension: keep it if it looks like text.
     const sample = buf.subarray(0, 4000).toString("utf8");
     if (!/[\u0000-\u0008\u000E-\u001F]/.test(sample)) return { ...base, kind: "text", text: clean(buf.toString("utf8")) };
     return { ...base, kind: "unknown", text: "" };
   } catch (e) {
-    return { ...base, kind: "unknown", text: `[could not read ${name}: ${(e as Error).message}]` };
+    // Never a source: an error message would reach the writer as if it were the file's content.
+    return { ...base, kind: "unknown", text: "", error: (e as Error).message };
   }
 }
 

@@ -1,7 +1,10 @@
 import { PNG } from "pngjs";
 import { getDb, now } from "../db.js";
 import { chatText, LlmError, type ContentPart, type LlmAuth } from "./client.js";
-import { PICTURE_BUDGET, shrinkPicture } from "./shrink.js";
+import { PICTURE_BUDGET, pictureSize, shrinkPicture } from "./shrink.js";
+
+/** PNG and JPEG can be re-encoded smaller; other formats are sent as they are. */
+const decodable = (mime: string, buf: Buffer) => /png|jpe?g/i.test(mime) && pictureSize(buf) !== null;
 
 // Whether the writer model can read pictures, found out once per endpoint and
 // model with a tiny test picture and remembered. A model that can is given the
@@ -79,7 +82,7 @@ export const NOTHING = "NONE";
 
 /** What a picture says, as notes a slide writer can cite; NONE for a picture with nothing to read. */
 export async function readPicture(auth: LlmAuth, name: string, original: Buffer, originalMime: string, budget = PICTURE_BUDGET): Promise<string> {
-  const { buf, mime } = shrinkPicture(original, originalMime, budget);
+  const { buf, mime, shrunk } = shrinkPicture(original, originalMime, budget);
   const user: ContentPart[] = [
     {
       type: "text",
@@ -92,7 +95,11 @@ export async function readPicture(auth: LlmAuth, name: string, original: Buffer,
     out = (await chatText(auth, "You transcribe pictures exactly. You never invent content.", user, 12000, 180000)).trim();
   } catch (e) {
     // A gateway with a lower body limit than ours: once more at a quarter of the size.
-    if (e instanceof LlmError && e.status === 413 && budget > 96 * 1024) return readPicture(auth, name, original, originalMime, Math.floor(budget / 4));
+    // (A picture that could not be re-encoded, a WEBP or GIF, would only be sent again unchanged.)
+    if (e instanceof LlmError && e.status === 413 && budget > 96 * 1024 && (shrunk || original.length > budget)) {
+      if (!decodable(originalMime, original)) throw new LlmError(`${e.message} This picture is a ${originalMime.replace("image/", "").toUpperCase()}, which Slidecraft cannot make smaller: upload it as PNG or JPEG.`, 413, "too_large");
+      return readPicture(auth, name, original, originalMime, Math.floor(budget / 4));
+    }
     throw e;
   }
   return out || NOTHING;
