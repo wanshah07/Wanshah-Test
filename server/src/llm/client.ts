@@ -32,11 +32,32 @@ export function jsonRules(schema: Record<string, unknown>): string {
   return `OUTPUT FORMAT: answer with one JSON object and nothing else: no prose, no code fences, no comments. It must match this JSON Schema exactly, every listed property present, null where a value is unknown:\n${JSON.stringify(schema)}`;
 }
 
+/** For a list whose items came back in the wrong shape, the keys each item must use. */
+function itemRule(schema: Record<string, unknown>, missing: string[]): string {
+  const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  return [...new Set(missing.filter((m) => m.includes("[]")).map((m) => m.split("[]")[0]))]
+    .map((k) => ` Each item of ${k} must use exactly these keys: ${Object.keys(((props[k]?.items as Record<string, unknown>)?.properties as object) ?? {}).join(", ")}.`)
+    .join("");
+}
+
 /** Top-level keys the schema requires that the answer lacks. */
 export function missingKeys(value: unknown, schema: Record<string, unknown>): string[] {
   const req = Array.isArray(schema.required) ? (schema.required as string[]) : [];
   if (!value || typeof value !== "object" || Array.isArray(value)) return req;
-  return req.filter((k) => !(k in (value as object)));
+  const v = value as Record<string, unknown>;
+  const out = req.filter((k) => !(k in v));
+  // One level down: a list whose items were written in a shape of the model's own (heading and
+  // content where the schema says title and body) is as unusable as a missing list.
+  const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  for (const k of req) {
+    const items = props[k]?.items as Record<string, unknown> | undefined;
+    const itemReq = Array.isArray(items?.required) ? (items!.required as string[]) : [];
+    const first = Array.isArray(v[k]) ? (v[k] as unknown[])[0] : undefined;
+    if (!itemReq.length || !first || typeof first !== "object") continue;
+    const lacking = itemReq.filter((x) => !(x in (first as object)));
+    if (lacking.length > itemReq.length / 2 || lacking.includes("title")) out.push(`${k}[].${lacking.slice(0, 6).join(`, ${k}[].`)}`);
+  }
+  return out;
 }
 
 export function hostOf(baseUrl: string): string {
@@ -236,7 +257,7 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       const had = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? Object.keys(parsed as object) : [];
       followUp = [
         { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
-        { role: "user", content: `That JSON is not in the shape the OUTPUT FORMAT rules ask for: it has ${had.length ? had.join(", ") : "no keys"} and is missing ${missing.join(", ")}. Answer again with one JSON object whose top-level keys are exactly ${keys.join(", ")}, with the content inside them as the schema describes. Only the JSON.` },
+        { role: "user", content: `That JSON is not in the shape the OUTPUT FORMAT rules ask for: it has ${had.length ? had.join(", ") : "no keys"} and is missing ${missing.join(", ")}. Answer again with one JSON object whose top-level keys are exactly ${keys.join(", ")}, with the content inside them as the schema describes.${itemRule(a.schema, missing)} Only the JSON.` },
       ];
       continue;
     }

@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -116,6 +116,19 @@ beforeAll(async () => {
         // What Mireld's writer sent on 26 Sep 2026: valid JSON, but a brief of its own and no slides.
         gw.deckOwnShape--;
         return reply(JSON.stringify({ purpose: "To communicate the system's value in plain language", audience: "decision-makers", keyMessages: ["one", "two"] }));
+      }
+      if (gw.deckOwnFields > 0) {
+        // Slides present, but in the model's own field names: what came back as a deck of empty frames.
+        gw.deckOwnFields--;
+        return reply(JSON.stringify({ title: "FACERINNA B5", subtitle: null, slides: [
+          { heading: "What B5 does", content: ["Calms redness", { point: "Supports the barrier" }], speakerNotes: "Open with the problem." },
+          { slideTitle: "How to use it", text: "Twice a day after cleansing." },
+          { heading: "Who it is for", points: ["Sensitive skin", "After procedures"] },
+        ] }));
+      }
+      if (gw.deckBlank > 0) {
+        gw.deckBlank--;
+        return reply(JSON.stringify({ title: "t", subtitle: null, slides: [{ foo: 1 }, { foo: 2 }, { foo: 3 }] }));
       }
       if (gw.deckNested > 0) {
         gw.deckNested--;
@@ -252,6 +265,29 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(job.status).toBe("done");
     expect(job.progress.join("\n")).toMatch(/The writer put the slides under "deck.content" instead of "slides"; using them/);
     expect(job.progress.join("\n")).not.toMatch(/undefined/);
+  });
+
+  it("reads slides written in the model's own field names instead of leaving them empty", async () => {
+    gw.deckOwnFields = 2;
+    const id = await newDeck("own-fields");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5" } }));
+    expect((await waitJob(jobId)).status).toBe("done");
+    expect(String(gw.deckLastMsgs.at(-1)!.content)).toMatch(/Each item of slides must use exactly these keys: layout, kicker, title/);
+    const deck = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
+    const slides = deck.slides as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(slides.map((x) => x.title)).toEqual(["What B5 does", "How to use it", "Who it is for"]);
+    expect(slides[0].bullets).toEqual(["Calms redness", "Supports the barrier"]);
+    expect(slides[1].body).toBe("Twice a day after cleansing.");
+    expect(slides[2].bullets).toEqual(["Sensitive skin", "After procedures"]);
+  });
+
+  it("fails clearly rather than delivering a deck of empty slides", async () => {
+    gw.deckBlank = 2;
+    const id = await newDeck("blank");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5" } }));
+    const job = await waitJob(jobId);
+    expect(job.status).toBe("failed");
+    expect(job.error).toMatch(/returned 3 slides but 3 have nothing on them \(it used the fields: foo\)/);
   });
 
   it("leaves the choices alone without Auto", async () => {

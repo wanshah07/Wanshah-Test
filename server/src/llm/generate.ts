@@ -208,8 +208,43 @@ export function demote(s: Slide): void {
   delete s.image;
 }
 
+const firstStr = (o: Record<string, unknown>, keys: string[]): string | undefined => {
+  for (const k of keys) if (typeof o[k] === "string" && (o[k] as string).trim()) return (o[k] as string).trim();
+  return undefined;
+};
+const asText = (v: unknown): string =>
+  typeof v === "string" ? v : v && typeof v === "object" ? String(firstStr(v as Record<string, unknown>, ["text", "point", "label", "title", "heading", "value"]) ?? Object.values(v as object).filter((x) => typeof x === "string").join(" — ")) : String(v ?? "");
+
+/**
+ * A model that ignored the schema still wrote slides, under names of its own
+ * (heading, content, points, speakerNotes). Map those onto the schema's names,
+ * never overwriting a field the model did fill correctly.
+ */
+export function coerceSlideShape(raw: Record<string, unknown>): Record<string, unknown> {
+  const inner = raw.content && typeof raw.content === "object" && !Array.isArray(raw.content) ? (raw.content as Record<string, unknown>) : {};
+  const o: Record<string, unknown> = { ...inner, ...raw };
+  const out: Record<string, unknown> = { ...raw };
+  if (typeof out.title !== "string" || !out.title.trim()) out.title = firstStr(o, ["title", "heading", "slideTitle", "slide_title", "headline", "name", "header"]) ?? "";
+  if (typeof out.kicker !== "string") out.kicker = firstStr(o, ["eyebrow", "label", "tag", "section"]) ?? null;
+  if (typeof out.subtitle !== "string") out.subtitle = firstStr(o, ["subheading", "sub_title", "subTitle", "tagline"]) ?? null;
+  if (typeof out.body !== "string" || !out.body.trim()) out.body = firstStr(o, ["body", "text", "content", "description", "summary", "message", "paragraph", "keyMessage", "key_message"]) ?? null;
+  if (!Array.isArray(out.bullets) || !out.bullets.length) {
+    const list = ["bullets", "points", "bullet_points", "bulletPoints", "keyPoints", "key_points", "items", "content", "list"].map((k) => o[k]).find((v) => Array.isArray(v) && v.length);
+    out.bullets = list ? (list as unknown[]).map(asText).filter((x) => x.trim()) : [];
+  } else out.bullets = (out.bullets as unknown[]).map(asText).filter((x) => x.trim());
+  if (typeof out.notes !== "string") out.notes = firstStr(o, ["speakerNotes", "speaker_notes", "presenterNotes", "narration", "script"]) ?? null;
+  if (typeof out.layout !== "string") out.layout = firstStr(o, ["type", "slideType", "slide_type", "kind"]) ?? null;
+  return out;
+}
+
+/** A slide with nothing on its face: no title, no body, no bullets, nothing drawn. */
+function isBlank(s: Slide): boolean {
+  const r = s as unknown as Record<string, unknown>;
+  return !String(s.title ?? "").trim() && !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote;
+}
+
 function toSlide(raw: Record<string, unknown>, features: Features, imageMode: string): Slide {
-  const s = normaliseSlide(raw);
+  const s = normaliseSlide(coerceSlideShape(raw));
   s.diagram = coerceDiagram(raw.diagram);
   if (s.layout === "diagram" && !s.diagram) s.layout = "bullets";
   if (s.layout === "chart" && (!s.chart || !s.chart.series?.length)) s.layout = "bullets";
@@ -297,7 +332,16 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         json = { ...json, title: json.title ?? found.title ?? "", subtitle: json.subtitle ?? null, slides: found.slides };
       }
     }
-    const slides = (Array.isArray(json.slides) ? json.slides : []).map((r) => toSlide(r, p.features, p.imageMode));
+    const rawSlides = (Array.isArray(json.slides) ? json.slides : []).filter((r) => r && typeof r === "object") as Record<string, unknown>[];
+    const slides = rawSlides.map((r) => toSlide(r, p.features, p.imageMode));
+    const blank = slides.filter(isBlank).length;
+    if (slides.length && blank > slides.length / 2) {
+      // Better a clear failure than a deck of empty frames that reads as done.
+      const keys = [...new Set(rawSlides.flatMap((r) => Object.keys(r)))].slice(0, 20).join(", ");
+      const e = new LlmError(`The writer returned ${slides.length} slides but ${blank} have nothing on them (it used the fields: ${keys || "none"})`, 0, "no_slides");
+      e.raw = rawSnippet(JSON.stringify(json));
+      throw e;
+    }
     if (!slides.length) {
       const e = new LlmError("The writer returned no slides", 0, "no_slides");
       e.raw = rawSnippet(JSON.stringify(json));
