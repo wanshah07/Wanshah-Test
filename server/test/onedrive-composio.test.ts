@@ -23,7 +23,7 @@ const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 7, 7, 7, 0xff, 0xd9]);
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const sha = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex").toUpperCase();
 
-const cz = { rejectLatest: false, versions: [] as (string | undefined)[], keyOnS3: 0, calls: [] as { slug: string; args: Record<string, unknown> }[] };
+const cz = { twin: false, rejectLatest: false, versions: [] as (string | undefined)[], keyOnS3: 0, calls: [] as { slug: string; args: Record<string, unknown> }[] };
 let server: http.Server;
 let base = "";
 
@@ -48,6 +48,7 @@ beforeAll(async () => {
       }
       if (req.headers["x-api-key"] !== KEY) return send(401, { error: { message: "Invalid API key" } });
       if (url.pathname === "/api/v3/connected_accounts") {
+        if (cz.twin) return send(200, { items: [{ id: "ca_first111111", status: "ACTIVE", user_id: "pg-test-1", created_at: "2026-09-20T01:00:00Z", toolkit: { slug: "one_drive" } }, { id: "ca_second222222", status: "ACTIVE", user_id: "pg-test-1", created_at: "2026-09-26T09:00:00Z", toolkit: { slug: "one_drive" } }] });
         return send(200, { items: [{ id: "ca_od", status: "ACTIVE", alias: "Muhammad-Ridzuan", toolkit: { slug: "one_drive" } }, { id: "ca_gm", status: "ACTIVE", toolkit: { slug: "gmail" } }] });
       }
       const m = /^\/api\/v3\/tools\/execute\/([A-Z_]+)$/.exec(url.pathname);
@@ -102,6 +103,13 @@ describe("OneDrive through Composio", () => {
     expect(J(bad).error).toBe("composio_key");
     const ok = J(await app.inject({ method: "POST", url: "/api/onedrive/composio/accounts", payload: { key: KEY } }));
     expect(ok.accounts).toEqual([{ id: "ca_od", label: "Muhammad-Ridzuan", status: "ACTIVE" }]);
+  });
+
+  it("tells two connections of the same user apart", async () => {
+    cz.twin = true;
+    const r = J(await app.inject({ method: "POST", url: "/api/onedrive/composio/accounts", payload: { key: KEY } }));
+    cz.twin = false;
+    expect(r.accounts.map((a: { label: string }) => a.label)).toEqual(["pg-test-1 (connected 2026-09-20, …111111)", "pg-test-1 (connected 2026-09-26, …222222)"]);
   });
 
   it("saves the route, the key encrypted and the account", async () => {

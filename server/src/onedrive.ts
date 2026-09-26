@@ -419,7 +419,13 @@ export async function composioAccounts(key: string): Promise<{ id: string; label
   const items = (j.items as Record<string, unknown>[] | undefined) ?? [];
   return items
     .filter((a) => String((a.toolkit as { slug?: string } | undefined)?.slug ?? "one_drive").toLowerCase() === "one_drive")
-    .map((a) => ({ id: String(a.id), label: String(a.alias ?? a.user_id ?? a.id), status: String(a.status ?? "") }));
+    .map((a) => ({ id: String(a.id), label: String(a.alias ?? a.user_id ?? a.id), status: String(a.status ?? ""), created: String(a.created_at ?? "") }))
+    // Two connections of one user share a label; tell them apart by when they were made and the end of their id.
+    .map((a, _i, all) => {
+      const twin = all.filter((b) => b.label === a.label).length > 1;
+      const when = /^\d{4}-\d{2}-\d{2}/.test(a.created) ? `connected ${a.created.slice(0, 10)}, ` : "";
+      return { id: a.id, label: twin ? `${a.label} (${when}…${a.id.slice(-6)})` : a.label, status: a.status };
+    });
 }
 
 let composioVersion: "latest" | null = "latest";
