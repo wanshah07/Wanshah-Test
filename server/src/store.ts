@@ -86,7 +86,7 @@ export function getMedia(userId: string, id: string): (MediaRow & { path: string
 }
 
 export function listMedia(userId: string, deckId: string): MediaRow[] {
-  return getDb().prepare("SELECT id, name, mime, bytes, origin, deck_id FROM media WHERE user_id = ? AND (deck_id = ? OR deck_id IS NULL) ORDER BY created_at").all(userId, deckId) as unknown as MediaRow[];
+  return getDb().prepare("SELECT id, name, mime, bytes, origin, deck_id FROM media WHERE user_id = ? AND (deck_id = ? OR deck_id IS NULL) AND origin != 'design' ORDER BY created_at").all(userId, deckId) as unknown as MediaRow[];
 }
 
 export function deleteMedia(userId: string, id: string): void {

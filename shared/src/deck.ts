@@ -105,6 +105,26 @@ export interface Slide {
   quote?: { text: string; by?: string };
   notes?: string;
   citations?: string[];
+  /** The user's sign-off and feedback on this slide. Never sent to the writer as slide content. */
+  review?: SlideReview;
+}
+
+export interface SlideFeedback {
+  text: string;
+  at: string;
+  /** When the writer applied it. Absent while it waits. */
+  appliedAt?: string;
+}
+
+export interface SlideReview {
+  ok: boolean;
+  okAt?: string;
+  feedback: SlideFeedback[];
+}
+
+/** Feedback saved on a slide and not yet applied. */
+export function pendingFeedback(s: Slide): SlideFeedback[] {
+  return (s.review?.feedback ?? []).filter((f) => !f.appliedAt);
 }
 
 export interface ThemeColors {
@@ -159,6 +179,8 @@ export interface Deck {
   onedrive?: OneDriveLink;
   /** The choices behind the last generation, so Regenerate starts from them. Written by the server only. */
   brief?: DeckBrief;
+  /** The saved design the theme came from. Its notes guide the writer while it is set. */
+  designId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,6 +191,8 @@ export interface DeckBrief {
   purposes: string[];
   include: string[];
   audiences: string[];
+  /** Ids of the user's saved prompts ticked for this deck. */
+  prompts?: string[];
   slides?: number;
   imageMode?: "none" | "uploaded" | "generate";
   features?: Record<string, boolean>;

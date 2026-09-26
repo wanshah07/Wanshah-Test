@@ -8,6 +8,7 @@ import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateP
 import { DECK_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
 import { resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
+import { getDesign, promptTexts } from "../library.js";
 
 export interface Job {
   id: string;
@@ -17,7 +18,7 @@ export interface Job {
   result?: unknown;
 }
 
-function setJob(id: string, patch: Partial<Job>): void {
+export function setJob(id: string, patch: Partial<Job>): void {
   const db = getDb();
   const row = db.prepare("SELECT status, progress, error, result FROM jobs WHERE id = ?").get(id) as { status: string; progress: string; error: string | null; result: string | null } | undefined;
   if (!row) return;
@@ -32,7 +33,7 @@ function setJob(id: string, patch: Partial<Job>): void {
   );
 }
 
-function log(jobId: string, line: string): void {
+export function log(jobId: string, line: string): void {
   const row = getDb().prepare("SELECT progress FROM jobs WHERE id = ?").get(jobId) as { progress: string } | undefined;
   const p = row ? (JSON.parse(row.progress) as string[]) : [];
   p.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
@@ -142,6 +143,10 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     if (!deck) throw new Error("deck not found");
     const auth = config.mockLlm ? null : resolveAuth(userId);
     if (!config.mockLlm && !auth) throw new LlmError("No OpenAI key. Add one in Settings.", 0, "no_key");
+    p.house = promptTexts(userId, deck.brief?.prompts);
+    p.designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : undefined;
+    if (p.house.length) log(jobId, `Saved prompts: ${p.house.map((h) => h.name).join(", ")}`);
+    if (deck.designId) log(jobId, p.designNotes !== undefined ? `Design: ${deck.theme.name}` : "The deck's design was deleted; writing without its notes");
     if (deck.onedrive && p.imageMode === "uploaded") {
       log(jobId, `Checking OneDrive folder "${deck.onedrive.folder || "(root)"}" for new pictures`);
       try {
@@ -214,30 +219,81 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
 
 export async function rewriteSlide(userId: string, deck: Deck, slide: Slide, instruction: string): Promise<Slide> {
   const raw = slide as unknown as Record<string, unknown>;
-  if (config.mockLlm) return toSlide({ ...mockRewrite(raw, instruction), id: slide.id }, DEFAULT_FEATURES, "uploaded");
+  if (config.mockLlm) {
+    const { review: _r, ...content } = raw;
+    const m = toSlide({ ...mockRewrite(content, instruction), id: slide.id }, DEFAULT_FEATURES, "uploaded");
+    if (slide.review) m.review = slide.review;
+    return m;
+  }
   const auth = resolveAuth(userId);
   if (!auth) throw new LlmError("No OpenAI key. Add one in Settings.", 0, "no_key");
-  const { id, ...rest } = slide;
+  // The review is the user's bookkeeping, not slide content: keep it away from the writer.
+  const { id, review, ...rest } = slide;
   const user = `INSTRUCTION: ${instruction}\n\nDECK: ${deck.title}\n\nSLIDE (JSON):\n${JSON.stringify(rest)}`;
-  const out = await chatJson<Record<string, unknown>>({ auth, system: rewriteSystem({ lang: deck.lang, angle: deck.angle }), user, schemaName: "slide", schema: SLIDE_SCHEMA, maxTokens: 4000 });
+  const house = promptTexts(userId, deck.brief?.prompts);
+  const designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : undefined;
+  const out = await chatJson<Record<string, unknown>>({ auth, system: rewriteSystem({ lang: deck.lang, angle: deck.angle, house, designNotes }), user, schemaName: "slide", schema: SLIDE_SCHEMA, maxTokens: 4000 });
   const s = toSlide({ ...out, id }, DEFAULT_FEATURES, "uploaded");
   // Keep a picture the rewrite could not know about.
   if (slide.image?.mediaId && s.layout === "image") s.image = { ...(s.image ?? {}), mediaId: slide.image.mediaId };
+  if (review) s.review = review;
   return s;
 }
 
-export function newDeck(userId: string, title: string, lang: "en" | "ms", angle: string, themeId: string): Deck {
+export function newDeck(userId: string, title: string, lang: "en" | "ms", angle: string, themeId: string, designId?: string): Deck {
   const t = now();
+  const design = designId ? getDesign(userId, designId) : null;
   const deck: Deck = {
     id: newId("d"),
     title: title || (lang === "ms" ? "Deck baharu" : "New deck"),
     lang,
     angle: angleById(angle).id,
-    theme: themePreset(themeId),
+    theme: design ? (JSON.parse(JSON.stringify(design.theme)) as Deck["theme"]) : themePreset(themeId),
+    ...(design ? { designId: design.id } : {}),
     slides: [],
     sources: [],
     createdAt: t,
     updatedAt: t,
   };
   return saveDeck(userId, deck);
+}
+
+/** The instruction the writer gets for a slide's saved feedback. */
+export function feedbackInstruction(items: string[]): string {
+  return `Apply this feedback from the presenter to the slide. Change what it asks; keep every other fact, citation and [SAHKAN] marker.\n${items.map((t) => `- ${t}`).join("\n")}`;
+}
+
+/** Applies every slide's waiting feedback, one slide at a time, as a job. */
+export async function runApplyFeedback(jobId: string, userId: string, deckId: string): Promise<void> {
+  setJob(jobId, { status: "running" });
+  try {
+    const deck = loadDeck(userId, deckId);
+    if (!deck) throw new Error("deck not found");
+    const todo = deck.slides.map((s, i) => ({ i, pending: (s.review?.feedback ?? []).filter((f) => !f.appliedAt) })).filter((x) => x.pending.length);
+    log(jobId, `${todo.length} slide${todo.length === 1 ? "" : "s"} with feedback waiting`);
+    let failed = 0;
+    for (const { i, pending } of todo) {
+      // Reload each time so edits saved while this runs are not overwritten.
+      const cur = loadDeck(userId, deckId);
+      if (!cur) throw new Error("deck not found");
+      const slide = cur.slides.find((s) => s.id === deck.slides[i].id);
+      if (!slide) continue;
+      log(jobId, `Slide ${i + 1}: ${slide.title.slice(0, 60)}`);
+      try {
+        const s = await rewriteSlide(userId, cur, slide, feedbackInstruction(pending.map((f) => f.text)));
+        const at = now();
+        s.review = { ok: false, feedback: (slide.review?.feedback ?? []).map((f) => (f.appliedAt ? f : { ...f, appliedAt: at })) };
+        cur.slides = cur.slides.map((x) => (x.id === s.id ? s : x));
+        saveDeck(userId, cur);
+      } catch (e) {
+        failed++;
+        log(jobId, `Slide ${i + 1} failed: ${(e as Error).message}`);
+      }
+    }
+    log(jobId, failed ? `Done, ${failed} slide${failed === 1 ? "" : "s"} still waiting` : "Done");
+    setJob(jobId, { status: "done", result: { deckId } });
+  } catch (e) {
+    log(jobId, `Failed: ${(e as Error).message}`);
+    setJob(jobId, { status: "failed", error: (e as Error).message });
+  }
 }

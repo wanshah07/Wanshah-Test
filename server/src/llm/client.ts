@@ -95,10 +95,13 @@ const SCHEMA_REFUSED = /response_format|json_schema|strict|structured output|sch
 const MAX_COMPLETION_REFUSED = /max_completion_tokens/i;
 const TEMPERATURE_REFUSED = /temperature/i;
 
+/** OpenAI chat content parts, for a message that carries pictures. */
+export type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+
 export interface ChatJsonArgs {
   auth: LlmAuth;
   system: string;
-  user: string;
+  user: string | ContentPart[];
   schemaName: string;
   schema: Record<string, unknown>;
   maxTokens?: number;

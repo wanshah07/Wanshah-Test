@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { BRIEF_AUDIENCES, BRIEF_INCLUDES, BRIEF_PURPOSES, type BriefChoice } from "@slidecraft/shared";
+import { api, type SavedPrompt } from "../api";
 
 export interface BriefValue {
   purposes: string[];
@@ -6,9 +9,20 @@ export interface BriefValue {
   audiences: string[];
   text: string;
   audienceText: string;
+  /** Ids of saved prompts ticked for this deck. */
+  prompts: string[];
 }
 
-export const EMPTY_BRIEF: BriefValue = { purposes: [], include: [], audiences: [], text: "", audienceText: "" };
+export const EMPTY_BRIEF: BriefValue = { purposes: [], include: [], audiences: [], text: "", audienceText: "", prompts: [] };
+
+/** The ids of saved prompts marked "tick by default". */
+export async function defaultPromptIds(): Promise<string[]> {
+  try {
+    return (await api.prompts()).filter((p) => p.isDefault).map((p) => p.id);
+  } catch {
+    return [];
+  }
+}
 
 function Chips({ list, value, onChange }: { list: BriefChoice[]; value: string[]; onChange: (v: string[]) => void }) {
   return (
@@ -29,8 +43,16 @@ function Chips({ list, value, onChange }: { list: BriefChoice[]; value: string[]
 /** Tick what the deck is for, what it must carry and who it is for. Typing is optional. */
 export function BriefPicker({ value, onChange, compact }: { value: BriefValue; onChange: (v: BriefValue) => void; compact?: boolean }) {
   const set = (patch: Partial<BriefValue>) => onChange({ ...value, ...patch });
+  const [saved, setSaved] = useState<SavedPrompt[]>([]);
+  useEffect(() => {
+    api.prompts().then(setSaved).catch(() => {});
+  }, []);
   return (
     <div className="stack">
+      <div>
+        <b className="small">Your saved prompts</b> <span className="small muted">{saved.length ? "Tick the ones this deck should follow." : ""} <Link to="/prompts">{saved.length ? "Manage" : "Add your own instructions for every deck"}</Link></span>
+        {saved.length > 0 && <Chips list={saved.map((p) => ({ id: p.id, label: p.name, line: p.text }))} value={value.prompts} onChange={(prompts) => set({ prompts })} />}
+      </div>
       <div>
         <b className="small">What is the deck for?</b> <span className="small muted">Tick one or more.</span>
         <Chips list={BRIEF_PURPOSES} value={value.purposes} onChange={(purposes) => set({ purposes })} />

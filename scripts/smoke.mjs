@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright-core";
+import { PNG } from "pngjs";
 
 const PORT = 8799;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "slidecraft-smoke-"));
@@ -36,7 +37,33 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`http://localhost:${PORT}/`);
   check("decks page renders", await page.locator("h1", { hasText: "Decks" }).isVisible());
+  // Library: a design from a screenshot, and a saved prompt ticked by default.
+  await page.goto(`http://localhost:${PORT}/designs`);
+  const png = path.join(tmp, "Reference slide.png");
+  {
+    // An opaque slide picture: navy with a blue bar.
+    const img = new PNG({ width: 160, height: 90 });
+    for (let i = 0; i < 160 * 90; i++) {
+      const y = Math.floor(i / 160);
+      const c = y > 20 && y < 30 ? [0x48, 0x98, 0xd8] : [0x16, 0x32, 0x4f];
+      img.data.set([...c, 255], i * 4);
+    }
+    fs.writeFileSync(png, PNG.sync.write(img));
+  }
+  await page.locator("input[type=file]").first().setInputFiles(png);
+  await page.locator(".design-card").first().waitFor({ timeout: 10000 });
+  check("a screenshot becomes a design", (await page.locator(".design-card").count()) === 1);
+  await page.goto(`http://localhost:${PORT}/prompts`);
+  await page.click("button:has-text('New prompt')");
+  await page.click(".chip:has-text('Malaysia first')");
+  await page.check("text=Tick by default on new decks");
+  await page.click("button:has-text('Save')");
+  await page.locator(".card b", { hasText: "Malaysia first" }).waitFor({ timeout: 5000 });
+  check("a saved prompt is kept", (await page.locator(".pill", { hasText: "default" }).count()) === 1);
+  await page.goto(`http://localhost:${PORT}/`);
   await page.click("text=New deck");
+  await page.locator(".chip.on", { hasText: "Malaysia first" }).waitFor({ timeout: 5000 }).catch(() => {});
+  check("a default prompt starts ticked", (await page.locator(".chip.on", { hasText: "Malaysia first" }).count()) === 1);
   let dialogs = 0;
   page.on("dialog", async (d) => {
     dialogs++;
@@ -58,11 +85,32 @@ try {
   await page.click("text=Continue");
   await page.click("text=Training / workshop");
   await page.click("text=Continue");
+  await page.locator(".card.pick", { hasText: "Reference slide" }).click();
+  check("my design can be picked for the deck", (await page.locator(".card.pick.on", { hasText: "Reference slide" }).count()) === 1);
   await page.click("button:has-text('Generate')");
   await page.waitForURL(/\/deck\//, { timeout: 30000 });
   await page.waitForSelector(".thumb", { timeout: 10000 });
   const thumbs = await page.locator(".thumb").count();
   check("editor shows the generated slides", thumbs >= 6);
+  {
+    const id = page.url().split("/deck/")[1];
+    const d = await (await fetch(`http://localhost:${PORT}/api/decks/${id}`)).json();
+    check("the deck uses the picked design and the ticked prompt", !!d.deck.designId && (d.deck.brief?.prompts ?? []).length === 1);
+  }
+  // Sign-off and feedback on slides.
+  await page.locator(".thumb").nth(1).click();
+  await page.click(".review button:has-text('OK ✓')");
+  await page.locator(".thumb .okmark").first().waitFor({ timeout: 5000 }).catch(() => {});
+  check("OK marks the slide", (await page.locator(".thumb .okmark").count()) === 1);
+  await page.locator(".thumb").nth(3).click();
+  await page.fill(".review textarea", "Shorter title please");
+  await page.click(".review button:has-text('Save for later')");
+  await page.locator(".thumb .fbmark").first().waitFor({ timeout: 5000 }).catch(() => {});
+  check("feedback saved for later shows on the slide", (await page.locator(".thumb .fbmark").count()) === 1);
+  await page.click("button:has-text('Apply saved feedback')");
+  await page.waitForFunction(() => !document.querySelector(".thumb .fbmark"), null, { timeout: 15000 }).catch(() => {});
+  check("apply saved feedback clears the queue", (await page.locator(".thumb .fbmark").count()) === 0);
+  check("a slide stays OK while others change", (await page.locator(".thumb .okmark").count()) === 1);
   await page.locator(".thumb").nth(2).click();
   await page.fill(".field textarea >> nth=0", "Edited from the smoke run");
   await page.waitForFunction(() => document.body.innerText.includes("Saved"), null, { timeout: 5000 }).catch(() => {});

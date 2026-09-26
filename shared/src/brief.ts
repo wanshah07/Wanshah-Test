@@ -57,6 +57,7 @@ export function cleanBrief(raw: Partial<DeckBrief> | undefined | null): DeckBrie
     purposes: ids(b.purposes, BRIEF_PURPOSES),
     include: ids(b.include, BRIEF_INCLUDES),
     audiences: ids(b.audiences, BRIEF_AUDIENCES),
+    prompts: Array.isArray(b.prompts) ? b.prompts.filter((x): x is string => typeof x === "string" && /^p_[a-z0-9]{4,40}$/.test(x)).slice(0, 30) : undefined,
     slides: typeof b.slides === "number" ? b.slides : undefined,
     imageMode: b.imageMode === "none" || b.imageMode === "uploaded" || b.imageMode === "generate" ? b.imageMode : undefined,
     features: b.features && typeof b.features === "object" ? Object.fromEntries(Object.entries(b.features).filter(([, v]) => typeof v === "boolean")) : undefined,

@@ -9,6 +9,24 @@ export interface GenerateParams {
   slides: number;
   features: Features;
   imageMode: "none" | "uploaded" | "generate";
+  /** The user's saved prompts ticked for this deck. */
+  house?: { name: string; text: string }[];
+  /** Notes read from the reference design the deck uses. */
+  designNotes?: string;
+}
+
+function houseLines(house: GenerateParams["house"], designNotes: string | undefined): string[] {
+  const out: string[] = [];
+  if (house?.length) {
+    out.push("HOUSE INSTRUCTIONS (the user's own saved prompts; follow them unless they conflict with FACTS AND SOURCES or STYLE, which always win):");
+    for (const h of house) out.push(`- ${h.name}: ${h.text.replace(/\s*\n\s*/g, " ")}`);
+    out.push("");
+  }
+  if (designNotes?.trim()) {
+    out.push(`DESIGN REFERENCE (the user chose this design; match its density and visual habits): ${designNotes.trim()}`);
+    out.push("");
+  }
+  return out;
 }
 
 const LANG_RULES: Record<Lang, string> = {
@@ -71,6 +89,7 @@ export function systemPrompt(p: GenerateParams): string {
   if (f.summary) lines.push("- Include one bullets slide titled with the decision or takeaways, immediately before the closing slide.");
   if (f.qa) lines.push("- The closing slide invites questions; its notes list three questions the audience is likely to ask, each with a one-line answer.");
   lines.push("");
+  lines.push(...houseLines(p.house, p.designNotes));
   lines.push(`LENGTH: exactly ${p.slides} slides including the title and closing slides.`);
   lines.push("Answer only with the JSON the schema asks for.");
   return lines.join("\n");
@@ -101,9 +120,10 @@ export function condensePrompt(p: GenerateParams): string {
   ].join("\n");
 }
 
-export function rewriteSystem(p: { lang: Lang; angle: string }): string {
+export function rewriteSystem(p: { lang: Lang; angle: string; house?: GenerateParams["house"]; designNotes?: string }): string {
   const angle = angleById(p.angle);
   return [
+    ...houseLines(p.house, p.designNotes).filter(Boolean),
     "You revise one slide of a deck. Keep the slide's layout unless the instruction asks for a change. Keep every fact and citation unless the instruction changes it. Keep the schema shape.",
     `ANGLE: ${angle.name}. ${angle.brief}`,
     `LANGUAGE: ${LANG_RULES[p.lang]}`,

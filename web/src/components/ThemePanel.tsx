@@ -1,19 +1,41 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { FONT_CHOICES, THEME_PRESETS, themePreset, type Theme, type ThemeColors } from "@slidecraft/shared";
-import { api, type MediaItem } from "../api";
+import { api, type Design, type MediaItem } from "../api";
 import { toast } from "./Toast";
 
 const COLOR_LABELS: Record<keyof ThemeColors, string> = {
   bg: "Background", surface: "Surface", ink: "Text", ink2: "Secondary text", muted: "Muted", line: "Lines", brand: "Brand", brandDeep: "Brand deep", accent: "Accent", gold: "Gold",
 };
 
-export function ThemePanel({ deckId, theme, onChange }: { deckId: string; theme: Theme; onChange: (t: Theme) => void }) {
+export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { deckId: string; theme: Theme; designId?: string; onChange: (t: Theme) => void; onDesign: (t: Theme, designId: string | undefined) => void }) {
   const logoRef = useRef<HTMLInputElement>(null);
+  const [designs, setDesigns] = useState<Design[]>([]);
+  const [saveName, setSaveName] = useState<string | null>(null);
+  useEffect(() => {
+    api.designs().then(setDesigns).catch(() => {});
+  }, []);
   const set = (patch: Partial<Theme>) => onChange({ ...theme, ...patch });
   const setColor = (k: keyof ThemeColors, v: string) => onChange({ ...theme, colors: { ...theme.colors, [k]: v } });
   const applyPreset = (id: string) => {
     const p = themePreset(id);
-    onChange({ ...p, footer: theme.footer, logoMediaId: theme.logoMediaId, slideNumbers: theme.slideNumbers });
+    onDesign({ ...p, footer: theme.footer, logoMediaId: theme.logoMediaId, slideNumbers: theme.slideNumbers }, undefined);
+  };
+  const applyDesign = (d: Design) => {
+    onDesign({ ...JSON.parse(JSON.stringify(d.theme)), footer: theme.footer, logoMediaId: theme.logoMediaId }, d.id);
+    toast(`Design "${d.name}" applied. Its notes guide the writer from the next rewrite or regenerate.`);
+  };
+  const saveAsDesign = async () => {
+    if (!saveName?.trim()) return;
+    try {
+      const d = await api.saveDesign(saveName.trim(), theme);
+      setDesigns((x) => [d, ...x]);
+      onDesign({ ...theme, id: d.theme.id, name: d.name }, d.id);
+      setSaveName(null);
+      toast(`Saved as design "${d.name}"`);
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
   };
   const uploadLogo = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -27,6 +49,26 @@ export function ThemePanel({ deckId, theme, onChange }: { deckId: string; theme:
   };
   return (
     <div className="stack">
+      <div className="field">
+        <label>My designs</label>
+        <div className="row">
+          {designs.map((d) => (
+            <button key={d.id} className={"btn btn-ghost btn-xs" + (designId === d.id ? " active" : "")} onClick={() => applyDesign(d)} title={d.notes || d.name}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: d.theme.colors.brand, display: "inline-block" }} /> {d.name}
+            </button>
+          ))}
+          {designs.length === 0 && <span className="help">None yet. <Link to="/designs">Add a reference design</Link> (PowerPoint, PDF or a screenshot).</span>}
+        </div>
+        {saveName === null ? (
+          <button className="btn btn-quiet btn-xs" style={{ alignSelf: "flex-start" }} onClick={() => setSaveName(theme.name.startsWith("design") ? "" : `${theme.name} (mine)`)}>Save this look as a design</button>
+        ) : (
+          <div className="row" style={{ gap: 6 }}>
+            <input type="text" value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Design name" style={{ flex: 1 }} />
+            <button className="btn btn-ghost btn-xs" onClick={saveAsDesign} disabled={!saveName.trim()}>Save</button>
+            <button className="btn btn-quiet btn-xs" onClick={() => setSaveName(null)}>Cancel</button>
+          </div>
+        )}
+      </div>
       <div className="field">
         <label>Preset</label>
         <div className="row">

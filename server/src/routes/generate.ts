@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getDb, now, uid } from "../db.js";
 import { loadDeck, saveDeck } from "../store.js";
-import { normaliseParams, rewriteSlide, runGenerate } from "../llm/generate.js";
+import { feedbackInstruction, normaliseParams, rewriteSlide, runApplyFeedback, runGenerate } from "../llm/generate.js";
 import { cleanBrief, scanSlide } from "@slidecraft/shared";
 import { LlmError } from "../llm/client.js";
 
@@ -51,5 +51,68 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
       const code = e instanceof LlmError ? e.code : "error";
       return reply.code(code === "no_key" ? 400 : 502).send({ error: code, message: (e as Error).message });
     }
+  });
+
+  // Feedback on one slide: saved for later, or applied now together with any
+  // feedback already waiting on it. Applying reopens the slide for sign-off.
+  app.post("/api/decks/:id/slides/:sid/feedback", async (req, reply) => {
+    const { id, sid } = req.params as { id: string; sid: string };
+    const deck = loadDeck(req.user.id, id);
+    if (!deck) return reply.code(404).send({ error: "not_found" });
+    const idx = deck.slides.findIndex((s) => s.id === sid);
+    if (idx < 0) return reply.code(404).send({ error: "slide_not_found" });
+    const b = (req.body ?? {}) as { text?: string; apply?: boolean };
+    const text = String(b.text ?? "").trim().slice(0, 4000);
+    const slide = deck.slides[idx];
+    const review = { ok: false, feedback: [...(slide.review?.feedback ?? [])] };
+    if (text) review.feedback.push({ text, at: now() });
+    const pending = review.feedback.filter((f) => !f.appliedAt);
+    if (!pending.length) return reply.code(400).send({ error: "empty", message: "Write what should change first." });
+    if (!b.apply) {
+      deck.slides[idx] = { ...slide, review };
+      saveDeck(req.user.id, deck);
+      return { slide: deck.slides[idx], slop: scanSlide(deck.slides[idx], deck.lang) };
+    }
+    try {
+      const s = await rewriteSlide(req.user.id, deck, { ...slide, review }, feedbackInstruction(pending.map((f) => f.text)));
+      const at = now();
+      s.review = { ok: false, feedback: review.feedback.map((f) => (f.appliedAt ? f : { ...f, appliedAt: at })) };
+      deck.slides[idx] = s;
+      saveDeck(req.user.id, deck);
+      return { slide: s, slop: scanSlide(s, deck.lang) };
+    } catch (e) {
+      // The feedback is kept, so nothing typed is lost when the writer fails.
+      deck.slides[idx] = { ...slide, review };
+      saveDeck(req.user.id, deck);
+      const code = e instanceof LlmError ? e.code : "error";
+      return reply.code(code === "no_key" ? 400 : 502).send({ error: code, message: `${(e as Error).message} Your feedback is saved on the slide.` });
+    }
+  });
+
+  app.post("/api/decks/:id/slides/:sid/ok", async (req, reply) => {
+    const { id, sid } = req.params as { id: string; sid: string };
+    const deck = loadDeck(req.user.id, id);
+    if (!deck) return reply.code(404).send({ error: "not_found" });
+    const idx = deck.slides.findIndex((s) => s.id === sid);
+    if (idx < 0) return reply.code(404).send({ error: "slide_not_found" });
+    const ok = (req.body as { ok?: boolean } | undefined)?.ok !== false;
+    const cur = deck.slides[idx].review ?? { ok: false, feedback: [] };
+    deck.slides[idx] = { ...deck.slides[idx], review: { ...cur, ok, okAt: ok ? now() : undefined } };
+    if (!ok) delete deck.slides[idx].review!.okAt;
+    saveDeck(req.user.id, deck);
+    return { slide: deck.slides[idx], slop: scanSlide(deck.slides[idx], deck.lang) };
+  });
+
+  app.post("/api/decks/:id/feedback/apply", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const deck = loadDeck(req.user.id, id);
+    if (!deck) return reply.code(404).send({ error: "not_found" });
+    if (!deck.slides.some((s) => (s.review?.feedback ?? []).some((f) => !f.appliedAt))) return reply.code(400).send({ error: "empty", message: "No slide has feedback waiting." });
+    const running = getDb().prepare("SELECT id FROM jobs WHERE deck_id = ? AND status IN ('queued','running')").get(id);
+    if (running) return reply.code(409).send({ error: "already_running", jobId: (running as { id: string }).id });
+    const jobId = uid("job");
+    getDb().prepare("INSERT INTO jobs (id, user_id, deck_id, kind, status, progress, created_at, updated_at) VALUES (?, ?, ?, 'feedback', 'queued', '[]', ?, ?)").run(jobId, req.user.id, id, now(), now());
+    void runApplyFeedback(jobId, req.user.id, id);
+    return { jobId };
   });
 }

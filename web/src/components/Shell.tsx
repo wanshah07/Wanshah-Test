@@ -39,6 +39,8 @@ export function Shell() {
           <nav className="links">
             <NavLink to="/" end className={({ isActive }) => (isActive ? "on" : "")}>Decks</NavLink>
             <NavLink to="/new" className={({ isActive }) => (isActive ? "on" : "")}>New deck</NavLink>
+            <NavLink to="/designs" className={({ isActive }) => (isActive ? "on" : "")}>Designs</NavLink>
+            <NavLink to="/prompts" className={({ isActive }) => (isActive ? "on" : "")}>Prompts</NavLink>
             <NavLink to="/settings" className={({ isActive }) => (isActive ? "on" : "")}>Settings</NavLink>
           </nav>
           <span className="sp" />

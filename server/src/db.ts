@@ -85,6 +85,29 @@ function migrate(d: DatabaseSync): void {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS media_deck ON media(deck_id);
+    CREATE TABLE IF NOT EXISTS designs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      theme TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      analysis TEXT NOT NULL DEFAULT '{}',
+      preview_media_id TEXT,
+      source_name TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS designs_user ON designs(user_id, updated_at);
+    CREATE TABLE IF NOT EXISTS prompts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      text TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS prompts_user ON prompts(user_id, name);
     CREATE TABLE IF NOT EXISTS jobs (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,

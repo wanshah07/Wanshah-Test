@@ -175,3 +175,7 @@ table.edit input{padding:5px 8px;font-size:12px}
 .chip input{margin:0;accent-color:var(--brand)}
 .drop.compact{padding:16px}
 .btn-danger{background:#C63B3B !important;color:#fff !important;border-color:#C63B3B !important}
+.review.ok{border-color:#9BD8B4;background:color-mix(in srgb,#E3F5EA 55%,var(--surface))}
+.thumb .okmark{position:absolute;right:6px;bottom:5px;z-index:2;width:20px;height:20px;border-radius:50%;background:#1B7F4B;color:#fff;font-size:12px;display:grid;place-items:center;font-weight:700}
+.thumb .fbmark{position:absolute;right:6px;bottom:5px;z-index:2;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#E8A13B;color:#fff;font-size:11px;display:grid;place-items:center;font-weight:700}
+.design-card .sw{width:22px;height:22px;border-radius:6px;border:1px solid var(--line);display:inline-block}

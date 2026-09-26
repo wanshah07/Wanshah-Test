@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
-import { api, type Job } from "../api";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ANGLES, blankSlide, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef, type Theme } from "@slidecraft/shared";
+import { api, type Design, type Job } from "../api";
 import { toast } from "../components/Toast";
-import { BriefPicker, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
+import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
+import { SlideFrame } from "../components/SlideFrame";
 import { DropZone } from "../components/DropZone";
 import { OneDriveBox } from "../components/OneDriveBox";
 import type { PathedFile } from "../lib/files";
@@ -13,6 +14,10 @@ const STEPS = ["Brief", "Sources", "Angle", "Features", "Generate"];
 
 function fmtChars(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k chars` : `${n} chars`;
+}
+
+function designSample(t: Theme, lang: "en" | "ms") {
+  return { ...blankSlide("title", lang), title: t.name, subtitle: `${t.fontDisplay} / ${t.fontBody}` };
 }
 
 export default function NewDeck() {
@@ -28,6 +33,9 @@ export default function NewDeck() {
   const [slides, setSlides] = useState(10);
   const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
   const [themeId, setThemeId] = useState("facerinna");
+  const [params] = useSearchParams();
+  const [designId, setDesignId] = useState<string | undefined>(params.get("design") ?? undefined);
+  const [designs, setDesigns] = useState<Design[]>([]);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [uploading, setUploading] = useState(false);
   const [pasteName, setPasteName] = useState("");
@@ -38,12 +46,14 @@ export default function NewDeck() {
 
   useEffect(() => {
     api.settings().then((s) => setThemeId(s.defaultTheme)).catch(() => {});
+    api.designs().then(setDesigns).catch(() => {});
+    defaultPromptIds().then((prompts) => setBrief((b) => ({ ...b, prompts })));
   }, []);
 
   // The deck row exists from step 2 so uploads have somewhere to go.
   const ensureDeck = async (): Promise<string> => {
     if (deckId) return deckId;
-    const d = await api.createDeck({ title, lang, angle, themeId });
+    const d = await api.createDeck({ title, lang, angle, themeId, designId });
     setDeckId(d.id);
     return d.id;
   };
@@ -85,10 +95,16 @@ export default function NewDeck() {
   };
 
   const start = async () => {
+    const existed = !!deckId;
     const id = await ensureDeck();
+    // The deck may have been created at the Sources step, before a design was picked.
+    if (existed) {
+      if (designId) await api.applyDesign(id, designId);
+      else await api.applyPreset(id, themeId);
+    }
     setStep(4);
     try {
-      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences } });
+      const { jobId } = await api.generate(id, { prompt, title, lang, angle, audience, slides, features, imageMode, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
         const j = await api.job(jobId);
         setJob(j);
@@ -193,13 +209,28 @@ export default function NewDeck() {
                   {LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}
                 </select>
               </label>
-              <label className="f">
-                Theme <span className="h">Change any colour or font later in the editor.</span>
-                <select value={themeId} onChange={(e) => setThemeId(e.target.value)}>
-                  {THEME_PRESETS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </label>
             </div>
+          </div>
+          <div className="card stack">
+            <div className="row between">
+              <h3>Design</h3>
+              <a href="/designs" className="small">Add a reference design</a>
+            </div>
+            <div className="grid auto" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))" }}>
+              {[...designs.map((d) => ({ key: d.id, name: d.name, theme: d.theme, mine: true })), ...THEME_PRESETS.map((t) => ({ key: t.id, name: t.name, theme: t, mine: false }))].map((o) => {
+                const on = o.mine ? designId === o.key : !designId && themeId === o.key;
+                return (
+                  <div key={o.key} className={"card tight pick" + (on ? " on" : "")} onClick={() => (o.mine ? setDesignId(o.key) : (setDesignId(undefined), setThemeId(o.key)))}>
+                    <SlideFrame slide={designSample(o.theme, lang)} theme={o.theme} index={0} total={1} lang={lang} />
+                    <div className="row between small" style={{ marginTop: 6 }}>
+                      <b>{o.name}</b>
+                      {o.mine && <span className="pill brand">mine</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <span className="small muted">Your designs also carry notes the writer follows (title length, text per slide). Colours and fonts can be changed later in the editor.</span>
           </div>
           <div className="card stack">
             <h3>Features</h3>

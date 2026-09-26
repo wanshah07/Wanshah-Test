@@ -32,6 +32,29 @@ single HTML file. Runs on your own machine or server, with your own key.
   with presets. The default preset is the token set of my.facerinna.com
   (Fraunces and Inter, brand `#4898D8` on ink `#1D344E`, 20px radius); the
   app chrome uses the same tokens, light and dark.
+- **Brief by ticking.** What the deck is for, what it must include, the
+  audience and the language are tick boxes; typing is optional. The choices
+  are kept on the deck, so Regenerate starts from them.
+- **Saved prompts** (Prompts page). Instructions written once, such as "cite
+  NPRA before any EU source", ticked on any deck; some can start ticked on
+  every new deck. They sit below the fact rules: no prompt can make the
+  writer invent a fee, date or clause.
+- **Reference designs** (Designs page). Drop a PowerPoint, a PDF or a
+  screenshot of slides you like. A PowerPoint gives its theme colours
+  (through its colour map), the colours its slides actually use, its fonts,
+  and how dense it is (title length, lines per slide, charts, tables,
+  pictures). A PDF gives the page background, text and fill colours, and
+  fonts by size and by use. A screenshot gives its colours from the pixels;
+  its fonts and layout need a writer model that can see pictures. Text
+  colours are adjusted until they read on the background; brand colours are
+  kept exact. Pick a design for a new deck or in the editor's Theme tab; its
+  notes, which you can edit, guide the writer. Office fonts (Calibri,
+  Cambria, Arial, Times New Roman) stay named in the PPTX and are shown in
+  the browser with free fonts of the same widths.
+- **Slide sign-off.** Under every slide: OK, or say what should change and
+  apply it now or save it for later. Feedback can be added to a slide that
+  was already OK, which reopens it. Apply saved feedback runs every waiting
+  note in one go. The editor counts the slides that are OK.
 - **Export.** PowerPoint with editable text, native charts, tables and shapes;
   a standalone HTML deck with keyboard navigation, speaker notes and a grid
   view; the JSON spec.

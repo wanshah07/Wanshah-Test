@@ -184,7 +184,8 @@ export function autoFixSlide(slide: Slide): Slide {
 export const SAHKAN_RE = /\[SAHKAN:[^\]]*\]/g;
 
 export function sahkanCount(deck: Deck): number {
-  const text = JSON.stringify(deck.slides);
+  // Feedback the user wrote is not slide content, so a marker quoted in it does not count.
+  const text = JSON.stringify(deck.slides.map(({ review: _r, ...content }) => content));
   return (text.match(SAHKAN_RE) ?? []).length;
 }
 

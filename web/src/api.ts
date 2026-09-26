@@ -1,4 +1,4 @@
-import type { Deck, OneDriveLink, Slide, SlopHit, SourceRef } from "@slidecraft/shared";
+import type { Deck, OneDriveLink, Slide, SlopHit, SourceRef, Theme } from "@slidecraft/shared";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) {
@@ -84,6 +84,31 @@ export interface OneDriveImport {
   sources: SourceRef[];
 }
 
+export interface Design {
+  id: string;
+  name: string;
+  theme: Theme;
+  notes: string;
+  analysis: {
+    kind?: "pptx" | "pdf" | "image";
+    files?: string[];
+    colours?: { hex: string; share: number }[];
+    fonts?: { display?: string; body?: string; found: string[] };
+    stats?: { slides: number; titleWords: number; longestTitle: number; linesPerSlide: number; charts: number; tables: number; pictures: number };
+    warnings?: string[];
+  };
+  previewMediaId: string | null;
+  sourceName: string | null;
+  updatedAt: string;
+}
+
+export interface SavedPrompt {
+  id: string;
+  name: string;
+  text: string;
+  isDefault: boolean;
+}
+
 export interface MediaItem {
   id: string;
   name: string;
@@ -99,7 +124,7 @@ export const api = {
   login: (email: string, password: string) => req<{ user: Settings["user"] }>("POST", "/api/auth/login", { email, password }),
   logout: () => req<{ ok: true }>("POST", "/api/auth/logout"),
   decks: () => req<DeckSummary[]>("GET", "/api/decks"),
-  createDeck: (b: { title?: string; lang?: string; angle?: string; themeId?: string }) => req<Deck>("POST", "/api/decks", b),
+  createDeck: (b: { title?: string; lang?: string; angle?: string; themeId?: string; designId?: string }) => req<Deck>("POST", "/api/decks", b),
   deck: (id: string) => req<DeckResponse>("GET", `/api/decks/${id}`),
   saveDeck: (deck: Deck) => req<DeckResponse>("PUT", `/api/decks/${deck.id}`, deck),
   deleteDeck: (id: string) => req<{ ok: true }>("DELETE", `/api/decks/${id}`),
@@ -133,6 +158,24 @@ export const api = {
   oneDriveBrowse: (folder: string) => req<{ name: string; folders: string[]; pictures: number }>("GET", `/api/onedrive/browse?folder=${encodeURIComponent(folder)}`),
   importOneDrive: (id: string, folder: string, subfolders: boolean) => req<OneDriveImport>("POST", `/api/decks/${id}/onedrive`, { folder, subfolders }),
   unlinkOneDrive: (id: string) => req<{ ok: true }>("DELETE", `/api/decks/${id}/onedrive`),
+  designs: () => req<Design[]>("GET", "/api/designs"),
+  analyseDesign: (files: File[], name: string) => {
+    const fd = new FormData();
+    if (name.trim()) fd.append("name", name.trim());
+    for (const f of files) fd.append("files", f, encodeURIComponent(f.name));
+    return req<Design>("POST", "/api/designs/analyse", undefined, fd);
+  },
+  saveDesign: (name: string, theme: Theme, notes = "") => req<Design>("POST", "/api/designs", { name, theme, notes }),
+  updateDesign: (id: string, b: { name?: string; notes?: string; theme?: Theme }) => req<Design>("PUT", `/api/designs/${id}`, b),
+  deleteDesign: (id: string) => req<{ ok: true }>("DELETE", `/api/designs/${id}`),
+  applyDesign: (deckId: string, designId: string) => req<Deck>("POST", `/api/decks/${deckId}/design`, { designId }),
+  prompts: () => req<SavedPrompt[]>("GET", "/api/prompts"),
+  addPrompt: (b: { name: string; text: string; isDefault: boolean }) => req<SavedPrompt>("POST", "/api/prompts", b),
+  updatePrompt: (id: string, b: { name: string; text: string; isDefault: boolean }) => req<SavedPrompt>("PUT", `/api/prompts/${id}`, b),
+  deletePrompt: (id: string) => req<{ ok: true }>("DELETE", `/api/prompts/${id}`),
+  feedback: (deckId: string, sid: string, text: string, apply: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/feedback`, { text, apply }),
+  slideOk: (deckId: string, sid: string, ok: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/ok`, { ok }),
+  applyAllFeedback: (deckId: string) => req<{ jobId: string }>("POST", `/api/decks/${deckId}/feedback/apply`),
   testKey: (openaiKey?: string, baseUrl?: string) => req<{ ok: boolean; message: string; models?: string[] }>("POST", "/api/settings/test-key", { openaiKey, baseUrl }),
 };
 

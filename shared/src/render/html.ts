@@ -1,4 +1,5 @@
 import type { Deck, Slide, Theme } from "../deck.js";
+import { fontStack } from "../theme.js";
 import { esc, inline } from "./escape.js";
 import { chartSvg } from "./charts.js";
 import { diagramSvg } from "./diagrams.js";
@@ -25,8 +26,8 @@ export function themeVars(t: Theme): string {
     `--accent:${c.accent}`,
     `--gold:${c.gold}`,
     `--radius:${t.radius}px`,
-    `--font-display:'${t.fontDisplay.replace(/'/g, "")}'`,
-    `--font-body:'${t.fontBody.replace(/'/g, "")}'`,
+    `--font-display:${fontStack(t.fontDisplay)}`,
+    `--font-body:${fontStack(t.fontBody)}`,
   ].join(";");
 }
 
@@ -59,7 +60,7 @@ function chrome(s: Slide, t: Theme, ctx: RenderCtx): string {
 
 export function renderSlideHtml(s: Slide, t: Theme, ctx: RenderCtx): string {
   const c = t.colors;
-  const font = t.fontBody;
+  const font = fontStack(t.fontBody);
   let body = "";
   switch (s.layout) {
     case "title":

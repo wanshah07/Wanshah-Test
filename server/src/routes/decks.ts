@@ -4,6 +4,7 @@ import { getDb, now } from "../db.js";
 import { loadDeck, saveDeck } from "../store.js";
 import { newDeck } from "../llm/generate.js";
 import { readSettings } from "../settings.js";
+import { getDesign } from "../library.js";
 
 function validDeck(raw: unknown): raw is Deck {
   if (!raw || typeof raw !== "object") return false;
@@ -27,9 +28,9 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/api/decks", async (req) => {
-    const b = (req.body ?? {}) as { title?: string; lang?: string; angle?: string; themeId?: string };
+    const b = (req.body ?? {}) as { title?: string; lang?: string; angle?: string; themeId?: string; designId?: string };
     const s = readSettings(req.user.id);
-    return newDeck(req.user.id, b.title ?? "", b.lang === "ms" ? "ms" : "en", b.angle ?? "custom", b.themeId ?? s.default_theme ?? "facerinna");
+    return newDeck(req.user.id, b.title ?? "", b.lang === "ms" ? "ms" : "en", b.angle ?? "custom", b.themeId ?? s.default_theme ?? "facerinna", b.designId);
   });
 
   app.get("/api/decks/:id", async (req, reply) => {
@@ -78,6 +79,20 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     const b = (req.body ?? {}) as { presetId?: string };
     const keep = { logoMediaId: d.theme.logoMediaId, footer: d.theme.footer };
     d.theme = { ...themePreset(b.presetId ?? "facerinna"), ...keep };
+    delete d.designId;
+    saveDeck(req.user.id, d);
+    return d;
+  });
+
+  // Use a saved design: its theme, and its notes for the writer from now on.
+  app.post("/api/decks/:id/design", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const d = loadDeck(req.user.id, id);
+    if (!d) return reply.code(404).send({ error: "not_found" });
+    const design = getDesign(req.user.id, String((req.body as { designId?: string } | undefined)?.designId ?? ""));
+    if (!design) return reply.code(404).send({ error: "design_not_found" });
+    d.theme = { ...(JSON.parse(JSON.stringify(design.theme)) as Deck["theme"]), logoMediaId: d.theme.logoMediaId, footer: d.theme.footer };
+    d.designId = design.id;
     saveDeck(req.user.id, d);
     return d;
   });
