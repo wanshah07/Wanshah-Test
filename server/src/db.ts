@@ -124,7 +124,7 @@ function migrate(d: DatabaseSync): void {
   // Columns added after the first release. SQLite has no ADD COLUMN IF NOT EXISTS.
   const cols = (d.prepare("PRAGMA table_info(settings)").all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes("openai_base")) d.exec("ALTER TABLE settings ADD COLUMN openai_base TEXT");
-  for (const c of ["ms_client_id", "ms_refresh_enc", "ms_account", "ms_folder", "od_provider", "cz_key_enc", "cz_account", "cz_account_label", "cz_user", "vision_ok", "vision_for"]) if (!cols.includes(c)) d.exec(`ALTER TABLE settings ADD COLUMN ${c} TEXT`);
+  for (const c of ["ms_client_id", "ms_refresh_enc", "ms_account", "ms_folder", "od_provider", "cz_key_enc", "cz_account", "cz_account_label", "cz_user", "vision_ok", "vision_for", "rd_base", "rd_key_enc", "rd_model"]) if (!cols.includes(c)) d.exec(`ALTER TABLE settings ADD COLUMN ${c} TEXT`);
   const srcCols = (d.prepare("PRAGMA table_info(sources)").all() as { name: string }[]).map((c) => c.name);
   // A picture pulled from OneDrive keeps the item id and version, so a second pull skips what has not changed.
   for (const c of ["remote_id", "remote_etag"]) if (!srcCols.includes(c)) d.exec(`ALTER TABLE sources ADD COLUMN ${c} TEXT`);

@@ -198,6 +198,7 @@ try {
   await page.locator("text=Composio API key").waitFor({ timeout: 5000 }).catch(() => {});
   check("OneDrive can go through Composio", (await page.locator("text=Composio API key").count()) === 1 && (await page.locator("button:has-text('Find my OneDrive accounts')").count()) === 1);
   check("settings says whether the writer reads pictures", (await page.locator("text=Reads pictures:").count()) === 1);
+  check("settings offers a separate picture reader", (await page.locator("[data-testid=reader] h2", { hasText: "Picture reader" }).count()) === 1 && (await page.locator("button:has-text('Save picture reader')").count()) === 1);
   // Inside another page (VS Code's preview pane), say so and offer a real tab.
   await page.setContent(`<iframe src="http://localhost:${PORT}/" style="width:1200px;height:700px"></iframe>`);
   const inner = page.frameLocator("iframe");

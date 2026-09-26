@@ -82,7 +82,8 @@ async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: numbe
       const err = errorOf(json);
       last = new LlmError(err.message ? `${host} answered ${res.status}: ${err.message}` : `${host} answered ${res.status}`, res.status, err.code || `http_${res.status}`);
       if (res.status === 429 || res.status >= 500) {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        // A busy model ("high demand", 503) needs longer than a blip to clear.
+        await new Promise((r) => setTimeout(r, (res.status === 503 ? 5000 : 1500) * (attempt + 1)));
         continue;
       }
       throw last;

@@ -141,6 +141,12 @@ so uploaded pictures reach the deck and Auto plans reliably. For generated
 pictures the image model is an Imagen model; Google serves Imagen only on a
 billed project, so on the free tier leave "Pictures come from" on uploads.
 
+**Picture reader** (Settings, optional). A second endpoint and model that
+only reads the pictures uploaded as sources and hands their text to the
+writer, so a writer that cannot see still writes from a poster or a table
+screenshot: for example Gemini Flash reads, Mireld writes. It has its own key,
+sent only to its own endpoint. Turned off, the writer reads pictures itself.
+
 The key is sent only to the endpoint it was saved with. The server-wide
 `OPENAI_API_KEY` is only ever sent to `OPENAI_BASE_URL`, never to an endpoint
 a user picks in Settings.

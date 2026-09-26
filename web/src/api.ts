@@ -66,6 +66,8 @@ export interface Settings {
   defaults: { model: string; imageModel: string };
   /** Whether the writer model reads pictures, as last checked. */
   vision: "yes" | "no" | "unknown";
+  /** An optional second endpoint that only reads uploaded pictures. */
+  reader: { baseUrl: string; model: string; key: string; complete: boolean };
   appTheme: "light" | "dark" | "system";
   defaultTheme: string;
 }
@@ -181,6 +183,9 @@ export const api = {
   feedback: (deckId: string, sid: string, text: string, apply: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/feedback`, { text, apply }),
   slideOk: (deckId: string, sid: string, ok: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/ok`, { ok }),
   applyAllFeedback: (deckId: string) => req<{ jobId: string }>("POST", `/api/decks/${deckId}/feedback/apply`),
+  saveReader: (b: { key?: string | null; baseUrl?: string | null; model?: string | null }) => req<{ ok: true }>("PUT", "/api/settings/reader", b),
+  clearReader: () => req<{ ok: true }>("DELETE", "/api/settings/reader"),
+  testReader: (b: { key?: string; baseUrl?: string; model?: string }) => req<{ ok: boolean; message: string; models?: string[]; vision?: string }>("POST", "/api/settings/reader/test", b),
   testKey: (openaiKey?: string, baseUrl?: string, model?: string) => req<{ ok: boolean; message: string; models?: string[]; imageModels?: string[]; vision?: string }>("POST", "/api/settings/test-key", { openaiKey, baseUrl, model }),
 };
 

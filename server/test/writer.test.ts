@@ -298,7 +298,7 @@ describe("pictures the writer may not be able to read", () => {
     const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "What the label table says about limits" } }));
     const job = await waitJob(jobId);
     expect(job.status).toBe("done");
-    expect(job.progress.join("\n")).toMatch(/Reading picture 1: label-table.png/);
+    expect(job.progress.join("\n")).toMatch(/Reading picture 1 with writer-1: label-table.png/);
     expect(gw.users.at(-1)).toMatch(/### Picture: label-table.png[\s\S]*Effective \| 1 Jan 2027/);
     const again = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "Again" } }));
     await waitJob(again.jobId);
@@ -313,5 +313,67 @@ describe("pictures the writer may not be able to read", () => {
       { id: "c", name: "read.png", rel_path: null, kind: "image", chars: 0, text: "NONE", media_id: "m", remote_id: null },
     ];
     expect(unreadPictures(rows).map((r) => r.name)).toEqual(["scan.png"]);
+  });
+});
+
+describe("a picture reader beside a writer that cannot see", () => {
+  const rd = { reads: 0, probes: 0, auths: [] as string[] };
+  let readerServer: http.Server;
+  let readerBase = "";
+
+  beforeAll(async () => {
+    readerServer = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (c) => (raw += c));
+      req.on("end", () => {
+        rd.auths.push(String(req.headers.authorization));
+        res.writeHead(200, { "content-type": "application/json" });
+        if (req.url === "/v1/models") return res.end(JSON.stringify({ data: [{ id: "models/reader-1" }] }));
+        const text = String((JSON.parse(raw).messages?.[1]?.content ?? []).find?.((p: { type: string }) => p.type === "text")?.text ?? "");
+        if (/What colour/.test(text)) rd.probes++;
+        else rd.reads++;
+        res.end(JSON.stringify({ choices: [{ message: { content: /What colour/.test(text) ? "Red" : "Poster claim | Reduces acne lesions by 42% in 4 weeks" }, finish_reason: "stop" }] }));
+      });
+    });
+    await new Promise<void>((r) => readerServer.listen(0, "127.0.0.1", () => r()));
+    readerBase = `http://127.0.0.1:${(readerServer.address() as AddressInfo).port}/v1`;
+  });
+
+  afterAll(async () => {
+    readerServer.closeAllConnections();
+    await new Promise<void>((r) => readerServer.close(() => r()));
+  });
+
+  it("tests the reader on its own endpoint and key", async () => {
+    const t = J(await app.inject({ method: "POST", url: "/api/settings/reader/test", payload: { baseUrl: readerBase, key: "rk-reader", model: "reader-1" } }));
+    expect(t).toMatchObject({ ok: true, vision: "yes" });
+    expect(t.models).toEqual(["reader-1"]);
+    expect(t.message).toMatch(/reader-1 reads pictures: it will read uploaded pictures for the writer/);
+  });
+
+  it("has the reader read the poster and the writer write from its text", async () => {
+    gw.vision = false;
+    await app.inject({ method: "PUT", url: "/api/settings/reader", payload: { baseUrl: readerBase, key: "rk-reader", model: "reader-1" } });
+    const s = J(await app.inject({ method: "GET", url: "/api/settings" }));
+    expect(s.reader).toMatchObject({ baseUrl: readerBase, model: "reader-1", complete: true });
+    expect(s.reader.key).not.toContain("rk-reader");
+    const id = await newDeck("reader");
+    await app.inject({ method: "POST", url: `/api/decks/${id}/sources`, ...multipart([{ name: "poster.png", content: pngBytes() }]) });
+    const r = await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "What the poster shows" } });
+    expect(r.statusCode).toBe(200); // no "cannot read pictures" stop: the reader can
+    const job = await waitJob(J(r).jobId);
+    expect(job.status, job.error ?? "").toBe("done");
+    expect(job.progress.join("\n")).toMatch(/Reading picture 1 with reader-1: poster.png/);
+    expect(rd.reads).toBe(1);
+    expect(gw.users.at(-1)).toMatch(/### Picture: poster.png[\s\S]*Reduces acne lesions by 42% in 4 weeks/);
+    // Each key goes only to its own endpoint.
+    expect(rd.auths.every((a) => a === "Bearer rk-reader")).toBe(true);
+  });
+
+  it("forgets the reader's key when its endpoint changes, and turns off", async () => {
+    await app.inject({ method: "PUT", url: "/api/settings/reader", payload: { baseUrl: "https://example.org/v1" } });
+    expect(J(await app.inject({ method: "GET", url: "/api/settings" })).reader).toMatchObject({ key: "", complete: false });
+    await app.inject({ method: "DELETE", url: "/api/settings/reader" });
+    expect(J(await app.inject({ method: "GET", url: "/api/settings" })).reader).toMatchObject({ baseUrl: "", model: "", complete: false });
   });
 });

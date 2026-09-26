@@ -4,6 +4,7 @@ import { maskKey } from "../crypto.js";
 import { checkKey, hostOf, NOT_A_WRITER } from "../llm/client.js";
 import { baseUrlFor, normaliseBase, PROVIDERS, readSettings, resolveAuth, userKey, writeSettings } from "../settings.js";
 import { knownVision, visionFor } from "../llm/vision.js";
+import { pictureAuth, readerSettings, saveReader } from "../reader.js";
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/settings", async (req) => {
@@ -25,9 +26,14 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       model: s.openai_model || config.openaiModel,
       imageModel: s.openai_image_model || config.openaiImageModel,
       defaults: { model: config.openaiModel, imageModel: config.openaiImageModel },
+      // About whoever reads pictures: the picture reader when set up, else the writer.
       vision: (() => {
-        const auth = resolveAuth(req.user.id);
+        const auth = pictureAuth(req.user.id);
         return auth ? knownVision(req.user.id, auth) : "unknown";
+      })(),
+      reader: (() => {
+        const r = readerSettings(req.user.id);
+        return { baseUrl: r.baseUrl, model: r.model, key: maskKey(r.key), complete: r.complete };
       })(),
       appTheme: s.app_theme || "system",
       defaultTheme: s.default_theme || "facerinna",
@@ -73,6 +79,44 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     if (r.models && r.models.length && !r.models.includes(model)) return { ...r, vision: "unknown", message: `${r.message} The writer model ${model} is not in this list: pick one below, save it, and press Test again.` };
     const vision = await visionFor(req.user.id, { apiKey: key, baseUrl, model, imageModel: st.openai_image_model || config.openaiImageModel }, true);
     const words = vision === "yes" ? `${model} reads pictures: uploaded pictures are read before a deck is written.` : vision === "no" ? `${model} cannot read pictures: uploaded pictures are used only as slide pictures, and you are warned before a deck is written.` : `Could not check whether ${model} reads pictures.`;
+    return { ...r, vision, message: `${r.message} ${words}` };
+  });
+
+  // The picture reader: a second endpoint that only reads uploaded pictures.
+  app.put("/api/settings/reader", async (req, reply) => {
+    const b = (req.body ?? {}) as { key?: string | null; baseUrl?: string | null; model?: string | null };
+    try {
+      saveReader(req.user.id, { key: b.key, baseUrl: b.baseUrl, model: b.model });
+    } catch (e) {
+      return reply.code(400).send({ error: "invalid", message: (e as Error).message });
+    }
+    return { ok: true };
+  });
+
+  app.delete("/api/settings/reader", async (req) => {
+    saveReader(req.user.id, { key: null, baseUrl: null, model: null });
+    return { ok: true };
+  });
+
+  app.post("/api/settings/reader/test", async (req) => {
+    const b = (req.body ?? {}) as { key?: string; baseUrl?: string; model?: string };
+    const saved = readerSettings(req.user.id);
+    let baseUrl: string;
+    try {
+      baseUrl = normaliseBase(b.baseUrl || saved.baseUrl || "");
+    } catch (e) {
+      return { ok: false, message: (e as Error).message };
+    }
+    // The saved key only goes to the endpoint it was saved with.
+    const key = (b.key ?? "").trim() || (baseUrl === saved.baseUrl ? saved.key : "");
+    if (!key) return { ok: false, message: `No key to test against ${hostOf(baseUrl)}.` };
+    const r = await checkKey(key, baseUrl);
+    if (!r.ok) return r;
+    const model = (b.model ?? "").trim() || saved.model;
+    if (!model) return { ...r, vision: "unknown", message: `${r.message} Pick a model below, save it, and press Test again.` };
+    if (NOT_A_WRITER.test(model)) return { ...r, vision: "unknown", message: `${r.message} ${model} makes pictures or speech; a picture reader must be a model that reads pictures and answers in text.` };
+    const vision = await visionFor(req.user.id, { apiKey: key, baseUrl, model, imageModel: "" }, true);
+    const words = vision === "yes" ? `${model} reads pictures: it will read uploaded pictures for the writer.` : vision === "no" ? `${model} cannot read pictures; pick another model.` : `Could not check whether ${model} reads pictures (the endpoint may be busy); try Test again.`;
     return { ...r, vision, message: `${r.message} ${words}` };
   });
 }

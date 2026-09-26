@@ -4,6 +4,7 @@ import { listSources, loadDeck, saveDeck, unreadPictures } from "../store.js";
 import { config } from "../config.js";
 import { resolveAuth } from "../settings.js";
 import { visionFor } from "../llm/vision.js";
+import { pictureAuth, readerSettings } from "../reader.js";
 import { AUTO_PROMPT, feedbackInstruction, normaliseParams, rewriteSlide, runApplyFeedback, runGenerate } from "../llm/generate.js";
 import { cleanBrief, scanSlide } from "@slidecraft/shared";
 import { LlmError } from "../llm/client.js";
@@ -23,13 +24,14 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
     // written around blind. Stop and say so, unless the user already chose to go on.
     const allow = !!(req.body as { allowUnreadPictures?: boolean } | undefined)?.allowUnreadPictures;
     const auth = config.mockLlm ? null : resolveAuth(req.user.id);
-    if (auth && !allow) {
+    const reader = config.mockLlm ? null : pictureAuth(req.user.id);
+    if (auth && reader && !allow) {
       const pics = unreadPictures(listSources(id));
-      if (pics.length && (await visionFor(req.user.id, auth)) === "no") {
+      if (pics.length && (await visionFor(req.user.id, reader)) === "no") {
         const names = pics.map((r) => r.rel_path || r.name);
         return reply.code(409).send({
           error: "pictures_unreadable",
-          message: `The writer model (${auth.model}) cannot read pictures. ${names.length} picture source${names.length === 1 ? "" : "s"} (${names.slice(0, 5).join(", ")}${names.length > 5 ? ", …" : ""}) would be used only as slide pictures; any text, table or figure inside them would not reach the deck.`,
+          message: `The ${readerSettings(req.user.id).complete ? "picture reader" : "writer"} model (${reader.model}) cannot read pictures. ${names.length} picture source${names.length === 1 ? "" : "s"} (${names.slice(0, 5).join(", ")}${names.length > 5 ? ", …" : ""}) would be used only as slide pictures; any text, table or figure inside them would not reach the deck.`,
           pictures: names,
         });
       }

@@ -11,6 +11,7 @@ import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
 import { resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
 import { getDesign, promptTexts } from "../library.js";
+import { pictureAuth } from "../reader.js";
 
 export interface Job {
   id: string;
@@ -227,7 +228,8 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         log(jobId, `OneDrive not read (${(e as Error).message}). Using the pictures already pulled.`);
       }
     }
-    if (auth) await readUploadedPictures(jobId, userId, deckId, auth);
+    const reader = config.mockLlm ? null : pictureAuth(userId);
+    if (reader) await readUploadedPictures(jobId, userId, deckId, reader);
     const rows = listSources(deckId);
     const { sources, condensed } = await prepareSources(jobId, auth, p, rows);
     if (p.auto) {
@@ -430,7 +432,7 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
       continue;
     }
     n++;
-    log(jobId, `Reading picture ${n}: ${r.rel_path || r.name}`);
+    log(jobId, `Reading picture ${n} with ${auth.model}: ${r.rel_path || r.name}`);
     try {
       const text = await readPicture(auth, r.rel_path || r.name, fs.readFileSync(m.path), m.mime);
       getDb().prepare("UPDATE sources SET text = ?, chars = ? WHERE id = ?").run(text, text === NOTHING ? 0 : text.length, r.id);
