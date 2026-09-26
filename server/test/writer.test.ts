@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -107,9 +107,20 @@ beforeAll(async () => {
       gw.systems.push(String(body.messages?.[0]?.content ?? ""));
       gw.formats.push(String(body.response_format?.type ?? ""));
       gw.users.push(String(user ?? ""));
+      gw.deckLastMsgs = body.messages;
       if (gw.deckProse > 0) {
         gw.deckProse--;
         return reply("Sure! Here is the deck you asked for, slide by slide.");
+      }
+      if (gw.deckOwnShape > 0) {
+        // What Mireld's writer sent on 26 Sep 2026: valid JSON, but a brief of its own and no slides.
+        gw.deckOwnShape--;
+        return reply(JSON.stringify({ purpose: "To communicate the system's value in plain language", audience: "decision-makers", keyMessages: ["one", "two"] }));
+      }
+      if (gw.deckNested > 0) {
+        gw.deckNested--;
+        const d = mockDeckJson({ prompt: "x", lang: "en", angle: "custom", slides: 6, features: DEFAULT_FEATURES, imageMode: "none" }, []);
+        return reply(JSON.stringify({ purpose: "p", deck: { title: d.title, content: d.slides } }));
       }
       if (gw.garbage) return reply("Sorry, I can only help with questions about cooking. " + "x".repeat(900));
       reply(JSON.stringify(mockDeckJson({ prompt: "x", lang: "en", angle: "custom", slides: 6, features: DEFAULT_FEATURES, imageMode: "none" }, [])));
@@ -223,6 +234,24 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     const id = await newDeck("deck-retry");
     const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
     expect((await waitJob(jobId)).status).toBe("done");
+  });
+
+  it("asks again when the reply is JSON in a shape of the model's own", async () => {
+    gw.deckOwnShape = 1;
+    const id = await newDeck("own-shape");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
+    expect((await waitJob(jobId)).status).toBe("done");
+    expect(String(gw.deckLastMsgs.at(-1)!.content)).toMatch(/it has purpose, audience, keyMessages and is missing title, subtitle, slides/);
+  });
+
+  it("uses slides the model wrapped in its own shape", async () => {
+    gw.deckNested = 2;
+    const id = await newDeck("nested");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
+    const job = await waitJob(jobId);
+    expect(job.status).toBe("done");
+    expect(job.progress.join("\n")).toMatch(/The writer put the slides under "deck.content" instead of "slides"; using them/);
+    expect(job.progress.join("\n")).not.toMatch(/undefined/);
   });
 
   it("leaves the choices alone without Auto", async () => {

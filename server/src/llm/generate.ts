@@ -43,6 +43,23 @@ export function log(jobId: string, line: string): void {
   setJob(jobId, { progress: p });
 }
 
+/** The first array of slide-like objects anywhere in an answer, and where it was. */
+export function findSlides(value: unknown, at = "", depth = 0): { at: string; slides: Record<string, unknown>[]; title?: string } | null {
+  if (!value || typeof value !== "object" || depth > 4) return null;
+  if (Array.isArray(value)) {
+    const objs = value.filter((v) => v && typeof v === "object" && !Array.isArray(v)) as Record<string, unknown>[];
+    const slideLike = objs.filter((o) => typeof o.title === "string" || typeof o.heading === "string" || typeof o.layout === "string");
+    return value.length >= 2 && slideLike.length >= Math.ceil(value.length / 2) ? { at: at || "(top level)", slides: objs } : null;
+  }
+  const o = value as Record<string, unknown>;
+  const keys = Object.keys(o).sort((a, b) => Number(/slide/i.test(b)) - Number(/slide/i.test(a)));
+  for (const k of keys) {
+    const hit = findSlides(o[k], at ? `${at}.${k}` : k, depth + 1);
+    if (hit) return { ...hit, title: hit.title ?? (typeof o.title === "string" ? o.title : undefined) };
+  }
+  return null;
+}
+
 export function normaliseParams(raw: Record<string, unknown>, fallbackAngle = "custom"): GenerateParams {
   const features: Features = { ...DEFAULT_FEATURES, ...((raw.features as Partial<Features>) ?? {}) };
   const slides = Math.max(3, Math.min(40, Number(raw.slides) || 10));
@@ -253,7 +270,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       }
       applyPlan(p, plan, hasPictures);
       const on = (["charts", "tables", "diagrams", "kpis", "sections"] as const).filter((k) => p.features[k]);
-      log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}. ${plan.reason}`);
+      log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}.${plan.reason ? " " + plan.reason : ""}`);
       const d = loadDeck(userId, deckId);
       if (d) {
         d.brief = { ...(d.brief ?? { text: "", purposes: [], include: [], audiences: [] }), slides: p.slides, imageMode: p.imageMode, features: { ...p.features }, auto: true };
@@ -272,7 +289,15 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         { auth, system: systemPrompt(p), user: userPrompt(p, sources, condensed), schemaName: "deck", schema: DECK_SCHEMA, maxTokens: Math.min(32000, 1800 * p.slides + 2000) },
       );
     }
-    const slides = (json.slides ?? []).map((r) => toSlide(r, p.features, p.imageMode));
+    if (!Array.isArray(json.slides)) {
+      // A model that wrapped the deck in a shape of its own ({deck:{slides}}, {outline:[…]}) still wrote it.
+      const found = findSlides(json);
+      if (found) {
+        log(jobId, `The writer put the slides under "${found.at}" instead of "slides"; using them`);
+        json = { ...json, title: json.title ?? found.title ?? "", subtitle: json.subtitle ?? null, slides: found.slides };
+      }
+    }
+    const slides = (Array.isArray(json.slides) ? json.slides : []).map((r) => toSlide(r, p.features, p.imageMode));
     if (!slides.length) {
       const e = new LlmError("The writer returned no slides", 0, "no_slides");
       e.raw = rawSnippet(JSON.stringify(json));

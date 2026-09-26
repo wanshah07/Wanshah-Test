@@ -32,6 +32,13 @@ export function jsonRules(schema: Record<string, unknown>): string {
   return `OUTPUT FORMAT: answer with one JSON object and nothing else: no prose, no code fences, no comments. It must match this JSON Schema exactly, every listed property present, null where a value is unknown:\n${JSON.stringify(schema)}`;
 }
 
+/** Top-level keys the schema requires that the answer lacks. */
+export function missingKeys(value: unknown, schema: Record<string, unknown>): string[] {
+  const req = Array.isArray(schema.required) ? (schema.required as string[]) : [];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return req;
+  return req.filter((k) => !(k in (value as object)));
+}
+
 export function hostOf(baseUrl: string): string {
   try {
     return new URL(baseUrl).host;
@@ -214,20 +221,35 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       e.raw = rawSnippet(choice.message.content ?? "");
       throw e;
     }
+    let parsed: unknown;
     try {
-      return extractJson(choice.message.content ?? "") as T;
+      parsed = extractJson(choice.message.content ?? "");
     } catch {
-      if (!followUp.length) {
-        followUp = [
-          { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
-          { role: "user", content: "That answer is not JSON, so it cannot be used. Answer again with only the JSON object the OUTPUT FORMAT rules describe: start with { and end with }, no prose, no markdown fences." },
-        ];
-        continue;
-      }
-      const e = new LlmError("The model answered with something that is not JSON", 0, "parse");
-      e.raw = rawSnippet(choice.message.content ?? "");
-      throw e;
+      parsed = undefined;
     }
+    if (parsed !== undefined) {
+      // Valid JSON in a shape of the model's own (a brief, an outline) is as unusable as prose,
+      // and it happens most in plain JSON mode, where the schema is only in the instructions.
+      const missing = missingKeys(parsed, a.schema);
+      if (!missing.length || followUp.length) return parsed as T;
+      const keys = Object.keys((a.schema.properties as Record<string, unknown>) ?? {});
+      const had = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? Object.keys(parsed as object) : [];
+      followUp = [
+        { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
+        { role: "user", content: `That JSON is not in the shape the OUTPUT FORMAT rules ask for: it has ${had.length ? had.join(", ") : "no keys"} and is missing ${missing.join(", ")}. Answer again with one JSON object whose top-level keys are exactly ${keys.join(", ")}, with the content inside them as the schema describes. Only the JSON.` },
+      ];
+      continue;
+    }
+    if (!followUp.length) {
+      followUp = [
+        { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
+        { role: "user", content: "That answer is not JSON, so it cannot be used. Answer again with only the JSON object the OUTPUT FORMAT rules describe: start with { and end with }, no prose, no markdown fences." },
+      ];
+      continue;
+    }
+    const e = new LlmError("The model answered with something that is not JSON", 0, "parse");
+    e.raw = rawSnippet(choice.message.content ?? "");
+    throw e;
   }
   throw new LlmError("The endpoint refused every request shape tried", 400, "unsupported");
 }
