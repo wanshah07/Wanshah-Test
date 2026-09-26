@@ -2,7 +2,7 @@
   "name": "Slidecraft",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
   "hostRequirements": { "cpus": 2, "memory": "4gb" },
-  "postCreateCommand": "npm ci --no-audit --no-fund && npm run build",
+  "postCreateCommand": "npm ci --include=dev --no-audit --no-fund && npm run build",
   "postAttachCommand": "npm start",
   "forwardPorts": [8787],
   "portsAttributes": {
