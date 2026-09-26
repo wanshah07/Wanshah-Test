@@ -233,7 +233,7 @@ describe("endpoint setting", () => {
     const s = (await app.inject({ method: "GET", url: "/api/settings" })).json();
     expect(s.endpoint.baseUrl).toBe("https://api.mireld.my/v1");
     expect(s.endpoint.provider).toBe("mireld");
-    expect(s.providers.map((p: { id: string }) => p.id)).toEqual(["openai", "mireld"]);
+    expect(s.providers.map((p: { id: string }) => p.id)).toEqual(["openai", "mireld", "gemini"]);
     const bad = await app.inject({ method: "PUT", url: "/api/settings", payload: { baseUrl: "mireld" } });
     expect(bad.statusCode).toBe(400);
     const { resolveAuth } = await import("../src/settings.js");

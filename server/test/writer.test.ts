@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -63,6 +63,11 @@ beforeAll(async () => {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }] }));
       };
+      if (req.url === "/v1/images/generations") {
+        gw.imageBodies.push(JSON.parse(raw || "{}"));
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ data: [{ b64_json: pngBytes().toString("base64") }] }));
+      }
       if (req.url === "/v1/models") {
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify({ data: [{ id: "writer-1" }] }));
@@ -216,6 +221,21 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     await waitJob(jobId);
     expect(gw.plans).toBe(before);
     expect(gw.systems.at(-1)).toMatch(/exactly 8 slides/);
+  });
+});
+
+describe("picture generation", () => {
+  it("asks Imagen and DALL-E for bytes, and leaves gpt-image alone", async () => {
+    const { generateImage } = await import("../src/llm/client.js");
+    const auth = { apiKey: "k", baseUrl: process.env.OPENAI_BASE_URL!, model: "writer-1", imageModel: "imagen-4.0-generate-001" };
+    expect((await generateImage(auth, "a lab bench")).length).toBeGreaterThan(0);
+    await generateImage({ ...auth, imageModel: "gpt-image-1" }, "a lab bench");
+    expect(gw.imageBodies.map((b) => b.response_format)).toEqual(["b64_json", undefined]);
+  });
+
+  it("offers Google Gemini as a named endpoint", async () => {
+    const s = J(await app.inject({ method: "GET", url: "/api/settings" }));
+    expect(s.providers).toContainEqual({ id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" });
   });
 });
 

@@ -134,6 +134,13 @@ it sent nothing back to GitHub Actions runners on 19 Sep (three client
 shapes, all timeouts). A Codespace runs on GitHub's own cloud, so **Test**
 from inside it is the check that settles it there.
 
+**Google Gemini** is listed too
+(`https://generativelanguage.googleapis.com/v1beta/openai`), with a key from
+aistudio.google.com. Gemini models read pictures and follow the JSON schema,
+so uploaded pictures reach the deck and Auto plans reliably. For generated
+pictures the image model is an Imagen model; Google serves Imagen only on a
+billed project, so on the free tier leave "Pictures come from" on uploads.
+
 The key is sent only to the endpoint it was saved with. The server-wide
 `OPENAI_API_KEY` is only ever sent to `OPENAI_BASE_URL`, never to an endpoint
 a user picks in Settings.

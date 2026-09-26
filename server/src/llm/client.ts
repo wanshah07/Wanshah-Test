@@ -221,7 +221,8 @@ export async function chatText(auth: LlmAuth, system: string, user: string | Con
 /** Returns PNG bytes. */
 export async function generateImage(auth: LlmAuth, prompt: string, size = "1536x1024"): Promise<Buffer> {
   const body: Record<string, unknown> = { model: auth.imageModel, prompt, n: 1, size };
-  if (/^dall-e/.test(auth.imageModel)) body.response_format = "b64_json";
+  // gpt-image always answers with bytes; DALL-E and Imagen (Gemini) send a link unless asked for bytes.
+  if (/^(dall-e|imagen)/.test(auth.imageModel)) body.response_format = "b64_json";
   const json = await call(auth, "/images/generations", body, 240000);
   const b64 = (json.data as { b64_json?: string }[] | undefined)?.[0]?.b64_json;
   if (!b64) throw new LlmError("The image model returned no picture");
