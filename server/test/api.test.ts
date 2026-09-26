@@ -158,7 +158,7 @@ describe("api", () => {
     const slide1 = await zip.file("ppt/slides/slide1.xml")!.async("string");
     expect(slide1).toContain(d.title.split(" ")[0]);
     // Numbered cards come out as shapes with the kicker and a coloured verdict tag.
-    const ci = d.slides.findIndex((s: { layout: string }) => s.layout === "cards");
+    const ci = d.slides.findIndex((s: { layout: string; kicker?: string }) => s.layout === "cards" && /next steps/i.test(s.kicker ?? ""));
     expect(ci).toBeGreaterThan(-1);
     const cx = await zip.file(`ppt/slides/slide${ci + 1}.xml`)!.async("string");
     expect(cx).toContain("NEXT STEPS");

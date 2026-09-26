@@ -13,6 +13,7 @@ import { resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
 import { getDesign, promptTexts } from "../library.js";
 import { pictureAuth } from "../reader.js";
+import { visualise } from "./visualise.js";
 
 export interface Job {
   id: string;
@@ -465,6 +466,8 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     }
     const rawSlides = (Array.isArray(json.slides) ? json.slides : []).filter((r) => r && typeof r === "object") as Record<string, unknown>[];
     const slides = rawSlides.map((r) => toSlide(r, p.features, p.imageMode));
+    const redrawn = visualise(slides, p.features);
+    if (redrawn) log(jobId, `The writer sent too many text slides; ${redrawn} redrawn from their own words as figures, diagrams or cards`);
     // Keep the writer's answer for this deck, so a deck that comes out wrong can be looked into.
     try {
       const dir = path.join(config.dataDir, "writer-replies");

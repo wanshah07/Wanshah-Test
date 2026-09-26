@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckAllText: 0, deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -134,6 +134,15 @@ beforeAll(async () => {
           { layout: "bullets", title: "What is B5?", explanation: { summary: "Panthenol, a form of vitamin B5", whyItMatters: "Holds water in the skin" } },
           { layout: "kpi", title: "In numbers", kpi: null, figures: [{ label: "Panthenol", value: "5%" }, { label: "Uses a day", value: "2" }] },
           { layout: "diagram", title: "How to use", diagram: { kind: "flow", stages: ["Cleanse", "Apply B5", "Moisturise"] }, notes: "Walk through the routine." },
+        ] }));
+      }
+      if (gw.deckAllText > 0) {
+        gw.deckAllText--;
+        const bl = (title: string, bullets: string[]) => ({ layout: "bullets", kicker: null, title, subtitle: null, body: null, bullets, leftHeading: null, rightHeading: null, bulletsRight: [], chart: null, table: null, diagram: null, kpi: [], cards: [], image: null, quote: null, notes: null, citations: [] });
+        return reply(JSON.stringify({ title: "B5", subtitle: null, slides: [
+          bl("Results at week 4", ["32% less redness", "18% more hydration", "92% of subjects saw calmer skin"]),
+          bl("How the study ran", ["1. Screening", "2. Baseline measurements", "3. Twice-daily use for 4 weeks", "4. Final measurements"]),
+          bl("Who it suits", ["Sensitive skin", "After procedures", "Dry, tight skin"]),
         ] }));
       }
       if (gw.deckCards > 0) {
@@ -338,6 +347,18 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(slides[1].citations).toEqual(["Label, 2026"]);
     expect(slides[1].quote).toEqual({ text: "It just works" });
     expect(Object.keys(slides[1]).sort()).toEqual(["bullets", "citations", "id", "layout", "quote", "subtitle", "title"]);
+  });
+
+  it("redraws a deck the writer sent as nothing but bullets", async () => {
+    gw.deckAllText = 1;
+    const id = await newDeck("all-text");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about vitamin B5", features: { kpis: true } } }));
+    const job = await waitJob(jobId);
+    expect(job.status).toBe("done");
+    expect(job.progress.join("\n")).toMatch(/The writer sent too many text slides; \d redrawn from their own words/);
+    const slides = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    // Two of three visual meets the rule, so the third keeps its bullets.
+    expect(slides.map((x) => x.layout)).toEqual(["kpi", "diagram", "bullets"]);
   });
 
   it("fails clearly when the content slides are titles with nothing under them, and says what the writer sent", async () => {
