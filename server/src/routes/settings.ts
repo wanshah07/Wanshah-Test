@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { HOUSE_DEFAULT, HOUSE_MAX, houseFor, saveHouse } from "../llm/house.js";
 import { config } from "../config.js";
 import { maskKey } from "../crypto.js";
 import { checkKey, hostOf, NOT_A_WRITER } from "../llm/client.js";
@@ -55,6 +56,21 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "invalid", message: (e as Error).message });
     }
     return { ok: true };
+  });
+
+  // The instructions every deck follows: the person's own, or the built-in house rules.
+  app.get("/api/settings/house", async (req) => {
+    const own = houseFor(req.user.id);
+    return { text: own ?? HOUSE_DEFAULT, custom: !!own, default: HOUSE_DEFAULT, max: HOUSE_MAX };
+  });
+
+  app.put("/api/settings/house", async (req, reply) => {
+    const text = (req.body as { text?: unknown } | undefined)?.text;
+    if (text !== null && typeof text !== "string") return reply.code(400).send({ error: "invalid", message: "text must be text, or null to go back to the built-in rules" });
+    if (typeof text === "string" && text.length > HOUSE_MAX) return reply.code(400).send({ error: "too_long", message: `Keep the instructions under ${HOUSE_MAX.toLocaleString("en")} characters.` });
+    saveHouse(req.user.id, text);
+    const own = houseFor(req.user.id);
+    return { text: own ?? HOUSE_DEFAULT, custom: !!own, default: HOUSE_DEFAULT, max: HOUSE_MAX };
   });
 
   // Tests the key typed in the box against the endpoint typed in the box, so

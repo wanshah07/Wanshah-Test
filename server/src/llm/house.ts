@@ -1,10 +1,16 @@
+import { getDb, now } from "../db.js";
+
 // The house design system, as the writer reads it. The visual half (canvas,
 // palette, fonts, backgrounds, card and band styles, the grid) is applied by
 // the renderer through the "house" theme, so the writer never places a box; this is the half that
 // decides what goes on each slide. It applies to every deck. FACTS AND SOURCES outrank it.
 
+/** The line that frames the rules in every prompt. It is not editable, so no edit can place the rules above the facts. */
+export const HOUSE_HEADER = "HOUSE DESIGN SYSTEM (the user's instructions for every deck, set in Settings; FACTS AND SOURCES and STYLE outrank them):";
+
+/** The built-in rules: what Settings shows until the person writes their own. */
 export const HOUSE_DESIGN: string[] = [
-  "HOUSE DESIGN SYSTEM (applies to every deck; FACTS AND SOURCES outrank it). You are a senior presentation designer: build a deck that looks designed, not generated.",
+  "You are a senior presentation designer: build a deck that looks designed, not generated.",
   "- One idea per slide. If two ideas fight, split them into two slides.",
   "- Titles are statements, not labels ('JSON is a labelled box for data', not 'JSON'), on ONE line of at most about 50 characters.",
   "- `kicker` is the eyebrow over the title: a section label of 1 to 4 words.",
@@ -20,7 +26,26 @@ export const HOUSE_DESIGN: string[] = [
   "- No emoji, no clip-art, no decorative symbols, no underlined or striped titles.",
 ];
 
-/** The house rules as one block for a system prompt. */
-export function houseDesign(): string {
-  return HOUSE_DESIGN.join("\n");
+export const HOUSE_DEFAULT = HOUSE_DESIGN.join("\n");
+export const HOUSE_MAX = 12_000;
+
+/** The house rules as one block for a system prompt: the person's own when they wrote some, the built-in ones when not. */
+export function houseDesign(custom?: string | null): string {
+  const body = custom?.trim() ? custom.trim().slice(0, HOUSE_MAX) : HOUSE_DEFAULT;
+  return `${HOUSE_HEADER}\n${body}`;
+}
+
+/** The person's own instructions for every deck, or null for the built-in ones. */
+export function houseFor(userId: string): string | null {
+  const r = getDb().prepare("SELECT house_prompt FROM settings WHERE user_id = ?").get(userId) as { house_prompt: string | null } | undefined;
+  return r?.house_prompt?.trim() ? r.house_prompt : null;
+}
+
+/** Saves the person's instructions; empty text, or the built-in text unchanged, goes back to the built-in rules. */
+export function saveHouse(userId: string, text: string | null): void {
+  const t = (text ?? "").replace(/\r\n/g, "\n").trim().slice(0, HOUSE_MAX);
+  const value = !t || t === HOUSE_DEFAULT ? null : t;
+  const db = getDb();
+  db.prepare("INSERT OR IGNORE INTO settings (user_id, updated_at) VALUES (?, ?)").run(userId, now());
+  db.prepare("UPDATE settings SET house_prompt = ?, updated_at = ? WHERE user_id = ?").run(value, now(), userId);
 }

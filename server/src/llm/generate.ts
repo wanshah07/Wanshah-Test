@@ -15,6 +15,7 @@ import { getDesign, promptTexts } from "../library.js";
 import { pictureAuth } from "../reader.js";
 import { visualise } from "./visualise.js";
 import { designPass, needsDesign, placePictures } from "./design.js";
+import { houseFor } from "./house.js";
 
 export interface Job {
   id: string;
@@ -432,6 +433,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     const auth = config.mockLlm ? null : resolveAuth(userId);
     if (!config.mockLlm && !auth) throw new LlmError("No OpenAI key. Add one in Settings.", 0, "no_key");
     p.house = promptTexts(userId, deck.brief?.prompts);
+    p.houseRules = houseFor(userId);
     p.designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : themeGuide(deck.theme?.id);
     if (p.house.length) log(jobId, `Saved prompts: ${p.house.map((h) => h.name).join(", ")}`);
     if (deck.designId) log(jobId, p.designNotes !== undefined ? `Design: ${deck.theme.name}` : "The deck's design was deleted; writing without its notes");
@@ -537,7 +539,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     if (!config.mockLlm && auth && needsDesign(slides)) {
       log(jobId, "Designing: most slides are text, so the writer is asked to redraw them as charts, tables, diagrams and figures");
       try {
-        const n = await designPass(auth, slides, sources, p.features, p.lang, (r) => toSlide(r, p.features, p.imageMode), p.designNotes);
+        const n = await designPass(auth, slides, sources, p.features, p.lang, (r) => toSlide(r, p.features, p.imageMode), p.designNotes, p.houseRules);
         log(jobId, n ? `Design: ${n} slide${n === 1 ? "" : "s"} redrawn as visuals` : "Design: the writer found no slide it could redraw honestly");
       } catch (e) {
         // The deck is already written; a design pass that fails costs the redesign, never the deck.
@@ -650,7 +652,7 @@ export async function rewriteSlide(userId: string, deck: Deck, slide: Slide, ins
   const user = `INSTRUCTION: ${instruction}\n\nDECK: ${deck.title}\n\nSLIDE (JSON):\n${JSON.stringify(rest)}`;
   const house = promptTexts(userId, deck.brief?.prompts);
   const designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : themeGuide(deck.theme?.id);
-  const out = await chatJson<Record<string, unknown>>({ auth, system: rewriteSystem({ lang: deck.lang, angle: deck.angle, house, designNotes }), user, schemaName: "slide", schema: SLIDE_SCHEMA, maxTokens: 4000 });
+  const out = await chatJson<Record<string, unknown>>({ auth, system: rewriteSystem({ lang: deck.lang, angle: deck.angle, house, designNotes, houseRules: houseFor(userId) }), user, schemaName: "slide", schema: SLIDE_SCHEMA, maxTokens: 4000 });
   const s = toSlide({ ...out, id }, EVERY_FEATURE, "uploaded");
   // A reply with nothing on the slide must never replace the user's slide.
   if (!String(s.title ?? "").trim() || hasNoFace(s)) {

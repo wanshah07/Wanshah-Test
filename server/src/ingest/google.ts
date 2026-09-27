@@ -26,7 +26,7 @@ export class GoogleLinkError extends Error {
   }
 }
 
-export const SHARE_HELP = "In Google Drive, open Share, set General access to \"Anyone with the link\" as Viewer, then paste the link again. Or download the file and drop it here.";
+export const SHARE_HELP = "In Google Drive, open Share, set General access to \"Anyone with the link\" as Viewer, then paste the link again. Or connect your Google Drive in Settings to read private files, or download the file and drop it here.";
 
 const ID = "([A-Za-z0-9_-]{10,})";
 
@@ -186,10 +186,25 @@ export interface LinkFile {
   buf: Buffer;
 }
 
-/** Every file a link stands for: one for a file, up to 25 for a folder, with what could not be read and why. */
-export async function fetchGoogleLink(raw: string): Promise<{ files: LinkFile[]; skipped: string[] }> {
+/** Reads a link as the person's connected Google account: the way in for files that are not shared by link. */
+export type PrivateReader = (l: GoogleLink) => Promise<{ files: LinkFile[]; skipped: string[] }>;
+
+/**
+ * Every file a link stands for: one for a file, up to 25 for a folder, with what could not be read and why.
+ * A link Google will not hand out publicly is read through the connected Google Drive account, when there is one.
+ */
+export async function fetchGoogleLink(raw: string, privateReader?: PrivateReader): Promise<{ files: LinkFile[]; skipped: string[] }> {
   const l = parseGoogleLink(raw);
   if (!l) throw new GoogleLinkError("That is not a Google Drive, Docs, Sheets or Slides link. Copy the link from Share, or from the address bar of the open file.", "not_google");
+  try {
+    return await fetchPublic(l);
+  } catch (e) {
+    if (!privateReader || !(e instanceof GoogleLinkError) || (e.code !== "not_shared" && e.code !== "empty_folder")) throw e;
+    return privateReader(l);
+  }
+}
+
+async function fetchPublic(l: GoogleLink): Promise<{ files: LinkFile[]; skipped: string[] }> {
   if (l.type !== "folder") {
     try {
       const f = await fetchGoogleFile(l);

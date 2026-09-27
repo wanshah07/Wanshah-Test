@@ -24,7 +24,7 @@ export const DESIGN_SCHEMA = {
   required: ["slides"],
 };
 
-export function designSystem(f: Features, lang: "en" | "ms", designNotes?: string): string {
+export function designSystem(f: Features, lang: "en" | "ms", designNotes?: string, houseRules?: string | null): string {
   const kinds = [
     f.charts && "chart (bar, column, line, area, pie or doughnut) when the sources give numbers for several items or several points in time: categories are the items or periods, each series a list of numbers taken exactly from the sources, unit and source set",
     f.tables && "table when the slide compares items across the same attributes: a header row and one row per item",
@@ -40,7 +40,7 @@ export function designSystem(f: Features, lang: "en" | "ms", designNotes?: strin
     "Keep the slide's title and its facts. Use only figures, names and wording that appear in the slide or in the sources below; never invent a number, a category, a date or a study. If no visual fits a slide honestly, leave that slide out of your answer.",
     "Put what a presenter would say, but the slide cannot show, in notes. Keep citations.",
     [f.badges && "badge: a verdict pill where the slide judges", f.callouts && "callout: the one sentence to keep, on a few slides", f.asides && "aside: Reading and Watch-outs panels beside a chart, table or map"].filter(Boolean).join("; ") || "Leave badge, callout and aside empty.",
-    houseDesign(),
+    houseDesign(houseRules),
     ...(designNotes?.trim() ? [`The deck's design, follow its devices: ${designNotes.trim()}`] : []),
     `Write in ${lang === "ms" ? "Bahasa Malaysia (Malaysia), never Bahasa Indonesia" : "English"}. No dashes as punctuation, no emoji.`,
     "Answer with JSON: {\"slides\": [{\"index\": <the slide's index as given>, \"slide\": <the redesigned slide in the schema>}]}.",
@@ -85,12 +85,13 @@ export async function designPass(
   lang: "en" | "ms",
   build: (raw: Record<string, unknown>) => Slide,
   designNotes?: string,
+  houseRules?: string | null,
 ): Promise<number> {
   const indices = textSlideIndices(slides).slice(0, 16);
   if (!indices.length) return 0;
   const json = await chatJson<{ slides?: { index?: unknown; slide?: Record<string, unknown> }[] }>({
     auth,
-    system: designSystem(f, lang, designNotes),
+    system: designSystem(f, lang, designNotes, houseRules),
     user: designUser(slides, indices, sources),
     schemaName: "design",
     schema: DESIGN_SCHEMA,

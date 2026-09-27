@@ -30,9 +30,11 @@ single HTML file. Runs on your own machine or server, with your own key.
   written.
 - **Google Drive and Sheets links.** Paste a link to a Google Sheet (every
   tab comes through), a Doc, Slides, any file in Drive, or a shared folder
-  (its files, up to 25, 25 MB each). The file must be shared as "Anyone with
-  the link", Viewer; the server fetches only from Google's own hosts. A file
-  that is not shared is refused with the steps to share it.
+  (its files, up to 25, 25 MB each). A file shared as "Anyone with the
+  link", Viewer, is fetched from Google's own hosts. A private file is read
+  as the Google account connected in Settings (see "Private Google Drive
+  files" below); with no account connected, it is refused with the steps to
+  share it.
 - **Every source is checked before you go on.** Each one shows what was
   read: rows per tab for a sheet, words for a document, and the first lines
   of the data. A source with nothing readable (an empty sheet, a scanned
@@ -92,7 +94,11 @@ single HTML file. Runs on your own machine or server, with your own key.
   that never repeat back to back, a dark cover and close around light
   content, one honest caveat slide, illustrative numbers labelled as such,
   and speaker notes written as what the presenter says. The facts rules
-  still come first. New decks use the **Teal Explainer** look by default:
+  still come first. Settings, **Instructions for every deck**, shows these
+  rules as text you can edit: your version replaces them in every new deck
+  and every rewrite, and **Reset to the built-in rules** brings them back.
+  Whatever you write sits below the facts rules, so it cannot make the
+  writer invent a figure or drop a source. New decks use the **Teal Explainer** look by default:
   Arial titles, Calibri body, amber eyebrows, soft cards on a white-to-tint
   wash with a faint particle field, a teal pull-quote band in Cambria
   italic, and a dark cover whose second title line is lit. Pick another
@@ -258,6 +264,31 @@ through the folders, or paste a OneDrive share link, and press Pull pictures.
   redirect address, which a codespace (whose address changes) could not give.
   The refresh token is stored encrypted with `APP_SECRET`.
 
+### Private Google Drive files
+
+A Google Drive or Sheets link that is not public is read through the Google
+Drive account you connected in Composio. It uses the same Composio API key as
+OneDrive.
+
+1. On composio.dev, connect Google Drive in the project whose key you use.
+2. In Slidecraft, Settings, **Google Drive (private files)**: paste the key
+   (or keep the one already saved for OneDrive) and press **Find my Google
+   Drive accounts**. Pick the account.
+3. Paste private links as usual. A public link is still read directly; only a
+   link Google refuses goes through the connected account.
+
+- The file must be one that account can open: owned by it, or shared with it.
+  Otherwise the message names the account and says to share the file with it.
+- Google Sheets, Docs and Slides are exported to Excel, Word and PowerPoint;
+  other Google file types (drawings, forms) are skipped with a reason.
+- A folder gives its files, not its subfolders: up to 25 files, 25 MB each,
+  100 MB in all.
+- Only reading tools are called (file details, download, folder listing).
+  The download link Composio hands back is fetched over https, from public
+  addresses only, and the API key is never sent to it.
+- Pasting a new Composio key here or under OneDrive replaces it for both, and
+  both accounts are then picked again.
+
 ### On GitHub, no laptop: Codespaces
 
 `.devcontainer/devcontainer.json` builds and starts the server inside a GitHub
@@ -320,4 +351,5 @@ time. For an always-on address for a team, use the Docker image on a host.
 | `MAX_UPLOAD_MB` | Per-file upload limit, default 40. |
 | `MOCK_LLM` | `1` to skip OpenAI and return a fixture deck. |
 | `MS_CLIENT_ID` | Microsoft app (client) ID for OneDrive pictures. Optional; a per-user one in Settings takes precedence. |
+| `COMPOSIO_API_BASE` | Composio API address for OneDrive and Google Drive, default `https://backend.composio.dev/api/v3`. |
 | `MS_TENANT` | Sign-in authority for OneDrive, default `common` (personal and work accounts). |

@@ -235,7 +235,21 @@ try {
   check("settings offers OneDrive", await page.locator("h2", { hasText: "OneDrive pictures" }).isVisible());
   await page.click(".chip:has-text('Composio')");
   await page.locator("text=Composio API key").waitFor({ timeout: 5000 }).catch(() => {});
-  check("OneDrive can go through Composio", (await page.locator("text=Composio API key").count()) === 1 && (await page.locator("button:has-text('Find my OneDrive accounts')").count()) === 1);
+  const odCard = page.locator("section", { has: page.locator("h2", { hasText: "OneDrive pictures" }) });
+  check("OneDrive can go through Composio", (await odCard.locator("text=Composio API key").count()) === 1 && (await odCard.locator("button:has-text('Find my OneDrive accounts')").count()) === 1);
+  const gdCard = page.locator("section", { has: page.locator("h2", { hasText: "Google Drive (private files)" }) });
+  check("settings offers private Google Drive files", (await gdCard.locator("button:has-text('Find my Google Drive accounts')").count()) === 1);
+  const house = page.locator("section", { has: page.locator("h2", { hasText: "Instructions for every deck" }) });
+  const houseText = await house.locator("textarea").inputValue().catch(() => "");
+  check("settings shows the instructions for every deck, starting from the built-in rules", houseText.includes("One idea per slide"));
+  await house.locator("textarea").fill(houseText + "\nClose every deck on a Next steps slide.");
+  await house.locator("button:has-text('Save')").click();
+  await house.locator("button:has-text('Reset to the built-in rules')").waitFor({ timeout: 5000 }).catch(() => {});
+  const saved = await page.evaluate(() => fetch("/api/settings/house").then((r) => r.json()));
+  check("saving the instructions keeps them for every deck", saved.custom === true && saved.text.includes("Next steps slide"));
+  await house.locator("button:has-text('Reset to the built-in rules')").click();
+  await page.waitForFunction(() => fetch("/api/settings/house").then((r) => r.json()).then((j) => !j.custom), null, { timeout: 5000 }).catch(() => {});
+  check("reset brings the built-in rules back", (await page.evaluate(() => fetch("/api/settings/house").then((r) => r.json()))).custom === false);
   check("settings says whether the writer reads pictures", (await page.locator("text=Reads pictures:").count()) === 1);
   check("settings offers a separate picture reader", (await page.locator("[data-testid=reader] h2", { hasText: "Picture reader" }).count()) === 1 && (await page.locator("button:has-text('Save picture reader')").count()) === 1);
   // Inside another page (VS Code's preview pane), say so and offer a real tab.
