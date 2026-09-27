@@ -33,11 +33,21 @@ const slides = [
   { id: "q", layout: "quote", title: long(10), quote: { text: long(90), by: long(20) } },
   { id: "i", layout: "image", title: long(20), image: { caption: long(30), prompt: long(30) }, bullets: Array.from({ length: 6 }, () => long(20)) },
   { id: "ch", layout: "chart", title: long(20), chart: { kind: "column", categories: ["2023", "2024", "2025"], series: [{ name: "Complaints", values: [412, 610, 838] }], source: long(15) }, bullets: Array.from({ length: 5 }, () => long(20)) },
+  // The elements from the reference decks, over-full.
+  { id: "hero", layout: "title", title: long(20), subtitle: long(30), kpi: Array.from({ length: 4 }, () => ({ value: "RM 1,250,000", label: long(10) })) },
+  { id: "chx", layout: "chart", kicker: "EVIDENCE", badge: "PARTIAL EVIDENCE ONLY", title: long(18), subtitle: long(20), chart: { kind: "bar", categories: ["Ours", "Brand B", "Brand C", "Brand D"], series: [{ name: "Score", values: [9, 6, 5, 4] }], highlight: "Ours", source: long(12) }, aside: [{ heading: "Reading", items: Array.from({ length: 5 }, () => long(14)) }, { heading: "Watch-outs", items: Array.from({ length: 5 }, () => long(14)) }], callout: long(40), citations: cites },
+  { id: "rg", layout: "kpi", kpiStyle: "rings", title: long(15), kpi: Array.from({ length: 4 }, (_, i) => ({ value: `+${20 * i + 5}%`, label: long(12), note: long(16) })), body: long(20), callout: long(25) },
+  { id: "fx", layout: "facts", badge: "Q1", title: long(15), facts: Array.from({ length: 10 }, (_, i) => ({ label: long(3), value: long(30), highlight: i === 6 })), aside: [{ heading: "Watch-outs", items: Array.from({ length: 4 }, () => long(12)) }], citations: cites },
+  { id: "gx", layout: "gallery", title: long(15), gallery: Array.from({ length: 6 }, () => ({ caption: long(18), prompt: long(8) })), body: long(20) },
+  { id: "mpx", layout: "map", title: long(15), map: { region: "world", areas: ["MY", "SG", "ID", "TH", "VN", "PH", "EU", "UK", "US", "CN", "JP", "KR", "IN", "AU", "GCC", "BR", "ZA", "CA"].map((code, i) => ({ code, status: ["ALLOWED", "RESTRICTED 2%", "BANNED", "PENDING"][i % 4], note: long(12) })), legend: long(12), source: long(10) }, citations: cites },
+  { id: "hbx", layout: "diagram", title: long(15), diagram: { kind: "hub", center: long(6), nodes: Array.from({ length: 8 }, () => ({ label: long(5), detail: long(16) })), pills: Array.from({ length: 5 }, () => long(3)) } },
+  { id: "fnx", layout: "diagram", title: long(15), diagram: { kind: "funnel", stages: Array.from({ length: 7 }, (_, i) => ({ value: String(3000 - i * 400), label: long(10) })) }, body: long(20), callout: long(20) },
+  { id: "eqx", layout: "diagram", title: long(15), diagram: { kind: "equation", terms: Array.from({ length: 5 }, () => ({ value: "1,250", label: long(12) })), result: { value: "40/40", label: long(12) } }, callout: long(25) },
   { id: "n", layout: "cards", kicker: "NEXT STEPS", title: "Three decisions before the next batch", subtitle: "Each card is one owner and one date.", cards: [{ heading: "Reformulate rinse-off SKUs to 2%", detail: "R&D, before the next batch.", tag: "HIGH" }, { heading: "Update the labels", detail: "Regulatory and packaging.", tag: "MEDIUM" }, { heading: "Confirm the effective date", detail: "With NPRA this month." }], citations: ["EC 1223/2009 Annex III entry 98"] },
 ];
 // ONLY=tb keeps one slide, and with an outDir also writes it as a picture.
 if (process.env.ONLY) slides.splice(0, slides.length, ...slides.filter((s) => s.id === process.env.ONLY));
-const theme = { ...themePreset("facerinna"), fontDisplay: "Liberation Serif", fontBody: "Liberation Sans", footer: "Slidecraft fit check" };
+const theme = { ...themePreset("booth-bright"), fontDisplay: "Liberation Serif", fontBody: "Liberation Sans", footer: "Slidecraft fit check", tag: "For healthcare professionals only" };
 const deck = { id: "d", title: "Fit", lang: "en", angle: "custom", theme, slides, sources: [], createdAt: "", updatedAt: "" };
 const buf = await deckToPptx(deck, "u");
 

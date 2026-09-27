@@ -3,7 +3,7 @@ import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { MAX_PIXELS, pictureSize } from "../llm/shrink.js";
 import { FONT_CHOICES, knownFonts, type Theme } from "@slidecraft/shared";
-import { contrast, designTheme, distance, hueGap, isChromatic, parseHex, themeColors, toHex, type Picked, type RGB } from "./colour.js";
+import { contrast, designTheme, distance, hueGap, isChromatic, luminance, parseHex, themeColors, toHex, type Picked, type RGB } from "./colour.js";
 import { chatJson, type ContentPart, type LlmAuth } from "../llm/client.js";
 
 // Reads a reference design: a PowerPoint file, a PDF of slides, or pictures
@@ -22,6 +22,16 @@ export interface DesignStats {
   charts: number;
   tables: number;
   pictures: number;
+  /** Chart kinds found in the file: doughnut 4, bar 12. */
+  chartKinds?: Record<string, number>;
+}
+
+/** What a PowerPoint reference does beyond colours and fonts, read from the file, applied to the theme. */
+export interface DesignLook {
+  series?: string[];
+  upperTitles?: boolean;
+  darkTitle?: boolean;
+  kpiStyle?: "tiles" | "rings";
 }
 
 export interface DesignAnalysis {
@@ -80,7 +90,7 @@ function words(s: string): number {
   return s ? s.split(/\s+/).filter(Boolean).length : 0;
 }
 
-async function readPptx(name: string, buf: Buffer): Promise<{ picked: Picked; fonts: DesignAnalysis["fonts"]; stats: DesignStats; colours: DesignAnalysis["colours"]; preview?: { buf: Buffer; mime: string }; warnings: string[] }> {
+async function readPptx(name: string, buf: Buffer): Promise<{ picked: Picked; fonts: DesignAnalysis["fonts"]; stats: DesignStats; colours: DesignAnalysis["colours"]; preview?: { buf: Buffer; mime: string }; look: DesignLook; warnings: string[] }> {
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(buf);
@@ -143,6 +153,9 @@ async function readPptx(name: string, buf: Buffer): Promise<{ picked: Picked; fo
   const typefaces = new Map<string, number>();
   const titleLens: number[] = [];
   const lineCounts: number[] = [];
+  const titleTexts: string[] = [];
+  const titleFaces = new Map<string, number>();
+  const slideBgs: string[] = [];
   let charts = 0;
   let tables = 0;
   let pictures = 0;
@@ -150,6 +163,7 @@ async function readPptx(name: string, buf: Buffer): Promise<{ picked: Picked; fo
     const x = await read(p);
     const bg = bgOf(x) ?? masterBg;
     bgTally.set(bg, (bgTally.get(bg) ?? 0) + 1);
+    slideBgs.push(bg);
     for (const m of x.matchAll(/<a:solidFill>\s*<a:(srgbClr|schemeClr) val="([^"]+)"/g)) {
       const c = m[1] === "schemeClr" ? resolve(m[2]) : m[2].toUpperCase();
       if (c) tally.set(c, (tally.get(c) ?? 0) + 1);
@@ -167,7 +181,11 @@ async function readPptx(name: string, buf: Buffer): Promise<{ picked: Picked; fo
       const biggest = [...shapes].sort((a, b) => sizeOf(b) - sizeOf(a))[0];
       if (sizeOf(biggest) > 0) title = biggest;
     }
-    if (title) titleLens.push(words(textOf(title)));
+    if (title) {
+      titleLens.push(words(textOf(title)));
+      titleTexts.push(textOf(title));
+      for (const m of title.matchAll(/<a:latin typeface="([^"+][^"]*)"/g)) titleFaces.set(cleanFontName(m[1]), (titleFaces.get(cleanFontName(m[1])) ?? 0) + 1);
+    }
     let lines = 0;
     for (const sp of shapes) if (sp !== title) lines += (sp.match(/<a:p>(?:(?!<\/a:p>)[\s\S])*?<a:t>[^<]+<\/a:t>/g) ?? []).length;
     lineCounts.push(lines);
@@ -177,15 +195,25 @@ async function readPptx(name: string, buf: Buffer): Promise<{ picked: Picked; fo
   const topFace = [...typefaces.entries()].sort((a, b) => b[1] - a[1])[0];
   const totalFaces = [...typefaces.values()].reduce((a, b) => a + b, 0);
   if (topFace && topFace[1] / totalFaces > 0.5 && topFace[1] >= 5) body = topFace[0];
+  // The face set by hand on most titles is the display font, whatever the theme says.
+  const topTitle = [...titleFaces.entries()].sort((a, b) => b[1] - a[1])[0];
+  const titleTotal = [...titleFaces.values()].reduce((a, b) => a + b, 0);
+  if (topTitle && titleTotal >= 3 && topTitle[1] / titleTotal > 0.5) display = topTitle[0];
   if (!display) display = body;
 
   const bgHex = [...bgTally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? masterBg;
   const bg = parseHex(bgHex) ?? [255, 255, 255];
   const candidates: RGB[] = [];
+  const pale: RGB[] = [];
   for (const [hex] of [...tally.entries()].sort((a, b) => b[1] - a[1])) {
     const c = parseHex(hex);
-    if (c && isChromatic(c) && distance(c, bg) > 40) candidates.push(c);
+    if (!c || !isChromatic(c) || distance(c, bg) <= 40) continue;
+    // A pale tint is a panel fill, not a brand colour: it only counts once nothing stronger is used.
+    if (contrast(c, bg) >= 2.2) candidates.push(c);
+    else pale.push(c);
   }
+  const handUsed = candidates.length;
+  candidates.push(...pale);
   // Fall back on the theme's own accents when the slides use none by hand.
   for (const slot of ["accent1", "accent2", "accent3", "accent4", "accent5", "accent6"]) {
     const c = scheme[slot] ? parseHex(scheme[slot]) : null;
@@ -201,12 +229,41 @@ async function readPptx(name: string, buf: Buffer): Promise<{ picked: Picked; fo
   const colours = [...tally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([hex, n]) => ({ hex: "#" + hex, share: Math.round((n / totalUse) * 100) / 100 }));
   const thumb = zip.file("docProps/thumbnail.jpeg");
   const preview = thumb ? { buf: Buffer.from(await thumb.async("uint8array")), mime: "image/jpeg" } : undefined;
+
+  // The kinds of chart the reference draws, from the chart parts themselves.
+  const chartKinds: Record<string, number> = {};
+  const chartPaths = Object.keys(zip.files).filter((p) => /^ppt\/charts\/chart\d+\.xml$/.test(p)).slice(0, 200);
+  for (const p of chartPaths) {
+    const x = await read(p);
+    for (const [kind, re] of [["doughnut", /<c:doughnutChart>/], ["pie", /<c:pieChart>/], ["line", /<c:lineChart>/], ["area", /<c:areaChart>/], ["scatter", /<c:scatterChart>/]] as const) if (re.test(x)) chartKinds[kind] = (chartKinds[kind] ?? 0) + 1;
+    if (/<c:barChart>/.test(x)) {
+      const k = /<c:barDir val="bar"\/>/.test(x) ? "bar" : "column";
+      chartKinds[k] = (chartKinds[k] ?? 0) + 1;
+    }
+  }
+  // Series colours: the distinct hues the slides use most, in order.
+  const series: RGB[] = [];
+  // Only colours the slides use by hand and that stand out from the background; the theme's stock accents are not a palette.
+  for (const c of candidates.slice(0, handUsed)) if (series.every((x) => hueGap(x, c) >= 18 || distance(x, c) > 90)) series.push(c);
+  // Titles in capitals: most titles have no lower-case letter.
+  const lettered = titleTexts.filter((t) => /\p{L}/u.test(t));
+  const upper = lettered.length >= 3 && lettered.filter((t) => t === t.toUpperCase()).length / lettered.length >= 0.6;
+  // Dark title slides: the first slide is dark on a deck whose slides are mostly light.
+  const lum = (h: string) => luminance(parseHex(h) ?? [255, 255, 255]);
+  const darkFirst = slideBgs.length >= 2 && lum(slideBgs[0]) < 0.2 && slideBgs.filter((b) => lum(b) > 0.5).length > slideBgs.length / 2;
+  const look: DesignLook = {
+    ...(series.length >= 2 ? { series: series.slice(0, 6).map(toHex) } : {}),
+    ...(upper ? { upperTitles: true } : {}),
+    ...(darkFirst ? { darkTitle: true } : {}),
+    ...((chartKinds.doughnut ?? 0) >= 2 ? { kpiStyle: "rings" as const } : {}),
+  };
   return {
     picked: { bg, ink, brand, accent, accent2 },
     fonts: { display, body, found: [...new Set([display, body, ...typefaces.keys()].filter(Boolean))] },
-    stats: statsOf(slidePaths.length, titleLens, lineCounts, charts, tables, pictures),
+    stats: { ...statsOf(slidePaths.length, titleLens, lineCounts, charts, tables, pictures), chartKinds },
     colours,
     preview,
+    look,
     warnings,
   };
 }
@@ -237,6 +294,9 @@ async function readPdf(name: string, buf: Buffer): Promise<{ picked: Picked; fon
   const fontMaxSize = new Map<string, number>();
   const titleLens: number[] = [];
   const lineCounts: number[] = [];
+  const titleTexts: string[] = [];
+  const titleFaces = new Map<string, number>();
+  const slideBgs: string[] = [];
   const pages = Math.min(doc.numPages, 30);
   for (let n = 1; n <= pages; n++) {
     const page = await doc.getPage(n);
@@ -408,6 +468,9 @@ export function styleNotes(s: DesignStats | undefined, extra?: string): string {
     if (s.linesPerSlide) out.push(`Content slides carry about ${Math.round(s.linesPerSlide)} lines of text; match that density.`);
     const uses = [s.charts && `${s.charts} chart${s.charts === 1 ? "" : "s"}`, s.tables && `${s.tables} table${s.tables === 1 ? "" : "s"}`, s.pictures && `${s.pictures} picture${s.pictures === 1 ? "" : "s"}`].filter(Boolean);
     if (uses.length) out.push(`It uses ${uses.join(", ")}; use the same kinds of visual where the sources allow.`);
+    const k = s.chartKinds ?? {};
+    const kinds = Object.entries(k).sort((a, b) => b[1] - a[1]).map(([name, n]) => `${n} ${name === "doughnut" ? "doughnut (ring gauge)" : name === "bar" ? "horizontal bar" : name}`);
+    if (kinds.length) out.push(`Its charts: ${kinds.join(", ")}.${(k.doughnut ?? 0) >= 2 ? " Draw percentages as ring gauges (kpiStyle rings)." : ""}${(k.bar ?? 0) >= 3 ? " Rank items as horizontal bar charts, our item highlighted against the comparators." : ""}`);
   }
   if (extra) out.push(extra.trim());
   return out.join(" ");
@@ -448,9 +511,11 @@ export async function analyseReference(files: RefFile[], name: string, auth: Llm
   let colours: DesignAnalysis["colours"] = [];
   let preview: DesignDraft["preview"];
   let kind: DesignAnalysis["kind"] = "image";
+  let fileLook: DesignLook = {};
   if (pptx) {
     const r = await readPptx(pptx.name, pptx.buf);
     ({ picked, fonts, stats, colours, preview } = r);
+    fileLook = r.look;
     warnings.push(...r.warnings);
     kind = "pptx";
   } else if (pdf) {
@@ -479,7 +544,9 @@ export async function analyseReference(files: RefFile[], name: string, auth: Llm
   } else if (kind === "image") {
     warnings.push("Fonts cannot be read from pixels without a writer model that sees pictures. Pick them in the editor.");
   }
-  const theme = designTheme(name, themeColors(picked), { display: fonts.display, body: fonts.body });
+  const theme = { ...designTheme(name, themeColors(picked), { display: fonts.display, body: fonts.body }), ...fileLook };
+  const lookNote = [fileLook.upperTitles && "titles in capitals", fileLook.darkTitle && "dark title slides", fileLook.kpiStyle === "rings" && "figures as ring gauges", fileLook.series && `${fileLook.series.length} series colours`].filter(Boolean);
+  if (lookNote.length) warnings.push(`Read from the file and applied: ${lookNote.join(", ")}.`);
   return {
     name,
     theme,

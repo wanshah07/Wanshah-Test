@@ -1,4 +1,4 @@
-import { ANGLES, angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themePreset, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
+import { ANGLES, angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themeGuide, themePreset, VISUAL_FEATURES, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
 import { config } from "../config.js";
 import { getDb, now } from "../db.js";
 import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, updateDeck, updateSlide, type SourceRow } from "../store.js";
@@ -63,8 +63,12 @@ export function findSlides(value: unknown, at = "", depth = 0): { at: string; sl
   return null;
 }
 
+/** A rewrite may use any device: the person asked for this slide by name. */
+const EVERY_FEATURE: Features = Object.fromEntries(Object.keys(DEFAULT_FEATURES).map((k) => [k, true])) as unknown as Features;
+
 export function normaliseParams(raw: Record<string, unknown>, fallbackAngle = "custom"): GenerateParams {
-  const features: Features = { ...DEFAULT_FEATURES, ...((raw.features as Partial<Features>) ?? {}) };
+  const given = raw.features && typeof raw.features === "object" ? (raw.features as Partial<Features>) : {};
+  const features: Features = { ...DEFAULT_FEATURES, ...given };
   const slides = Math.max(3, Math.min(40, Number(raw.slides) || 10));
   const imageMode = (["none", "uploaded", "generate"].includes(String(raw.imageMode)) ? raw.imageMode : "none") as GenerateParams["imageMode"];
   return {
@@ -77,6 +81,7 @@ export function normaliseParams(raw: Record<string, unknown>, fallbackAngle = "c
     features,
     imageMode: features.images ? imageMode : "none",
     auto: raw.auto === true,
+    off: VISUAL_FEATURES.filter((k) => given[k] === false),
   };
 }
 
@@ -109,10 +114,12 @@ export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): 
   p.slides = Math.max(6, Math.min(30, Math.round(Number(plan.slides) || 12)));
   if (!p.title && plan.title?.trim()) p.title = plan.title.trim().slice(0, 140);
   const f = plan.features ?? ({} as Plan["features"]);
-  // Charts, tables, diagrams and big numbers stay available whatever the plan says: they are how a slide carries a
-  // point without a paragraph, and the writer only uses a number tile when the sources give numbers.
-  p.features = { ...p.features, charts: true, tables: true, diagrams: true, kpis: true, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
-  p.imageMode = hasPictures ? "uploaded" : "none";
+  // Every visual device stays available whatever the plan says: they are how a slide carries a point without a
+  // paragraph, and the writer only uses one the sources can fill. A device the person unticked stays off.
+  const off = new Set(p.off ?? []);
+  const visual = Object.fromEntries(VISUAL_FEATURES.map((k) => [k, !off.has(k)])) as Partial<Features>;
+  p.features = { ...p.features, ...visual, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures && !off.has("images") };
+  p.imageMode = p.features.images ? "uploaded" : "none";
 }
 
 /** The planner's own message: the brief and a short look at each source, and a clear instruction not to write the deck. */
@@ -172,6 +179,8 @@ async function prepareSources(jobId: string, auth: LlmAuth | null, p: GeneratePa
 
 function coerceDiagram(raw: unknown): DiagramSpec | undefined {
   if (!raw || typeof raw !== "object") return undefined;
+  // The newer kinds are read by the sanitizer, which knows their shapes.
+  if (["hub", "funnel", "equation"].includes(String((raw as { kind?: unknown }).kind))) return undefined;
   const d = raw as { kind?: string; steps?: { label: string; detail?: string | null }[]; events?: { when: string; label: string }[]; rows?: string[]; cols?: string[]; cells?: string[][] };
   if (d.kind === "timeline" && d.events?.length) return { kind: "timeline", events: d.events };
   if (d.kind === "matrix" && d.rows?.length && d.cols?.length) return { kind: "matrix", rows: d.rows, cols: d.cols, cells: d.cells ?? [] };
@@ -195,9 +204,18 @@ export function demote(s: Slide): void {
     const d = s.diagram;
     if (d.kind === "flow") items.push(...d.steps.map((st, i) => `${i + 1}. ${st.label}${st.detail ? ": " + st.detail : ""}`));
     else if (d.kind === "timeline") items.push(...d.events.map((e) => `${e.when}: ${e.label}`));
+    else if (d.kind === "hub") items.push(...d.nodes.map((n) => `${n.label}${n.detail ? ": " + n.detail : ""}`), ...(d.pills ?? []));
+    else if (d.kind === "funnel") items.push(...d.stages.map((st) => `${st.value} ${st.label}`));
+    else if (d.kind === "equation") items.push(...d.terms.map((t) => `${t.value} ${t.label}`), ...(d.result ? [`= ${d.result.value} ${d.result.label}`] : []));
     else items.push(...d.rows.map((r, i) => `${r}: ${d.cols.map((c, j) => `${c} ${d.cells[i]?.[j] ?? ""}`).join(", ")}`));
   }
   if (s.layout === "image" && s.image?.caption) items.push(s.image.caption);
+  if (s.layout === "facts" && s.facts) items.push(...s.facts.map((f) => `${f.label}: ${f.value}`));
+  if (s.layout === "gallery" && s.gallery) items.push(...s.gallery.map((g) => g.caption).filter((x): x is string => !!x));
+  if (s.layout === "map" && s.map) {
+    items.push(...s.map.areas.map((a) => `${a.code}: ${a.status}${a.note ? ` (${a.note})` : ""}`));
+    if (s.map.source) s.citations = [...(s.citations ?? []), s.map.source];
+  }
   if (s.layout === "cards" && s.cards) items.push(...s.cards.map((k) => `${k.tag ? `${k.tag}: ` : ""}${k.heading}${k.detail ? ` (${k.detail})` : ""}`));
   if (s.layout === "section") {
     if (s.subtitle) items.push(s.subtitle);
@@ -209,6 +227,9 @@ export function demote(s: Slide): void {
   delete s.table;
   delete s.diagram;
   delete s.image;
+  delete s.facts;
+  delete s.gallery;
+  delete s.map;
 }
 
 const firstStr = (o: Record<string, unknown>, keys: string[]): string | undefined => {
@@ -313,7 +334,7 @@ function addVisuals(out: Record<string, unknown>, o: Record<string, unknown>): v
 /** A slide with nothing on its face: no title, no body, no bullets, nothing drawn. */
 function isBlank(s: Slide): boolean {
   const r = s as unknown as Record<string, unknown>;
-  return !String(s.title ?? "").trim() && !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote;
+  return !String(s.title ?? "").trim() && !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote && !(Array.isArray(r.facts) && r.facts.length) && !(Array.isArray(r.gallery) && r.gallery.length) && !r.map;
 }
 
 const NOT_FACE = new Set(["title", "heading", "slidetitle", "slide_title", "headline", "kicker", "eyebrow", "subtitle", "layout", "type", "kind", "slidetype", "notes", "speakernotes", "speaker_notes", "presenternotes", "narration", "script", "citations", "sources", "source", "references", "id", "image", "prompt", "unit", "sourcename"]);
@@ -361,7 +382,7 @@ const STRUCTURAL = new Set(["title", "section", "closing"]);
 export function hasNoFace(s: Slide): boolean {
   if (STRUCTURAL.has(s.layout)) return false;
   const r = s as unknown as Record<string, unknown>;
-  return !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !(Array.isArray(r.bulletsRight) && r.bulletsRight.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote && !r.image;
+  return !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !(Array.isArray(r.bulletsRight) && r.bulletsRight.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote && !r.image && !(Array.isArray(r.facts) && r.facts.length) && !(Array.isArray(r.gallery) && r.gallery.length) && !r.map;
 }
 
 function toSlide(raw: Record<string, unknown>, features: Features, imageMode: string): Slide {
@@ -385,10 +406,21 @@ function finishSlide(s: Slide, raw: Record<string, unknown>, features: Features,
   if (s.layout === "kpi" && !s.kpi?.length) s.layout = "bullets";
   if (s.layout === "quote" && !s.quote?.text) s.layout = "bullets";
   if (s.layout === "cards" && !s.cards?.length) s.layout = "bullets";
-  const banned: Record<string, boolean> = { chart: !features.charts, table: !features.tables, diagram: !features.diagrams, kpi: !features.kpis, image: !features.images || imageMode === "none", section: !features.sections };
+  if (s.layout === "facts" && !s.facts?.length) s.layout = "bullets";
+  if (s.layout === "map" && !s.map) s.layout = "bullets";
+  // A gallery with nothing in it would draw empty frames; one picture is an image slide.
+  if (s.layout === "gallery" && !s.gallery?.length) s.layout = "bullets";
+  const pictures = features.images && imageMode !== "none";
+  const banned: Record<string, boolean> = { chart: !features.charts, table: !features.tables, diagram: !features.diagrams, kpi: !features.kpis, image: !pictures, section: !features.sections, facts: !features.facts, map: !features.maps, gallery: !features.gallery || !pictures };
   if (banned[s.layout]) demote(s);
+  // The hero row on a title slide is figures too.
+  if (s.layout === "title" && !features.kpis) delete s.kpi;
   if (!features.notes) delete s.notes;
   if (!features.citations) delete s.citations;
+  if (!features.callouts) delete s.callout;
+  if (!features.asides) delete s.aside;
+  if (!features.badges) delete s.badge;
+  if (!features.gauges && s.kpiStyle === "rings") s.kpiStyle = "tiles";
   return autoFixSlide(s);
 }
 
@@ -400,7 +432,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     const auth = config.mockLlm ? null : resolveAuth(userId);
     if (!config.mockLlm && !auth) throw new LlmError("No OpenAI key. Add one in Settings.", 0, "no_key");
     p.house = promptTexts(userId, deck.brief?.prompts);
-    p.designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : undefined;
+    p.designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : themeGuide(deck.theme?.id);
     if (p.house.length) log(jobId, `Saved prompts: ${p.house.map((h) => h.name).join(", ")}`);
     if (deck.designId) log(jobId, p.designNotes !== undefined ? `Design: ${deck.theme.name}` : "The deck's design was deleted; writing without its notes");
     if (deck.onedrive && p.imageMode === "uploaded") {
@@ -505,7 +537,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     if (!config.mockLlm && auth && needsDesign(slides)) {
       log(jobId, "Designing: most slides are text, so the writer is asked to redraw them as charts, tables, diagrams and figures");
       try {
-        const n = await designPass(auth, slides, sources, p.features, p.lang, (r) => toSlide(r, p.features, p.imageMode));
+        const n = await designPass(auth, slides, sources, p.features, p.lang, (r) => toSlide(r, p.features, p.imageMode), p.designNotes);
         log(jobId, n ? `Design: ${n} slide${n === 1 ? "" : "s"} redrawn as visuals` : "Design: the writer found no slide it could redraw honestly");
       } catch (e) {
         // The deck is already written; a design pass that fails costs the redesign, never the deck.
@@ -530,21 +562,47 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         }
       }
     }
+    // Gallery pictures: the files the writer named, then pictures not yet on any slide.
+    if (p.imageMode === "uploaded" && pics.length) {
+      const onSlides = new Set(slides.flatMap((s) => [s.image?.mediaId, ...(s.gallery ?? []).map((g) => g.mediaId)]).filter(Boolean));
+      for (const [i, s] of slides.entries()) {
+        if (s.layout !== "gallery" || !s.gallery) continue;
+        const named = Array.isArray(rawSlides[i]?.gallery) ? (rawSlides[i].gallery as { sourceName?: unknown }[]) : [];
+        s.gallery.forEach((g, j) => {
+          if (g.mediaId) return;
+          const want = String(named[j]?.sourceName ?? "").toLowerCase().trim();
+          const match = pics.find((r) => !!want && (r.name.toLowerCase() === want || (r.rel_path ?? "").toLowerCase() === want)) ?? pics.find((r) => !onSlides.has(r.media_id!));
+          if (match?.media_id) {
+            g.mediaId = match.media_id;
+            onSlides.add(match.media_id);
+          }
+        });
+        // Frames with no picture are dropped; a gallery left with one picture is an image slide.
+        s.gallery = s.gallery.filter((g) => g.mediaId || g.url);
+        if (s.gallery.length === 1) {
+          s.layout = "image";
+          s.image = s.gallery[0];
+          delete s.gallery;
+        } else if (!s.gallery.length) demote(s);
+      }
+    }
     if (p.imageMode === "uploaded" && p.features.images && pics.length) {
       const placed = placePictures(slides, pics.map((r) => ({ mediaId: r.media_id!, name: r.rel_path || r.name, text: r.text })), p.lang, 6, p.auto ? Infinity : p.slides);
       if (placed) log(jobId, `${placed} uploaded picture${placed === 1 ? "" : "s"} the writer did not use put on the slides they belong to`);
-    } else if (imageSlides.length && p.imageMode === "generate" && auth) {
+    } else if (p.imageMode === "generate" && auth) {
+      // Every frame waiting for a picture: image slides first, then gallery frames. At most four in all.
+      const frames = [...imageSlides.map((s) => (s.image ??= {})), ...slides.filter((s) => s.layout === "gallery").flatMap((s) => s.gallery ?? [])];
       let n = 0;
-      for (const s of imageSlides) {
+      for (const img of frames) {
         if (n >= 4) break;
-        const prompt = s.image?.prompt;
-        if (!prompt) continue;
+        const prompt = img.prompt;
+        if (!prompt || img.mediaId) continue;
         n++;
         log(jobId, `Generating picture ${n}: ${prompt.slice(0, 60)}`);
         try {
           const png = await generateImage(auth, `${prompt}. Clean, well lit, no text, no logos, no watermark.`);
           const m = addMedia(userId, deckId, `generated-${n}.png`, "image/png", png, "generated");
-          s.image = { ...(s.image ?? {}), mediaId: m.id };
+          img.mediaId = m.id;
         } catch (e) {
           log(jobId, `Picture ${n} failed: ${(e as Error).message}`);
         }
@@ -581,7 +639,7 @@ export async function rewriteSlide(userId: string, deck: Deck, slide: Slide, ins
   const raw = slide as unknown as Record<string, unknown>;
   if (config.mockLlm) {
     const { review: _r, ...content } = raw;
-    const m = toSlide({ ...mockRewrite(content, instruction), id: slide.id }, DEFAULT_FEATURES, "uploaded");
+    const m = toSlide({ ...mockRewrite(content, instruction), id: slide.id }, EVERY_FEATURE, "uploaded");
     if (slide.review) m.review = slide.review;
     return m;
   }
@@ -591,9 +649,9 @@ export async function rewriteSlide(userId: string, deck: Deck, slide: Slide, ins
   const { id, review, ...rest } = slide;
   const user = `INSTRUCTION: ${instruction}\n\nDECK: ${deck.title}\n\nSLIDE (JSON):\n${JSON.stringify(rest)}`;
   const house = promptTexts(userId, deck.brief?.prompts);
-  const designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : undefined;
+  const designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : themeGuide(deck.theme?.id);
   const out = await chatJson<Record<string, unknown>>({ auth, system: rewriteSystem({ lang: deck.lang, angle: deck.angle, house, designNotes }), user, schemaName: "slide", schema: SLIDE_SCHEMA, maxTokens: 4000 });
-  const s = toSlide({ ...out, id }, DEFAULT_FEATURES, "uploaded");
+  const s = toSlide({ ...out, id }, EVERY_FEATURE, "uploaded");
   // A reply with nothing on the slide must never replace the user's slide.
   if (!String(s.title ?? "").trim() || hasNoFace(s)) {
     const e = new LlmError("The writer's rewrite came back empty, so the slide was left as it was. Try again, or rewrite with a clearer instruction.", 0, "no_slides");

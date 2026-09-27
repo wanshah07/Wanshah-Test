@@ -235,7 +235,7 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(sys).toMatch(/ANGLE: Medical affairs \/ HCP education/);
     expect(sys).toMatch(/AUDIENCE: dermatologists/);
     expect(sys).toMatch(/exactly 7 slides/);
-    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, chart, table, diagram, kpi\./);
+    expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, chart, table, diagram, kpi, facts, map\./);
     expect(gw.users.at(-1)).toMatch(/DECK TITLE \(use it\): Salicylic acid: 2% cap/);
     const deck = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
     expect(deck.angle).toBe("medical-affairs");
@@ -251,7 +251,11 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(sys).toMatch(/action titles/);
     expect(sys).toMatch(/YES \/ PARTLY \/ NO/);
     expect(sys).toMatch(/- cards: 2 to 6 numbered cards/);
-    expect(sys).toMatch(/BALANCE TEXT WITH VISUALS: .*At least half of the content slides are visual \(chart, table, diagram, kpi\)/);
+    expect(sys).toMatch(/BALANCE TEXT WITH VISUALS: .*At least half of the content slides are visual \(chart, table, diagram, kpi, facts, map\)/);
+    // Every device Auto keeps on is one the writer is told to use where the sources allow.
+    expect(sys).toMatch(/The user ticked these devices: a chart, a table, a diagram, a country map, big-number tiles, a fact sheet\./);
+    expect(sys).toMatch(/- map: ONLY when the sources say how several countries treat the same thing/);
+    expect(sys).toMatch(/hub is a mechanism map/);
     expect(sys).toMatch(/at most 60 words per content slide/);
     expect(sys).not.toMatch(/SAHKAN/);
     expect(sys).toMatch(/Never write placeholders, square-bracket notes or reminders to check something/);

@@ -5,7 +5,9 @@ export function diagramSvg(d: DiagramSpec, c: ThemeColors, W = 1600, H = 620, fo
   const font = `${fontName}, system-ui, sans-serif`;
   if (d.kind === "flow") return flowSvg(d.steps, c, W, H, font, radius);
   if (d.kind === "timeline") return timelineSvg(d.events, c, W, H, font);
-  return matrixSvg(d.rows, d.cols, d.cells, c, W, H, font, radius);
+  if (d.kind === "matrix") return matrixSvg(d.rows, d.cols, d.cells, c, W, H, font, radius);
+  // The newer kinds are drawn as slide elements only (diagramHtml).
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" role="img"></svg>`;
 }
 
 function wrap(text: string, maxChars: number): string[] {
@@ -109,6 +111,21 @@ function matrixSvg(rows: string[], cols: string[], cells: string[][], c: ThemeCo
   return g + "</svg>";
 }
 
+/** The first number in a figure: "1,240 scans" → 1240. */
+export function figureOf(v: string): number | null {
+  const m = /-?\d[\d,]*(?:\.\d+)?/.exec(v);
+  if (!m) return null;
+  const n = Number(m[0].replace(/,/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** How much of the previous stage reached this one, when both are plain counts. */
+export function stepRate(prev: string, cur: string): string {
+  const a = figureOf(prev), b = figureOf(cur);
+  if (a === null || b === null || a <= 0 || b > a || /%/.test(prev + cur)) return "";
+  return `${Math.round((b / a) * 100)}%`;
+}
+
 const YES = /^(yes|ya|✓|true|wajib|required|mandatory)$/i;
 const NO = /^(no|tidak|✗|false|x)$/i;
 
@@ -128,6 +145,25 @@ export function diagramHtml(d: DiagramSpec): string {
         return `<div class="sc-step${arrow}"><span class="no">${i + 1}</span><div class="lb">${inline(s.label)}</div>${s.detail ? `<div class="dt">${inline(s.detail)}</div>` : ""}</div>`;
       })
       .join("")}</div>`;
+  }
+  if (d.kind === "hub") {
+    const half = Math.ceil(d.nodes.length / 2);
+    const node = (n: { label: string; detail?: string }) => `<div class="nw"><div class="node"><div class="lb">${inline(n.label)}</div>${n.detail ? `<div class="dt">${inline(n.detail)}</div>` : ""}</div></div>`;
+    const pills = d.pills?.length ? `<div class="sc-pills">${d.pills.map((p) => `<span>${inline(p)}</span>`).join("")}</div>` : "";
+    return `<div class="sc-hub"><div class="side l">${d.nodes.slice(0, half).map(node).join("")}</div><div class="core"><div class="disc">${inline(d.center)}</div></div><div class="side r">${d.nodes.slice(half).map(node).join("")}</div></div>${pills}`;
+  }
+  if (d.kind === "funnel") {
+    const n = d.stages.length;
+    return `<div class="sc-funnel" style="--n:${n}">${d.stages
+      .map((st, i) => {
+        const rate = i > 0 ? stepRate(d.stages[i - 1].value, st.value) : "";
+        return `<div class="stage${i === 0 ? " first" : ""}" style="--i:${i}"><div class="chev"><span class="v">${esc(st.value)}</span></div><div class="lb">${inline(st.label)}</div>${rate ? `<div class="rate">${esc(rate)}</div>` : ""}</div>`;
+      })
+      .join("")}</div>`;
+  }
+  if (d.kind === "equation") {
+    const term = (t: { value: string; label: string }, cls = "") => `<div class="term${cls}"><div class="v">${esc(t.value)}</div><div class="lb">${inline(t.label)}</div></div>`;
+    return `<div class="sc-eq">${d.terms.map((t) => term(t)).join(`<div class="op">+</div>`)}${d.result ? `<div class="op">=</div>${term(d.result, " res")}` : ""}</div>`;
   }
   if (d.kind === "timeline") {
     return `<div class="sc-tl" style="--n:${Math.max(d.events.length, 1)}">${d.events

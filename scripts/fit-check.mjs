@@ -27,18 +27,38 @@ const heavy = [
   { id: "q", layout: "quote", title: long(10), quote: { text: long(90), by: long(20) } },
   { id: "i", layout: "image", title: long(20), image: { caption: long(30) }, bullets: Array.from({ length: 6 }, () => long(20)) },
   { id: "ch", layout: "chart", title: long(20), chart: { kind: "column", categories: ["2023", "2024", "2025"], series: [{ name: "Complaints", values: [412, 610, 838] }], source: long(15) }, bullets: Array.from({ length: 5 }, () => long(20)) },
+  // The elements from the reference decks, over-full, in the designs that use them.
+  { id: "hero", _theme: "booth-bright", layout: "title", title: long(20), subtitle: long(30), kpi: Array.from({ length: 4 }, () => ({ value: "RM 1,250,000", label: long(10) })) },
+  { id: "chx", _theme: "clinical-evidence", layout: "chart", kicker: "EVIDENCE", badge: "PARTIAL EVIDENCE ONLY", title: long(18), subtitle: long(20), chart: { kind: "bar", categories: ["Ours", "Brand B", "Brand C", "Brand D"], series: [{ name: "Score", values: [9, 6, 5, 4] }], highlight: "Ours", source: long(12) }, aside: [{ heading: "Reading", items: Array.from({ length: 5 }, () => long(14)) }, { heading: "Watch-outs", items: Array.from({ length: 5 }, () => long(14)) }], callout: long(40), citations: cites },
+  { id: "rg", _theme: "booth-bright", layout: "kpi", kpiStyle: "rings", title: long(15), kpi: Array.from({ length: 4 }, (_, i) => ({ value: `+${20 * i + 5}%`, label: long(12), note: long(16) })), body: long(20), callout: long(25) },
+  { id: "fx", _theme: "clinical-evidence", layout: "facts", badge: "Q1", title: long(15), facts: Array.from({ length: 10 }, (_, i) => ({ label: long(3), value: long(30), highlight: i === 6 })), aside: [{ heading: "Watch-outs", items: Array.from({ length: 4 }, () => long(12)) }], citations: cites },
+  { id: "gx", _theme: "audit-report", layout: "gallery", title: long(15), gallery: Array.from({ length: 6 }, () => ({ caption: long(18), prompt: long(8) })), body: long(20) },
+  { id: "mpx", _theme: "audit-report", layout: "map", title: long(15), map: { region: "world", areas: ["MY", "SG", "ID", "TH", "VN", "PH", "EU", "UK", "US", "CN", "JP", "KR", "IN", "AU", "GCC", "BR", "ZA", "CA"].map((code, i) => ({ code, status: ["ALLOWED", "RESTRICTED 2%", "BANNED", "PENDING"][i % 4], note: long(12) })), legend: long(12), source: long(10) }, citations: cites },
+  { id: "hbx", _theme: "rose-aesthetic", layout: "diagram", title: long(15), diagram: { kind: "hub", center: long(6), nodes: Array.from({ length: 8 }, () => ({ label: long(5), detail: long(16) })), pills: Array.from({ length: 5 }, () => long(3)) } },
+  { id: "fnx", _theme: "audit-report", layout: "diagram", title: long(15), diagram: { kind: "funnel", stages: Array.from({ length: 7 }, (_, i) => ({ value: String(3000 - i * 400), label: long(10) })) }, body: long(20), callout: long(20) },
+  { id: "eqx", _theme: "booth-bright", layout: "diagram", title: long(15), diagram: { kind: "equation", terms: Array.from({ length: 5 }, () => ({ value: "1,250", label: long(12) })), result: { value: "40/40", label: long(12) } }, callout: long(25) },
 ];
 const normal = [
   { id: "nb", layout: "bullets", kicker: "THE RULE", title: "Salicylic acid is capped at 2% in rinse-off", subtitle: "Read the limit first, then the exception.", bullets: ["Annex III entry 98 sets the limit", "Leave-on stays at 0.5%", "Mandatory label: not for children under 3"], citations: ["EC 1223/2009 Annex III entry 98"] },
   { id: "nc", layout: "cards", kicker: "NEXT STEPS", title: "Three decisions before the next batch", subtitle: "Each card is one owner and one date.", cards: [{ heading: "Reformulate rinse-off SKUs", detail: "R&D, before the next batch.", tag: "HIGH" }, { heading: "Update the labels", detail: "Regulatory and packaging.", tag: "MEDIUM" }, { heading: "Confirm the date", detail: "With NPRA this month." }] },
   { id: "nk", layout: "kpi", kicker: "AT A GLANCE", title: "The figures to remember", kpi: [{ value: "2%", label: "Rinse-off cap", note: "Annex III/98" }, { value: "2 years", label: "Notification validity", note: "NPRA" }, { value: "838", label: "Complaints 2025" }] },
+  // A realistic slide of each new element fits as designed, with nothing shrunk.
+  { id: "nhero", _theme: "booth-bright", layout: "title", title: "Product training day", subtitle: "Training day, Kuala Lumpur", kpi: [{ value: "120", label: "doctors met" }, { value: "4", label: "cities" }, { value: "40/40", label: "users improved" }] },
+  { id: "nch", _theme: "clinical-evidence", layout: "chart", kicker: "HYDRATION", badge: "DIRECT", title: "Ours leads on 4-week hydration", subtitle: "Corneometer units, change from baseline.", chart: { kind: "bar", categories: ["Ours", "Brand B", "Brand C"], series: [{ name: "Change", values: [38, 24, 19] }], highlight: "Ours", source: "Study 1, n = 60" }, aside: [{ heading: "Reading", items: ["Ours rises most by week 4", "B and C track together"] }, { heading: "Watch-outs", items: ["One study, 60 subjects", "Sponsor-run"] }], callout: "Only one head-to-head study supports the claim.", citations: ["Author A. J Cosmet Dermatol. 2025"] },
+  { id: "nrg", _theme: "rose-aesthetic", layout: "kpi", kpiStyle: "rings", kicker: "RESULTS", title: "Week 4 results", kpi: [{ value: "+45%", label: "Hydration", note: "Corneometer" }, { value: "23%", label: "Fewer wrinkles" }, { value: "0%", label: "Irritation" }] },
+  { id: "nfx", _theme: "clinical-evidence", layout: "facts", badge: "Q1", kicker: "STUDY 1", title: "The active improves barrier repair", facts: [{ label: "Design", value: "Randomised, double blind, split face" }, { label: "Subjects", value: "n = 60, aged 25 to 55" }, { label: "Method", value: "Corneometer and TEWL at weeks 0, 2, 4" }, { label: "Result", value: "Hydration up 38% at week 4", highlight: true }, { label: "Reference", value: "Author A. J Cosmet Dermatol. 2025" }] },
+  { id: "ngx", _theme: "audit-report", layout: "gallery", kicker: "EVIDENCE", title: "Three shelves, three findings", gallery: [{ caption: "Shelf A: label faded" }, { caption: "Shelf B: price tag missing" }, { caption: "Shelf C: stock blocked" }] },
+  { id: "nmp", _theme: "audit-report", layout: "map", kicker: "STATUS", title: "Salicylic acid is allowed in 2 of 4 markets", map: { region: "asean", areas: [{ code: "MY", status: "ALLOWED", note: "ACD Annex III" }, { code: "SG", status: "ALLOWED", note: "HSA" }, { code: "TH", status: "RESTRICTED", note: "FDA Thailand" }, { code: "ID", status: "PENDING", note: "BPOM draft" }], legend: "Leave-on products", source: "ASEAN Cosmetic Directive" } },
+  { id: "nhb", _theme: "rose-aesthetic", layout: "diagram", kicker: "MECHANISM", title: "What niacinamide does in the skin", diagram: { kind: "hub", center: "Niacinamide", nodes: [{ label: "Repairs", detail: "Barrier lipids up" }, { label: "Hydrates", detail: "TEWL down" }, { label: "Calms", detail: "Less redness" }, { label: "Firms", detail: "Collagen up" }], pills: ["+45% hydration", "1.25x elasticity"] } },
+  { id: "nfn", _theme: "audit-report", layout: "diagram", kicker: "DROP-OFF", title: "One in thirteen visits became a sale", diagram: { kind: "funnel", stages: [{ value: "400", label: "Visited" }, { value: "120", label: "Engaged" }, { value: "36", label: "Leads" }, { value: "30", label: "Sales" }] } },
+  { id: "neq", _theme: "booth-bright", layout: "diagram", kicker: "THE CLAIM", title: "What the claim rests on", diagram: { kind: "equation", terms: [{ value: "3", label: "actives" }, { value: "28", label: "days" }, { value: "40", label: "users" }], result: { value: "40/40", label: "improved" } }, callout: "Every user improved by day 28." },
 ];
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const fails = [];
 const render = async (s) => {
-  const html = renderSlideHtml(s, theme, { index: 2, total: 12, mediaUrl: (x) => x, lang: "en" });
+  const html = renderSlideHtml(s, s._theme ? themePreset(s._theme) : theme, { index: 2, total: 12, mediaUrl: (x) => x, lang: "en" });
   await page.setContent(`<!doctype html><html><head><style>body{margin:0}${SLIDE_CSS}</style></head><body>${html}</body></html>`);
   await page.evaluate(`window.fitSlide = ${fitSlide.toString()}`);
   return page.evaluate(() => {
@@ -46,7 +66,7 @@ const render = async (s) => {
     const r = window.fitSlide(slide);
     const sb = slide.getBoundingClientRect();
     const bad = [];
-    for (const el of slide.querySelectorAll(".sc-body, .sc-content, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table")) {
+    for (const el of slide.querySelectorAll(".sc-body, .sc-content, .sc-hub .disc, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table, .sc-row, .sc-main, .sc-asides, .sc-aside, .sc-rings, .sc-facts, .sc-gallery, .sc-mapwrap, .sc-mapkey, .sc-hub .node, .sc-hub .side, .sc-hub .core, .sc-eq .term, .sc-funnel .stage, .sc-callout, .sc-hero .hs")) {
       if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) bad.push(`${el.className} spills (${el.scrollWidth}x${el.scrollHeight} in ${el.clientWidth}x${el.clientHeight})`);
     }
     // Every piece of visible text must sit on the slide.
@@ -73,8 +93,9 @@ for (const s of heavy) {
 }
 for (const s of normal) {
   const r = await render(s);
+  if (out) await page.screenshot({ path: path.join(out, `normal-${s.layout}-${s.id}.png`) });
   if (r.scale !== 1 || r.bad.length) fails.push(`normal ${s.layout} was changed: scale ${r.scale} ${r.bad.join("; ")}`);
-  console.log(`${r.scale === 1 && !r.bad.length ? "ok  " : "FAIL"} normal ${s.layout} untouched`);
+  console.log(`${r.scale === 1 && !r.bad.length ? "ok  " : "FAIL"} normal ${s.layout} ${s.id} untouched${r.scale !== 1 ? ` (scale ${r.scale})` : ""}${r.bad.length ? `: ${r.bad.join("; ")}` : ""}`);
 }
 await browser.close();
 if (fails.length) {

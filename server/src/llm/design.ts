@@ -23,18 +23,23 @@ export const DESIGN_SCHEMA = {
   required: ["slides"],
 };
 
-export function designSystem(f: Features, lang: "en" | "ms"): string {
+export function designSystem(f: Features, lang: "en" | "ms", designNotes?: string): string {
   const kinds = [
     f.charts && "chart (bar, column, line, area, pie or doughnut) when the sources give numbers for several items or several points in time: categories are the items or periods, each series a list of numbers taken exactly from the sources, unit and source set",
     f.tables && "table when the slide compares items across the same attributes: a header row and one row per item",
     f.diagrams && "diagram: flow for a process, method, pathway or sequence (3 to 6 steps, each label 2 to 5 words, detail one short line); timeline for dated events; matrix for a comparison map with rows, cols and a short word in each cell",
-    f.kpis && "kpi for 2 to 4 headline figures, each value the figure with its unit and label what it measures",
+    f.diagrams && "diagram hub (a mechanism map: center, 4 to 8 nodes, optional pills) for what one product or ingredient does; funnel (stages of value and label) for a drop-off; equation (terms and a result) for parts adding to a claim",
+    f.kpis && "kpi for 2 to 4 headline figures, each value the figure with its unit and label what it measures" + (f.gauges ? ", kpiStyle rings when every value is a percentage" : ""),
+    f.facts && "facts for the profile of one study, product or rule: 4 to 8 label and value rows, the key row highlighted",
+    f.maps && "map when the slide says how several countries treat the same thing: region asean, asia or world, one area per country with its code and a status of 1 to 3 words",
   ].filter(Boolean);
   return [
     "You are the designer of a slide deck that has already been written. Most of its slides are plain bullet lists; your job is to redraw them as visuals so the deck is looked at, not read.",
     `For each slide you are given, choose the one visual that carries its point best: ${kinds.join("; ")}; cards for 2 to 6 distinct points that each have a short heading and one line of detail.`,
     "Keep the slide's title and its facts. Use only figures, names and wording that appear in the slide or in the sources below; never invent a number, a category, a date or a study. If no visual fits a slide honestly, leave that slide out of your answer.",
     "Put what a presenter would say, but the slide cannot show, in notes. Keep citations.",
+    [f.badges && "badge: a verdict pill where the slide judges", f.callouts && "callout: the one sentence to keep, on a few slides", f.asides && "aside: Reading and Watch-outs panels beside a chart, table or map"].filter(Boolean).join("; ") || "Leave badge, callout and aside empty.",
+    ...(designNotes?.trim() ? [`The deck's design, follow its devices: ${designNotes.trim()}`] : []),
     `Write in ${lang === "ms" ? "Bahasa Malaysia (Malaysia), never Bahasa Indonesia" : "English"}. No dashes as punctuation, no emoji.`,
     "Answer with JSON: {\"slides\": [{\"index\": <the slide's index as given>, \"slide\": <the redesigned slide in the schema>}]}.",
   ].join("\n");
@@ -77,12 +82,13 @@ export async function designPass(
   f: Features,
   lang: "en" | "ms",
   build: (raw: Record<string, unknown>) => Slide,
+  designNotes?: string,
 ): Promise<number> {
   const indices = textSlideIndices(slides).slice(0, 16);
   if (!indices.length) return 0;
   const json = await chatJson<{ slides?: { index?: unknown; slide?: Record<string, unknown> }[] }>({
     auth,
-    system: designSystem(f, lang),
+    system: designSystem(f, lang, designNotes),
     user: designUser(slides, indices, sources),
     schemaName: "design",
     schema: DESIGN_SCHEMA,

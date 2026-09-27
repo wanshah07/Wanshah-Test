@@ -10,3 +10,4 @@ export * from "./render/html.js";
 export * from "./render/fit.js";
 export * from "./render/deckHtml.js";
 export * from "./brief.js";
+export * from "./map.js";
