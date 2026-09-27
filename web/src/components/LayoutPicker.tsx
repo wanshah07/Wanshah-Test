@@ -15,6 +15,9 @@ export const LAYOUT_NAMES: Record<Layout, string> = {
   quote: "Quote",
   kpi: "Big numbers",
   cards: "Numbered cards",
+  facts: "Fact sheet",
+  gallery: "Gallery",
+  map: "Country map",
   closing: "Closing",
 };
 
@@ -29,6 +32,9 @@ export function fillFor(slide: Slide, l: Layout): Partial<Slide> {
   if (l === "cards" && !slide.cards?.length) out.cards = b.cards;
   if (l === "quote" && !slide.quote) out.quote = b.quote;
   if (l === "image" && !slide.image) out.image = b.image;
+  if (l === "facts" && !slide.facts?.length) out.facts = b.facts;
+  if (l === "gallery" && !slide.gallery?.length) out.gallery = b.gallery;
+  if (l === "map" && !slide.map) out.map = b.map;
   if ((l === "bullets" || l === "two-column") && !slide.bullets?.length) out.bullets = b.bullets;
   if (l === "two-column") {
     if (!slide.bulletsRight?.length) out.bulletsRight = b.bulletsRight;

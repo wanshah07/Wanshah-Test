@@ -6,7 +6,7 @@ import type { Features, Slide } from "@slidecraft/shared";
 // the slides: nothing is invented, only redrawn.
 
 const STRUCTURAL = new Set(["title", "section", "closing"]);
-export const VISUAL = new Set(["chart", "diagram", "kpi", "image", "table"]);
+export const VISUAL = new Set(["chart", "diagram", "kpi", "image", "table", "facts", "gallery", "map"]);
 
 // A figure a bullet leads with or carries: 92%, 5 %, 1.5x, 4 weeks, 120 subjects, RM 2,000.
 const FIGURE = /(?:RM\s?)?\d[\d,]*(?:\.\d+)?\s?(?:%|x\b|×|-fold|mg\b|g\b|ml\b|mL\b|µg|weeks?\b|days?\b|months?\b|years?\b|hours?\b|h\b|subjects?\b|participants?\b|patients?\b|volunteers?\b|minggu\b|hari\b|bulan\b|tahun\b|jam\b|orang\b|peserta\b|subjek\b)?/i;

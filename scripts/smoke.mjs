@@ -127,13 +127,32 @@ try {
   // Layouts as pictures: change one slide's layout, add a slide from the picture modal.
   await page.locator(".thumb").nth(3).click();
   await page.click("button:has-text('Change layout')");
-  check("layouts show as pictures", (await page.locator(".field .pickcard").count()) === 12);
+  check("layouts show as pictures", (await page.locator(".field .pickcard").count()) === 15);
   await page.locator(".field .pickcard", { hasText: "Table" }).click();
   await page.waitForTimeout(1200);
   {
     const id = page.url().split("/deck/")[1];
     const d = await (await fetch(`http://localhost:${PORT}/api/decks/${id}`)).json();
     check("picking a layout picture changes and saves the slide", d.deck.slides[3].layout === "table" && !!d.deck.slides[3].table);
+  }
+  // Add to this slide: a map, a mechanism map, a callout and side panels, each one click.
+  {
+    const id = page.url().split("/deck/")[1];
+    const get = async () => (await (await fetch(`http://localhost:${PORT}/api/decks/${id}`)).json()).deck.slides[3];
+    await page.click("button:has-text('Country map')");
+    await page.waitForTimeout(1200);
+    let s3 = await get();
+    check("Add to this slide: a country map", s3.layout === "map" && s3.map?.areas?.length > 0 && !!s3.table);
+    await page.click("button:has-text('Mechanism map')");
+    await page.click("button:has-text('+ Callout banner')");
+    await page.click("button:has-text('+ Side panels')");
+    await page.waitForTimeout(1200);
+    s3 = await get();
+    check("Add to this slide: a mechanism map with a callout and side panels", s3.layout === "diagram" && s3.diagram?.kind === "hub" && !!s3.callout && s3.aside?.length === 2);
+    check("the slide draws the mechanism map, the callout and the panels", (await page.locator(".sc-hub").count()) > 0 && (await page.locator(".sc-callout").count()) > 0 && (await page.locator(".sc-aside").count()) >= 2);
+    await page.click("button:has-text('Table')");
+    await page.waitForTimeout(1200);
+    check("switching back keeps what was typed", (await get()).layout === "table");
   }
   const thumbsBefore = await page.locator(".thumb").count();
   await page.click("button:has-text('+ Add')");
@@ -216,7 +235,8 @@ try {
   await page.click("button:has-text('Continue')");
   await page.locator("text=Drop files").first().waitFor({ timeout: 5000 }).catch(() => {});
   await page.click("button:has-text('Continue')");
-  check("Auto skips the angle step and the feature choices", (await page.locator("h3", { hasText: "Design" }).count()) === 1 && (await page.locator("h3", { hasText: "Features" }).count()) === 0 && (await page.locator("text=Training / workshop").count()) === 0);
+  // Auto still lets the person choose what may go on the slides, but not the deck extras it decides itself.
+  check("Auto skips the angle step and shows only the device choices", (await page.locator("h3", { hasText: "Design" }).count()) === 1 && (await page.locator("[data-testid=feature-choices] >> text=Country maps").count()) === 1 && (await page.locator("text=Deck extras").count()) === 0 && (await page.locator("text=Training / workshop").count()) === 0);
   await page.click("button:has-text('Generate (AI decides)')");
   await page.waitForURL(/\/deck\//, { timeout: 30000 });
   {

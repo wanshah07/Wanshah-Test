@@ -1,7 +1,8 @@
 import type { Deck, Slide, Theme } from "../deck.js";
 import { fontStack, sanitizeTheme } from "../theme.js";
 import { esc, inline } from "./escape.js";
-import { chartSvg } from "./charts.js";
+import { chartSvg, seriesPalette } from "./charts.js";
+import { mapGrid, mapTiles, tileName } from "../map.js";
 import { diagramHtml } from "./diagrams.js";
 
 export interface RenderCtx {
@@ -41,7 +42,10 @@ function bulletsHtml(items: string[] | undefined, cls = ""): string {
 function heading(s: Slide, kicker?: string): string {
   const k = s.kicker || kicker;
   const dek = s.subtitle && !["title", "closing", "section"].includes(s.layout) ? `<p class="sc-dek">${inline(s.subtitle)}</p>` : "";
-  return `<h2 class="sc-h">${k ? `<span class="sc-kicker">${esc(k)}</span>` : ""}${inline(s.title)}</h2>${dek}`;
+  const h = `<h2 class="sc-h">${k ? `<span class="sc-kicker">${esc(k)}</span>` : ""}${inline(s.title)}</h2>${dek}`;
+  if (!s.badge || ["title", "closing", "section"].includes(s.layout)) return h;
+  const tone = verdictTone(s.badge);
+  return `<div class="sc-headrow"><div class="sc-headtxt">${h}</div><span class="sc-badge sc-vbadge ${tone ? `v-${tone}` : "v-plain"}">${inline(s.badge)}</span></div>`;
 }
 
 /** Verdict words shown as coloured badges in tables and card tags. */
@@ -58,7 +62,7 @@ function cell(v: string): string {
   return tone ? `<span class="sc-badge v-${tone}">${inline(v)}</span>` : inline(v);
 }
 
-function cardsHtml(s: Slide): string {
+function cardsHtml(s: Slide, pal: string[] | null): string {
   const items = s.cards ?? [];
   const n = items.length;
   // Wide grids for many cards, so ten or twelve still read at a useful size.
@@ -66,7 +70,7 @@ function cardsHtml(s: Slide): string {
   return `<div class="sc-cards" style="--cols:${cols}">${items
     .map((c, i) => {
       const tone = c.tag ? verdictTone(c.tag) : "";
-      return `<div class="sc-card"><div class="top"><span class="no">${i + 1}</span>${c.tag ? `<span class="sc-badge ${tone ? `v-${tone}` : "v-plain"}">${inline(c.tag)}</span>` : ""}</div><div class="hd">${inline(c.heading)}</div>${c.detail ? `<div class="dt">${inline(c.detail)}</div>` : ""}</div>`;
+      return `<div class="sc-card"${pal ? ` style="--cc:${pal[i % pal.length]}"` : ""}><div class="top"><span class="no">${i + 1}</span>${c.tag ? `<span class="sc-badge ${tone ? `v-${tone}` : "v-plain"}">${inline(c.tag)}</span>` : ""}</div><div class="hd">${inline(c.heading)}</div>${c.detail ? `<div class="dt">${inline(c.detail)}</div>` : ""}</div>`;
     })
     .join("")}</div>`;
 }
@@ -85,34 +89,127 @@ function chrome(s: Slide, t: Theme, ctx: RenderCtx): string {
   if (t.footer) foot.push(`<span>${esc(t.footer)}</span>`);
   if (t.slideNumbers) foot.push(`<span class="sc-num">${ctx.index + 1} / ${ctx.total}</span>`);
   if (foot.length) out += `<div class="sc-foot">${foot.join("")}</div>`;
+  if (t.tag) out += `<div class="sc-tag">${esc(t.tag)}</div>`;
   return out;
 }
+
+/** A number drawn as a ring: the percentage in the figure, or null when it carries none. */
+export function ringPercent(value: string): number | null {
+  const m = /(-?\d+(?:[.,]\d+)?)\s*%/.exec(value);
+  if (!m) return null;
+  const n = Math.abs(Number(m[1].replace(",", ".")));
+  return Number.isFinite(n) ? Math.min(100, n) : null;
+}
+
+function ringHtml(k: NonNullable<Slide["kpi"]>[number], colour: string): string {
+  const p = ringPercent(k.value);
+  const C = 527.8;
+  const arc = !p ? "" : `<circle cx="100" cy="100" r="84" fill="none" style="stroke:${colour}" stroke-width="22" stroke-linecap="round" stroke-dasharray="${((p / 100) * C).toFixed(1)} ${C}" transform="rotate(-90 100 100)"/>`;
+  return `<div class="sc-ring"><div class="g"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="84" fill="none" style="stroke:var(--line)" stroke-width="22"/>${arc}</svg><div class="v">${inline(k.value)}</div></div><div class="l">${inline(k.label)}</div>${k.note ? `<div class="n">${inline(k.note)}</div>` : ""}</div>`;
+}
+
+function kpiHtml(s: Slide, t: Theme, pal: string[]): string {
+  const items = s.kpi ?? [];
+  const rings = (s.kpiStyle ?? t.kpiStyle) === "rings";
+  if (rings) return `<div class="sc-rings" style="--kpi-n:${Math.min(Math.max(items.length, 1), 4)}">${items.map((k, i) => ringHtml(k, pal[i % pal.length])).join("")}</div>`;
+  return `<div class="sc-kpis" style="--kpi-n:${Math.min(Math.max(items.length, 1), 4)}">${items
+    .map((k) => `<div class="sc-kpi"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div>${k.note ? `<div class="n">${inline(k.note)}</div>` : ""}</div>`)
+    .join("")}</div>`;
+}
+
+function factsHtml(s: Slide): string {
+  return `<div class="sc-facts">${(s.facts ?? [])
+    .map((f) => `<div class="fr${f.highlight ? " hl" : ""}"><div class="fl">${inline(f.label)}</div><div class="fv">${cell(f.value)}</div></div>`)
+    .join("")}</div>`;
+}
+
+function galleryHtml(s: Slide, ctx: RenderCtx): string {
+  const items = s.gallery ?? [];
+  const n = items.length;
+  const cols = n <= 4 ? Math.max(n, 1) : 3;
+  return `<div class="sc-gallery" style="--gc:${cols}">${items
+    .map((g) => {
+      const src = g.mediaId ? ctx.mediaUrl(g.mediaId) : g.url;
+      const ph = src ? `<img src="${esc(src)}" alt="${esc(g.alt ?? g.caption ?? "")}">` : `<div class="sc-placeholder">${esc(g.prompt || (ctx.lang === "ms" ? "Tiada gambar" : "No picture"))}</div>`;
+      return `<figure class="gi"><div class="ph">${ph}</div>${g.caption ? `<figcaption>${inline(g.caption)}</figcaption>` : ""}</figure>`;
+    })
+    .join("")}</div>`;
+}
+
+/** The colour class of a map tile from its status. */
+export function mapTone(status: string): "good" | "mid" | "bad" | "info" | "none" {
+  if (!status.trim()) return "none";
+  const v = verdictTone(status);
+  if (v) return v;
+  const t = status.toUpperCase();
+  if (/\b(BANNED|PROHIBITED|DILARANG|NOT ALLOWED|NOT PERMITTED|REJECTED)\b/.test(t)) return "bad";
+  if (/\b(RESTRICTED|LIMIT(?:ED)?|CAPPED|DIHADKAN|CONDITIONAL|PENDING|DRAFT|REVIEW)\b/i.test(t)) return "mid";
+  if (/\b(ALLOWED|PERMITTED|DIBENARKAN|APPROVED|LISTED|IN FORCE|BERKUAT KUASA)\b/.test(t)) return "good";
+  return "info";
+}
+
+function mapHtml(s: Slide, ctx: RenderCtx): string {
+  const m = s.map;
+  if (!m) return placeholder("No map", ctx.lang);
+  const tiles = mapTiles(m.region, m.areas.map((a) => a.code));
+  const grid = mapGrid(tiles);
+  const by = new Map(m.areas.map((a) => [a.code, a]));
+  const cells = tiles
+    .map((t) => {
+      const a = by.get(t.code);
+      const at = grid.at(t);
+      return `<div class="tile t-${a ? mapTone(a.status) : "none"}" style="grid-column:${at.col + 1};grid-row:${at.row + 1}" title="${esc(tileName(t.code, ctx.lang))}"><b>${esc(t.code)}</b>${a?.status ? `<span>${esc(a.status)}</span>` : ""}</div>`;
+    })
+    .join("");
+  const key = m.areas
+    .map((a) => `<li><i class="sw t-${mapTone(a.status)}"></i><b>${esc(tileName(a.code, ctx.lang))}</b>${a.status ? `: ${inline(a.status)}` : ""}${a.note ? `<span class="nt">${inline(a.note)}</span>` : ""}</li>`)
+    .join("");
+  return `<div class="sc-mapwrap"><div class="sc-mapbox"><div class="sc-map" style="grid-template-columns:repeat(${grid.cols},1fr);grid-template-rows:repeat(${grid.rows},1fr);--ar:${grid.cols}/${grid.rows}">${cells}</div></div><div class="sc-mapkey">${m.legend ? `<p class="lg">${inline(m.legend)}</p>` : ""}<ul>${key}</ul></div></div>`;
+}
+
+function asidesHtml(s: Slide): string {
+  return `<div class="sc-asides">${(s.aside ?? [])
+    .map((a, i) => `<div class="sc-aside a${i + 1}">${a.heading ? `<h4>${inline(a.heading)}</h4>` : ""}${a.items.length ? `<ul>${a.items.map((x) => `<li>${inline(x)}</li>`).join("")}</ul>` : ""}</div>`)
+    .join("")}</div>`;
+}
+
+const NO_ASIDE = new Set(["title", "section", "closing", "two-column", "quote"]);
 
 export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): string {
   // Every theme value goes into markup, whoever saved it (a deck, a design, an old file): only safe values get there.
   const t = sanitizeTheme(rawTheme);
   const c = t.colors;
   const font = fontStack(t.fontBody);
+  const pal = seriesPalette(c, t.series);
+  const cap = (text?: string) => (text ? `<p class="sc-cap">${inline(text)}</p>` : "");
+  const lineUnder = (text?: string) => (text ? `<p class="sc-cap" style="color:var(--ink2);font-size:calc(26px * var(--k, 1))">${inline(text)}</p>` : "");
+  // The slide's own content under its heading; asides and a callout are added around it.
+  let main = "";
+  const head = heading(s);
   let body = "";
   switch (s.layout) {
     case "title":
-    case "closing":
-      body = `${heading(s)}<div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}${s.body ? `<p class="sc-sub">${inline(s.body)}</p>` : ""}`;
+    case "closing": {
+      const hero = s.layout === "title" && s.kpi?.length ? `<div class="sc-hero">${s.kpi.slice(0, 4).map((k) => `<div class="hs"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div></div>`).join("")}</div>` : "";
+      body = `${heading(s)}<div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}${s.body ? `<p class="sc-sub">${inline(s.body)}</p>` : ""}${hero}`;
       break;
+    }
     case "section":
       body = `${heading(s, s.subtitle ? undefined : sectionKicker(s, ctx))}<div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}`;
       break;
-    case "bullets":
-      body = `${heading(s)}<div class="sc-content">${s.body ? `<p class="sc-prose" style="margin-bottom:24px;font-size:calc(32px * var(--k, 1));color:var(--ink2)">${inline(s.body)}</p>` : ""}${bulletsHtml(s.bullets)}</div>`;
-      break;
     case "two-column":
-      body = `${heading(s)}<div class="sc-cols"><div class="sc-col">${s.leftHeading ? `<h3>${inline(s.leftHeading)}</h3>` : ""}${bulletsHtml(s.bullets)}</div><div class="sc-col">${s.rightHeading ? `<h3>${inline(s.rightHeading)}</h3>` : ""}${bulletsHtml(s.bulletsRight)}</div></div>`;
+      body = `${head}<div class="sc-cols"><div class="sc-col">${s.leftHeading ? `<h3>${inline(s.leftHeading)}</h3>` : ""}${bulletsHtml(s.bullets)}</div><div class="sc-col">${s.rightHeading ? `<h3>${inline(s.rightHeading)}</h3>` : ""}${bulletsHtml(s.bulletsRight)}</div></div>`;
+      break;
+    case "quote":
+      body = `${head}<div class="sc-quote"><p class="q">${inline(s.quote?.text ?? "")}</p>${s.quote?.by ? `<p class="by">${inline(s.quote.by)}</p>` : ""}</div>`;
+      break;
+    case "bullets":
+      main = `<div class="sc-content">${s.body ? `<p class="sc-prose" style="margin-bottom:24px;font-size:calc(32px * var(--k, 1));color:var(--ink2)">${inline(s.body)}</p>` : ""}${bulletsHtml(s.bullets)}</div>`;
       break;
     case "chart": {
-      const svg = s.chart ? chartSvg(s.chart, c, 1500, 620, font) : "";
-      const cap = s.chart?.source ? `<p class="sc-cap">${inline(s.chart.source)}</p>` : "";
+      const svg = s.chart ? chartSvg(s.chart, c, 1500, 620, font, t.series) : "";
       const side = s.bullets?.length ? `<div class="sc-col" style="max-width:520px">${bulletsHtml(s.bullets)}</div>` : "";
-      body = `${heading(s)}<div class="sc-content" style="flex-direction:row;gap:40px"><div class="sc-fig">${svg || placeholder("No chart data", ctx.lang)}</div>${side}</div>${cap}`;
+      main = `<div class="sc-content" style="flex-direction:row;gap:40px"><div class="sc-fig">${svg || placeholder("No chart data", ctx.lang)}</div>${side}</div>${cap(s.chart?.source)}`;
       break;
     }
     case "table": {
@@ -123,13 +220,14 @@ export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): stri
             .map((r) => `<tr>${r.map((v) => `<td>${cell(v)}</td>`).join("")}</tr>`)
             .join("")}</tbody></table>`
         : placeholder("No table", ctx.lang);
-      const cap = t2?.source ? `<p class="sc-cap">${inline(t2.source)}</p>` : "";
-      body = `${heading(s)}<div class="sc-content">${tbl}</div>${cap}`;
+      main = `<div class="sc-content">${tbl}</div>${cap(t2?.source)}`;
       break;
     }
     case "diagram": {
       const dg = s.diagram ? diagramHtml(s.diagram) : placeholder("No diagram", ctx.lang);
-      body = `${heading(s)}<div class="sc-content"><div class="sc-diagram">${dg}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:calc(26px * var(--k, 1))">${inline(s.body)}</p>` : ""}</div>`;
+      // A design with its own series colours gives each funnel stage its own colour, as in PowerPoint.
+      const pv = t.series?.length ? ` sc-pal" style="${pal.slice(0, 8).map((x, i) => `--p${i}:${x}`).join(";")}` : "";
+      main = `<div class="sc-content"><div class="sc-diagram${pv}">${dg}</div>${lineUnder(s.body)}</div>`;
       break;
     }
     case "image": {
@@ -138,26 +236,36 @@ export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): stri
         ? `<div class="sc-fig"><img src="${esc(src)}" alt="${esc(s.image?.alt ?? "")}"></div>`
         : `<div class="sc-placeholder">${esc(s.image?.prompt ? (ctx.lang === "ms" ? "Gambar: " : "Figure: ") + s.image.prompt : ctx.lang === "ms" ? "Tiada gambar dipilih" : "No picture chosen")}</div>`;
       const side = s.bullets?.length ? `<div class="sc-col" style="max-width:560px">${bulletsHtml(s.bullets)}</div>` : "";
-      body = `${heading(s)}<div class="sc-content" style="flex-direction:row;gap:40px">${fig}${side}</div>${s.image?.caption ? `<p class="sc-cap">${inline(s.image.caption)}</p>` : ""}`;
+      main = `<div class="sc-content" style="flex-direction:row;gap:40px">${fig}${side}</div>${cap(s.image?.caption)}`;
       break;
     }
     case "cards":
-      body = `${heading(s)}<div class="sc-content">${cardsHtml(s)}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:calc(26px * var(--k, 1))">${inline(s.body)}</p>` : ""}`;
+      main = `<div class="sc-content">${cardsHtml(s, t.series?.length ? pal : null)}</div>${lineUnder(s.body)}`;
       break;
-    case "quote":
-      body = `${heading(s)}<div class="sc-quote"><p class="q">${inline(s.quote?.text ?? "")}</p>${s.quote?.by ? `<p class="by">${inline(s.quote.by)}</p>` : ""}</div>`;
+    case "kpi":
+      main = `${kpiHtml(s, t, pal)}${lineUnder(s.body)}`;
       break;
-    case "kpi": {
-      const items = s.kpi ?? [];
-      body = `${heading(s)}<div class="sc-kpis" style="--kpi-n:${Math.min(Math.max(items.length, 1), 4)}">${items
-        .map((k) => `<div class="sc-kpi"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div>${k.note ? `<div class="n">${inline(k.note)}</div>` : ""}</div>`)
-        .join("")}</div>${s.body ? `<p class="sc-cap" style="color:var(--ink2);font-size:calc(26px * var(--k, 1))">${inline(s.body)}</p>` : ""}`;
+    case "facts":
+      main = `<div class="sc-content">${s.facts?.length ? factsHtml(s) : placeholder("No facts", ctx.lang)}</div>${lineUnder(s.body)}`;
       break;
-    }
+    case "gallery":
+      main = `<div class="sc-content">${s.gallery?.length ? galleryHtml(s, ctx) : placeholder("No pictures", ctx.lang)}</div>${lineUnder(s.body)}`;
+      break;
+    case "map":
+      main = `<div class="sc-content">${mapHtml(s, ctx)}</div>${cap(s.map?.source)}`;
+      break;
     default:
-      body = `${heading(s)}<div class="sc-content">${bulletsHtml(s.bullets)}</div>`;
+      main = `<div class="sc-content">${bulletsHtml(s.bullets)}</div>`;
   }
-  return `<div class="sc-slide sc-${s.layout} sc-style-${t.slideStyle}" style="${themeVars(t)}" data-slide="${esc(s.id)}">${logoHtml(t, ctx)}<div class="sc-body">${body}</div>${chrome(s, t, ctx)}</div>`;
+  if (!body) {
+    const withAside = s.aside?.length && !NO_ASIDE.has(s.layout) ? `<div class="sc-row"><div class="sc-main">${main}</div>${asidesHtml(s)}</div>` : main;
+    body = `${head}${withAside}`;
+  }
+  if (s.callout && !["title", "section", "closing"].includes(s.layout)) body += `<div class="sc-callout">${inline(s.callout)}</div>`;
+  const cls = ["sc-slide", `sc-${s.layout}`, `sc-style-${t.slideStyle}`];
+  if (t.upperTitles) cls.push("sc-upper");
+  if (t.darkTitle && (s.layout === "title" || s.layout === "closing")) cls.push("sc-dark");
+  return `<div class="${cls.join(" ")}" style="${themeVars(t)}" data-slide="${esc(s.id)}">${logoHtml(t, ctx)}<div class="sc-body">${body}</div>${chrome(s, t, ctx)}</div>`;
 }
 
 function placeholder(text: string, lang: "en" | "ms"): string {

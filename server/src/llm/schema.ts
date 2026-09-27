@@ -5,12 +5,14 @@
 const str = { type: "string" };
 const nstr = { type: ["string", "null"] };
 const strArr = { type: "array", items: str };
+const labelDetail = { type: "object", additionalProperties: false, properties: { label: str, detail: nstr }, required: ["label", "detail"] };
+const valueLabel = { type: "object", additionalProperties: false, properties: { value: str, label: str }, required: ["value", "label"] };
 
 export const SLIDE_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
-    layout: { type: "string", enum: ["title", "section", "bullets", "two-column", "chart", "table", "diagram", "image", "quote", "kpi", "cards", "closing"] },
+    layout: { type: "string", enum: ["title", "section", "bullets", "two-column", "chart", "table", "diagram", "image", "quote", "kpi", "cards", "facts", "gallery", "map", "closing"] },
     kicker: nstr,
     title: str,
     subtitle: nstr,
@@ -28,8 +30,9 @@ export const SLIDE_SCHEMA = {
         series: { type: "array", items: { type: "object", additionalProperties: false, properties: { name: str, values: { type: "array", items: { type: "number" } } }, required: ["name", "values"] } },
         unit: nstr,
         source: nstr,
+        highlight: nstr,
       },
-      required: ["kind", "categories", "series", "unit", "source"],
+      required: ["kind", "categories", "series", "unit", "source", "highlight"],
     },
     table: {
       type: ["object", "null"],
@@ -41,14 +44,20 @@ export const SLIDE_SCHEMA = {
       type: ["object", "null"],
       additionalProperties: false,
       properties: {
-        kind: { type: "string", enum: ["flow", "timeline", "matrix"] },
-        steps: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: str, detail: nstr }, required: ["label", "detail"] } },
+        kind: { type: "string", enum: ["flow", "timeline", "matrix", "hub", "funnel", "equation"] },
+        steps: { type: "array", items: labelDetail },
         events: { type: "array", items: { type: "object", additionalProperties: false, properties: { when: str, label: str }, required: ["when", "label"] } },
         rows: strArr,
         cols: strArr,
         cells: { type: "array", items: strArr },
+        center: nstr,
+        nodes: { type: "array", items: labelDetail },
+        pills: strArr,
+        stages: { type: "array", items: valueLabel },
+        terms: { type: "array", items: valueLabel },
+        result: { ...valueLabel, type: ["object", "null"] },
       },
-      required: ["kind", "steps", "events", "rows", "cols", "cells"],
+      required: ["kind", "steps", "events", "rows", "cols", "cells", "center", "nodes", "pills", "stages", "terms", "result"],
     },
     kpi: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: str, value: str, note: nstr }, required: ["label", "value", "note"] } },
     cards: { type: "array", items: { type: "object", additionalProperties: false, properties: { heading: str, detail: nstr, tag: nstr }, required: ["heading", "detail", "tag"] } },
@@ -59,10 +68,27 @@ export const SLIDE_SCHEMA = {
       required: ["prompt", "caption", "sourceName"],
     },
     quote: { type: ["object", "null"], additionalProperties: false, properties: { text: str, by: nstr }, required: ["text", "by"] },
+    facts: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: str, value: str, highlight: { type: "boolean" } }, required: ["label", "value", "highlight"] } },
+    gallery: { type: "array", items: { type: "object", additionalProperties: false, properties: { prompt: nstr, caption: nstr, sourceName: nstr }, required: ["prompt", "caption", "sourceName"] } },
+    map: {
+      type: ["object", "null"],
+      additionalProperties: false,
+      properties: {
+        region: { type: "string", enum: ["asean", "asia", "world"] },
+        areas: { type: "array", items: { type: "object", additionalProperties: false, properties: { code: str, status: str, note: nstr }, required: ["code", "status", "note"] } },
+        legend: nstr,
+        source: nstr,
+      },
+      required: ["region", "areas", "legend", "source"],
+    },
+    kpiStyle: { type: ["string", "null"], enum: ["tiles", "rings", null] },
+    badge: nstr,
+    callout: nstr,
+    aside: { type: "array", items: { type: "object", additionalProperties: false, properties: { heading: str, items: strArr }, required: ["heading", "items"] } },
     notes: nstr,
     citations: strArr,
   },
-  required: ["layout", "kicker", "title", "subtitle", "body", "bullets", "leftHeading", "rightHeading", "bulletsRight", "chart", "table", "diagram", "kpi", "cards", "image", "quote", "notes", "citations"],
+  required: ["layout", "kicker", "title", "subtitle", "body", "bullets", "leftHeading", "rightHeading", "bulletsRight", "chart", "table", "diagram", "kpi", "cards", "image", "quote", "facts", "gallery", "map", "kpiStyle", "badge", "callout", "aside", "notes", "citations"],
 };
 
 export const DECK_SCHEMA = {

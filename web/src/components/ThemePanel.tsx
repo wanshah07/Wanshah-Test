@@ -20,10 +20,10 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
   const setColor = (k: keyof ThemeColors, v: string) => onChange({ ...theme, colors: { ...theme.colors, [k]: v } });
   const applyPreset = (id: string) => {
     const p = themePreset(id);
-    onDesign({ ...p, footer: theme.footer, logoMediaId: theme.logoMediaId, slideNumbers: theme.slideNumbers }, undefined);
+    onDesign({ ...p, footer: theme.footer, logoMediaId: theme.logoMediaId, slideNumbers: theme.slideNumbers, tag: theme.tag }, undefined);
   };
   const applyDesign = (d: Design) => {
-    onDesign({ ...JSON.parse(JSON.stringify(d.theme)), footer: theme.footer, logoMediaId: theme.logoMediaId }, d.id);
+    onDesign({ ...JSON.parse(JSON.stringify(d.theme)), footer: theme.footer, logoMediaId: theme.logoMediaId, tag: d.theme.tag ?? theme.tag }, d.id);
     toast(`Design "${d.name}" applied. Its notes guide the writer from the next rewrite or regenerate.`);
   };
   const saveAsDesign = async () => {
@@ -107,6 +107,33 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
           ))}
         </div>
         <span className="help">clean: flat background. panel: content on a card. gradient: brand wash behind everything.</span>
+      </div>
+      <div className="field">
+        <label>Series colours <span className="help">Charts, card headers, funnels and gauges take these in order</span></label>
+        <div className="row" style={{ gap: 6 }}>
+          {(theme.series ?? []).map((c, i) => (
+            <span key={i} className="row" style={{ gap: 2 }}>
+              <input type="color" value={toHex(c)} onChange={(e) => set({ series: (theme.series ?? []).map((x, j) => (j === i ? e.target.value.toUpperCase() : x)) })} />
+              <button className="btn btn-quiet btn-xs" onClick={() => { const next = (theme.series ?? []).filter((_, j) => j !== i); set({ series: next }); }} title="Remove">✕</button>
+            </span>
+          ))}
+          <button className="btn btn-ghost btn-xs" onClick={() => set({ series: [...(theme.series ?? []), theme.series?.length ? theme.colors.accent : theme.colors.brand] })} disabled={(theme.series?.length ?? 0) >= 8}>Add colour</button>
+        </div>
+        {!theme.series?.length && <span className="help">None set: brand, accent, gold, brand deep are used.</span>}
+      </div>
+      <div className="field">
+        <label>Figures</label>
+        <div className="row">
+          {(["tiles", "rings"] as const).map((k) => (
+            <button key={k} className={"btn btn-ghost btn-xs" + ((theme.kpiStyle ?? "tiles") === k ? " active" : "")} onClick={() => set({ kpiStyle: k })}>{k === "tiles" ? "Tiles" : "Ring gauges"}</button>
+          ))}
+        </div>
+      </div>
+      <label className="row small"><input type="checkbox" checked={!!theme.upperTitles} onChange={(e) => set({ upperTitles: e.target.checked })} /> Titles in capitals</label>
+      <label className="row small"><input type="checkbox" checked={!!theme.darkTitle} onChange={(e) => set({ darkTitle: e.target.checked })} /> Dark title and closing slides</label>
+      <div className="field">
+        <label>Tag on every slide <span className="help">Top right, e.g. HCP VERSION, INTERNAL, CONFIDENTIAL</span></label>
+        <input type="text" value={theme.tag ?? ""} maxLength={80} onChange={(e) => set({ tag: e.target.value || undefined })} placeholder="e.g. For healthcare professionals only" />
       </div>
       <div className="field">
         <label>Footer text</label>

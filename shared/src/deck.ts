@@ -1,3 +1,5 @@
+import { mapCode } from "./map.js";
+
 // The deck specification. One shape for the editor, the LLM output, the HTML
 // renderer and the PPTX exporter, so nothing has to be translated twice.
 
@@ -16,6 +18,8 @@ export interface ChartSpec {
   series: ChartSeries[];
   unit?: string;
   source?: string;
+  /** A category drawn in the brand colour, the others in a quiet comparator colour (brand vs competitors). */
+  highlight?: string;
 }
 
 export interface TableSpec {
@@ -41,7 +45,55 @@ export interface MatrixDiagram {
   cells: string[][];
 }
 
-export type DiagramSpec = FlowDiagram | TimelineDiagram | MatrixDiagram;
+/** A mechanism map: one centre (the product, the ingredient, the claim) with labelled benefits around it. */
+export interface HubDiagram {
+  kind: "hub";
+  center: string;
+  nodes: { label: string; detail?: string }[];
+  /** Short metric pills in a row under the map, e.g. "+45% hydration". */
+  pills?: string[];
+}
+
+/** A funnel or chevron run of big numbers: 400 → 120 → 36 → 30. */
+export interface FunnelDiagram {
+  kind: "funnel";
+  stages: { value: string; label: string }[];
+}
+
+/** Terms joined by + with a result: 3 actives + 28 days + 120 users = the claim. */
+export interface EquationDiagram {
+  kind: "equation";
+  terms: { value: string; label: string }[];
+  result?: { value: string; label: string };
+}
+
+export type DiagramSpec = FlowDiagram | TimelineDiagram | MatrixDiagram | HubDiagram | FunnelDiagram | EquationDiagram;
+export const DIAGRAM_KINDS = ["flow", "timeline", "matrix", "hub", "funnel", "equation"] as const;
+
+export type MapRegion = "asean" | "asia" | "world";
+
+/** A country map: each country a tile, coloured by its status. */
+export interface MapSpec {
+  region: MapRegion;
+  areas: { code: string; status: string; note?: string }[];
+  /** What the colours mean, e.g. "Status of salicylic acid in leave-on products". */
+  legend?: string;
+  source?: string;
+}
+
+/** One labelled row of a fact sheet: STUDY DESIGN | Randomised, double blind. */
+export interface FactItem {
+  label: string;
+  value: string;
+  /** Shade this row: the rating, the verdict, the one line that matters. */
+  highlight?: boolean;
+}
+
+/** A side panel beside the main visual: Reading, Watch-outs. */
+export interface AsidePanel {
+  heading: string;
+  items: string[];
+}
 
 export interface KpiItem {
   label: string;
@@ -72,6 +124,9 @@ export type Layout =
   | "quote"
   | "kpi"
   | "cards"
+  | "facts"
+  | "gallery"
+  | "map"
   | "closing";
 
 export const LAYOUTS: Layout[] = [
@@ -86,6 +141,9 @@ export const LAYOUTS: Layout[] = [
   "quote",
   "kpi",
   "cards",
+  "facts",
+  "gallery",
+  "map",
   "closing",
 ];
 
@@ -116,6 +174,19 @@ export interface Slide {
   cards?: CardItem[];
   image?: ImageRef;
   quote?: { text: string; by?: string };
+  /** Label and value rows for the facts layout. */
+  facts?: FactItem[];
+  /** Two to six pictures with captions for the gallery layout. */
+  gallery?: ImageRef[];
+  map?: MapSpec;
+  /** Figures as tiles or as ring gauges. Unset follows the theme. */
+  kpiStyle?: KpiStyle;
+  /** A verdict pill beside the title: DIRECT, PARTIAL, NO CLAIM, Q1. */
+  badge?: string;
+  /** One dark banner under the content carrying the slide's message. */
+  callout?: string;
+  /** Up to two side panels beside the main visual. */
+  aside?: AsidePanel[];
   notes?: string;
   citations?: string[];
   /** The user's sign-off and feedback on this slide. Never sent to the writer as slide content. */
@@ -154,6 +225,7 @@ export interface ThemeColors {
 }
 
 export type SlideStyle = "clean" | "panel" | "gradient";
+export type KpiStyle = "tiles" | "rings";
 
 export interface Theme {
   id: string;
@@ -169,6 +241,16 @@ export interface Theme {
   logoUrl?: string;
   /** Draw the slide number bottom right. */
   slideNumbers: boolean;
+  /** A line on every slide, top right: HCP VERSION, INTERNAL, CONFIDENTIAL. */
+  tag?: string;
+  /** Extra series colours for charts, card headers and funnels, in order. */
+  series?: string[];
+  /** Titles in capitals. */
+  upperTitles?: boolean;
+  /** Title and closing slides on the deep brand colour, white text. */
+  darkTitle?: boolean;
+  /** How figures are drawn when a slide does not say. */
+  kpiStyle?: KpiStyle;
 }
 
 export interface SourceRef {
@@ -305,6 +387,25 @@ function txtList(v: unknown): string[] | undefined {
 }
 const obj = (v: unknown): Record<string, unknown> | undefined => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined);
 
+/** The first of two lists that has anything in it. */
+const either = (a: unknown, b: unknown): unknown => (Array.isArray(a) && a.length ? a : b);
+
+/** {label, detail} items from strings or records. */
+function labelled(v: unknown): { label: string; detail?: string }[] {
+  return (Array.isArray(v) ? v : [])
+    .map((x) => (typeof x === "string" ? { label: x.trim() } : obj(x) ? { label: txt(obj(x)!.label) ?? "", ...(txt(obj(x)!.detail) ? { detail: txt(obj(x)!.detail) } : {}) } : null))
+    .filter((x): x is { label: string; detail?: string } => !!x && !!x.label);
+}
+
+/** {value, label} items: a big figure and what it counts. */
+function valued(v: unknown): { value: string; label: string }[] {
+  return (Array.isArray(v) ? v : [])
+    .map((x) => obj(x))
+    .filter((x): x is Record<string, unknown> => !!x)
+    .map((x) => ({ value: txt(x.value) ?? "", label: txt(x.label) ?? txt(x.detail) ?? "" }))
+    .filter((x) => x.value || x.label);
+}
+
 /**
  * Every field in the type the renderer expects, and nothing else. A slide is drawn by code that
  * maps arrays and prints strings, so an object where a string belongs (a model's own shape, an
@@ -344,7 +445,10 @@ export function sanitizeSlide(raw: unknown): Slide {
       let kind = (CHART_KINDS.includes(String(c.kind)) ? c.kind : "bar") as ChartKind;
       // A share cannot be negative: a pie of signed values is a column chart.
       if ((kind === "pie" || kind === "doughnut") && series.some((x) => x.values.some((v) => v < 0))) kind = "column";
-      s.chart = { kind, categories, series, ...(txt(c.unit) ? { unit: txt(c.unit) } : {}), ...(txt(c.source) ? { source: txt(c.source) } : {}) };
+      // A highlight names one of the categories, or there is none.
+      const hl = txt(c.highlight);
+      const highlight = hl ? categories.find((x) => x.toLowerCase() === hl.toLowerCase()) : undefined;
+      s.chart = { kind, categories, series, ...(txt(c.unit) ? { unit: txt(c.unit) } : {}), ...(txt(c.source) ? { source: txt(c.source) } : {}), ...(highlight ? { highlight } : {}) };
     }
   }
   const t = obj(r.table);
@@ -372,6 +476,17 @@ export function sanitizeSlide(raw: unknown): Slide {
         });
         s.diagram = { kind: "matrix", rows, cols, cells };
       }
+    } else if (d.kind === "hub") {
+      const nodes = labelled(either(d.nodes, d.steps)).slice(0, 8);
+      const center = txt(d.center) ?? "";
+      if (nodes.length && center) s.diagram = { kind: "hub", center, nodes, ...(txtList(d.pills) ? { pills: txtList(d.pills)!.slice(0, 5) } : {}) };
+    } else if (d.kind === "funnel") {
+      const stages = valued(either(d.stages, d.steps)).slice(0, 7);
+      if (stages.length >= 2) s.diagram = { kind: "funnel", stages };
+    } else if (d.kind === "equation") {
+      const terms = valued(either(d.terms, d.steps)).slice(0, 5);
+      const res = valued([d.result])[0];
+      if (terms.length >= 2) s.diagram = { kind: "equation", terms, ...(res ? { result: res } : {}) };
     } else {
       const steps = (Array.isArray(d.steps) ? d.steps : [])
         .map((x) => (typeof x === "string" ? { label: x } : obj(x) ? { label: txt(obj(x)!.label) ?? "", ...(txt(obj(x)!.detail) ? { detail: txt(obj(x)!.detail) } : {}) } : null))
@@ -397,6 +512,53 @@ export function sanitizeSlide(raw: unknown): Slide {
   }
   const q = typeof r.quote === "string" ? { text: r.quote } : obj(r.quote);
   if (q && txt(q.text)) s.quote = { text: txt(q.text)!, ...(txt(q.by) ? { by: txt(q.by) } : {}) };
+  if (Array.isArray(r.facts)) {
+    const facts = r.facts
+      .map((x) => obj(x))
+      .filter((x): x is Record<string, unknown> => !!x)
+      .map((x) => ({ label: txt(x.label) ?? "", value: txt(x.value) ?? "", ...(x.highlight === true ? { highlight: true } : {}) }))
+      .filter((x) => x.label || x.value)
+      .slice(0, 10);
+    if (facts.length) s.facts = facts;
+  }
+  if (Array.isArray(r.gallery)) {
+    const gallery = r.gallery
+      .map((x) => obj(x))
+      .filter((x): x is Record<string, unknown> => !!x)
+      .map((x) => {
+        const g: ImageRef = {};
+        for (const k of ["mediaId", "url", "caption", "alt", "prompt"] as const) if (typeof x[k] === "string" && (x[k] as string).trim()) g[k] = (x[k] as string).trim();
+        return g;
+      })
+      .filter((g) => Object.keys(g).length)
+      .slice(0, 6);
+    if (gallery.length) s.gallery = gallery;
+  }
+  const m = obj(r.map);
+  if (m) {
+    const seen = new Set<string>();
+    const areas = (Array.isArray(m.areas) ? m.areas : [])
+      .map((x) => obj(x))
+      .filter((x): x is Record<string, unknown> => !!x)
+      .map((x) => ({ code: mapCode(txt(x.code) ?? txt(x.country) ?? txt(x.name) ?? "") ?? "", status: txt(x.status) ?? txt(x.value) ?? "", ...(txt(x.note) ? { note: txt(x.note) } : {}) }))
+      .filter((x) => x.code && !seen.has(x.code) && seen.add(x.code));
+    const region = (["asean", "asia", "world"].includes(String(m.region)) ? m.region : "asean") as MapSpec["region"];
+    if (areas.length) s.map = { region, areas, ...(txt(m.legend) ? { legend: txt(m.legend) } : {}), ...(txt(m.source) ? { source: txt(m.source) } : {}) };
+  }
+  if (r.kpiStyle === "tiles" || r.kpiStyle === "rings") s.kpiStyle = r.kpiStyle;
+  const badge = txt(r.badge);
+  if (badge) s.badge = badge.slice(0, 40);
+  const callout = txt(r.callout);
+  if (callout) s.callout = callout.slice(0, 400);
+  if (Array.isArray(r.aside)) {
+    const aside = r.aside
+      .map((x) => obj(x))
+      .filter((x): x is Record<string, unknown> => !!x)
+      .map((x) => ({ heading: txt(x.heading) ?? "", items: (txtList(x.items) ?? []).slice(0, 5) }))
+      .filter((x) => x.heading || x.items.length)
+      .slice(0, 2);
+    if (aside.length) s.aside = aside;
+  }
   if (obj(r.review)) s.review = r.review as unknown as SlideReview;
   return s;
 }
@@ -442,6 +604,19 @@ export function blankSlide(layout: Layout, lang: Lang = "en"): Slide {
       break;
     case "image":
       s.image = { caption: "" };
+      break;
+    case "facts":
+      s.facts = [
+        { label: ms ? "Reka bentuk" : "Design", value: ms ? "Rawak, buta berganda" : "Randomised, double blind" },
+        { label: ms ? "Subjek" : "Subjects", value: "n = 60" },
+        { label: ms ? "Keputusan" : "Result", value: ms ? "Hasil utama" : "Main result", highlight: true },
+      ];
+      break;
+    case "gallery":
+      s.gallery = [{ caption: ms ? "Gambar 1" : "Picture 1" }, { caption: ms ? "Gambar 2" : "Picture 2" }, { caption: ms ? "Gambar 3" : "Picture 3" }];
+      break;
+    case "map":
+      s.map = { region: "asean", areas: [{ code: "MY", status: "YES" }, { code: "SG", status: "YES" }, { code: "ID", status: "PARTLY" }, { code: "TH", status: "NO" }] };
       break;
     case "closing":
       s.subtitle = ms ? "Terima kasih" : "Thank you";

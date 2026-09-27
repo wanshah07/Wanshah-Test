@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type CardItem, type ChartSpec, type DiagramSpec, type Slide, type SlopHit, type TableSpec, type Theme } from "@slidecraft/shared";
+import { MAP_REGIONS, MAP_TILES, type AsidePanel, type CardItem, type ChartSpec, type DiagramSpec, type FactItem, type ImageRef, type Layout, type MapSpec, type Slide, type SlopHit, type TableSpec, type Theme } from "@slidecraft/shared";
 import { fillFor, LAYOUT_NAMES, LayoutPicker } from "./LayoutPicker";
 import { api, type MediaItem } from "../api";
 import { toast } from "./Toast";
@@ -120,6 +120,14 @@ function ChartEditor({ chart, onChange }: { chart: ChartSpec; onChange: (c: Char
         <Text label="Unit" value={chart.unit} onChange={(v) => onChange({ ...chart, unit: v || undefined })} />
       </div>
       <Text label="Categories" help="Comma separated" value={chart.categories.join(", ")} onChange={(v) => onChange({ ...chart, categories: v.split(",").map((s) => s.trim()) })} />
+      {chart.series.length === 1 && (chart.kind === "bar" || chart.kind === "column") && (
+        <div className="field"><label>Highlight<span className="help">Draws one category in the brand colour and the rest in grey, e.g. our product against competitors</span></label>
+          <select value={chart.highlight ?? ""} onChange={(e) => onChange({ ...chart, highlight: e.target.value || undefined })}>
+            <option value="">None</option>
+            {chart.categories.filter(Boolean).map((c) => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
       {chart.series.map((s, i) => (
         <div key={i} className="grid" style={{ gridTemplateColumns: "1fr 2fr auto", gap: 6, alignItems: "end" }}>
           <Text label={`Series ${i + 1}`} value={s.name} onChange={(v) => setSeries(i, { name: v })} />
@@ -166,16 +174,56 @@ function TableEditor({ table, onChange }: { table: TableSpec; onChange: (t: Tabl
 function DiagramEditor({ d, onChange }: { d: DiagramSpec; onChange: (d: DiagramSpec) => void }) {
   const kind = d.kind;
   const switchKind = (k: DiagramSpec["kind"]) => {
-    if (k === kind) return;
-    if (k === "flow") onChange({ kind: "flow", steps: [{ label: "Step 1" }, { label: "Step 2" }, { label: "Step 3" }] });
-    else if (k === "timeline") onChange({ kind: "timeline", events: [{ when: "2025", label: "Event" }, { when: "2026", label: "Event" }] });
-    else onChange({ kind: "matrix", rows: ["Row 1", "Row 2"], cols: ["A", "B"], cells: [["yes", "no"], ["no", "yes"]] });
+    if (k !== kind) onChange(sampleDiagram(k));
   };
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="row">
-        {(["flow", "timeline", "matrix"] as const).map((k) => <button key={k} className={"btn btn-ghost btn-xs" + (kind === k ? " active" : "")} onClick={() => switchKind(k)}>{k}</button>)}
+        {DIAGRAM_KINDS.map(([k, name]) => <button key={k} className={"btn btn-ghost btn-xs" + (kind === k ? " active" : "")} onClick={() => switchKind(k)}>{name}</button>)}
       </div>
+      {d.kind === "hub" && (
+        <>
+          <Text label="Centre" help="The product, ingredient or claim" value={d.center} onChange={(v) => onChange({ ...d, center: v })} />
+          {d.nodes.map((n, i) => (
+            <div key={i} className="grid" style={{ gridTemplateColumns: "1fr 1.4fr auto", gap: 6, alignItems: "end" }}>
+              <Text label={`Benefit ${i + 1}`} value={n.label} onChange={(v) => onChange({ ...d, nodes: d.nodes.map((x, k) => (k === i ? { ...x, label: v } : x)) })} />
+              <Text label="Detail" value={n.detail} onChange={(v) => onChange({ ...d, nodes: d.nodes.map((x, k) => (k === i ? { ...x, detail: v || undefined } : x)) })} />
+              <button className="btn btn-quiet btn-xs" style={{ marginBottom: 12 }} onClick={() => onChange({ ...d, nodes: d.nodes.filter((_, k) => k !== i) })} disabled={d.nodes.length < 2}>✕</button>
+            </div>
+          ))}
+          <div className="row"><button className="btn btn-ghost btn-xs" onClick={() => onChange({ ...d, nodes: [...d.nodes, { label: `Benefit ${d.nodes.length + 1}` }] })} disabled={d.nodes.length >= 8}>Add benefit</button></div>
+          <Lines label="Metric pills" help="One per line, e.g. +45% hydration. Up to 5." value={d.pills} onChange={(v) => onChange({ ...d, pills: v.length ? v.slice(0, 5) : undefined })} rows={3} />
+        </>
+      )}
+      {d.kind === "funnel" && (
+        <>
+          {d.stages.map((st, i) => (
+            <div key={i} className="grid" style={{ gridTemplateColumns: "0.7fr 1.5fr auto", gap: 6, alignItems: "end" }}>
+              <Text label={`Stage ${i + 1}`} value={st.value} onChange={(v) => onChange({ ...d, stages: d.stages.map((x, k) => (k === i ? { ...x, value: v } : x)) })} />
+              <Text label="What it counts" value={st.label} onChange={(v) => onChange({ ...d, stages: d.stages.map((x, k) => (k === i ? { ...x, label: v } : x)) })} />
+              <button className="btn btn-quiet btn-xs" style={{ marginBottom: 12 }} onClick={() => onChange({ ...d, stages: d.stages.filter((_, k) => k !== i) })} disabled={d.stages.length < 3}>✕</button>
+            </div>
+          ))}
+          <div className="row"><button className="btn btn-ghost btn-xs" onClick={() => onChange({ ...d, stages: [...d.stages, { value: "0", label: "" }] })} disabled={d.stages.length >= 7}>Add stage</button></div>
+          <span className="help">Plain counts show how many carried over from the stage before (26%).</span>
+        </>
+      )}
+      {d.kind === "equation" && (
+        <>
+          {d.terms.map((t, i) => (
+            <div key={i} className="grid" style={{ gridTemplateColumns: "0.7fr 1.5fr auto", gap: 6, alignItems: "end" }}>
+              <Text label={`Term ${i + 1}`} value={t.value} onChange={(v) => onChange({ ...d, terms: d.terms.map((x, k) => (k === i ? { ...x, value: v } : x)) })} />
+              <Text label="Label" value={t.label} onChange={(v) => onChange({ ...d, terms: d.terms.map((x, k) => (k === i ? { ...x, label: v } : x)) })} />
+              <button className="btn btn-quiet btn-xs" style={{ marginBottom: 12 }} onClick={() => onChange({ ...d, terms: d.terms.filter((_, k) => k !== i) })} disabled={d.terms.length < 3}>✕</button>
+            </div>
+          ))}
+          <div className="row"><button className="btn btn-ghost btn-xs" onClick={() => onChange({ ...d, terms: [...d.terms, { value: "", label: "" }] })} disabled={d.terms.length >= 5}>Add term</button></div>
+          <div className="grid" style={{ gridTemplateColumns: "0.7fr 1.5fr", gap: 6 }}>
+            <Text label="= Result" value={d.result?.value} onChange={(v) => onChange({ ...d, result: v || d.result?.label ? { value: v, label: d.result?.label ?? "" } : undefined })} />
+            <Text label="Result label" value={d.result?.label} onChange={(v) => onChange({ ...d, result: v || d.result?.value ? { value: d.result?.value ?? "", label: v } : undefined })} />
+          </div>
+        </>
+      )}
       {d.kind === "flow" && (
         <>
           {d.steps.map((s, i) => (
@@ -212,6 +260,190 @@ function DiagramEditor({ d, onChange }: { d: DiagramSpec; onChange: (d: DiagramS
             </tbody>
           </table>
         </>
+      )}
+    </div>
+  );
+}
+
+
+const DIAGRAM_KINDS: [DiagramSpec["kind"], string][] = [["flow", "Flow"], ["timeline", "Timeline"], ["matrix", "Matrix"], ["hub", "Mechanism map"], ["funnel", "Funnel"], ["equation", "Equation"]];
+
+export function sampleDiagram(k: DiagramSpec["kind"]): DiagramSpec {
+  if (k === "timeline") return { kind: "timeline", events: [{ when: "2025", label: "Event" }, { when: "2026", label: "Event" }] };
+  if (k === "matrix") return { kind: "matrix", rows: ["Row 1", "Row 2"], cols: ["A", "B"], cells: [["yes", "no"], ["no", "yes"]] };
+  if (k === "hub") return { kind: "hub", center: "Product", nodes: [{ label: "Benefit 1" }, { label: "Benefit 2" }, { label: "Benefit 3" }, { label: "Benefit 4" }], pills: ["+00% metric"] };
+  if (k === "funnel") return { kind: "funnel", stages: [{ value: "300", label: "Reached" }, { value: "80", label: "Engaged" }, { value: "20", label: "Converted" }] };
+  if (k === "equation") return { kind: "equation", terms: [{ value: "3", label: "actives" }, { value: "28", label: "days" }], result: { value: "1", label: "claim" } };
+  return { kind: "flow", steps: [{ label: "Step 1" }, { label: "Step 2" }, { label: "Step 3" }] };
+}
+
+function FactsEditor({ facts, onChange }: { facts: FactItem[]; onChange: (f: FactItem[]) => void }) {
+  return (
+    <div className="field">
+      <label>Fact sheet<span className="help">Tick the row that matters most: it is shaded.</span></label>
+      {facts.map((f, i) => (
+        <div key={i} className="grid" style={{ gridTemplateColumns: "0.9fr 1.6fr auto auto", gap: 6, alignItems: "end" }}>
+          <Text label="Label" value={f.label} onChange={(v) => onChange(facts.map((x, j) => (j === i ? { ...x, label: v } : x)))} />
+          <Text label="Value" value={f.value} onChange={(v) => onChange(facts.map((x, j) => (j === i ? { ...x, value: v } : x)))} />
+          <label className="row small" style={{ gap: 4, marginBottom: 14 }} title="Shade this row"><input type="checkbox" checked={!!f.highlight} onChange={(e) => onChange(facts.map((x, j) => (j === i ? { ...x, highlight: e.target.checked || undefined } : x)))} />Key</label>
+          <button className="btn btn-quiet btn-xs" style={{ marginBottom: 12 }} onClick={() => onChange(facts.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      ))}
+      <div className="row"><button className="btn btn-ghost btn-xs" onClick={() => onChange([...facts, { label: "", value: "" }])} disabled={facts.length >= 10}>Add row</button></div>
+    </div>
+  );
+}
+
+function MapEditor({ map, lang, onChange }: { map: MapSpec; lang: "en" | "ms"; onChange: (m: MapSpec) => void }) {
+  const used = new Set(map.areas.map((a) => a.code));
+  const free = MAP_TILES.filter((t) => !used.has(t.code));
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <div className="field"><label>Region<span className="help">Countries outside it are still drawn when you add them</span></label>
+        <select value={map.region} onChange={(e) => onChange({ ...map, region: e.target.value as MapSpec["region"] })}>{MAP_REGIONS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select>
+      </div>
+      <span className="help">Status sets the colour: YES, ALLOWED, APPROVED are green; PARTLY, RESTRICTED, PENDING are amber; NO, BANNED, PROHIBITED are red; anything else is the brand colour.</span>
+      {map.areas.map((a, i) => (
+        <div key={a.code} className="grid" style={{ gridTemplateColumns: "1.1fr 1fr 1.3fr auto", gap: 6, alignItems: "end" }}>
+          <div className="field"><label>Country</label>
+            <select value={a.code} onChange={(e) => onChange({ ...map, areas: map.areas.map((x, j) => (j === i ? { ...x, code: e.target.value } : x)) })}>
+              {MAP_TILES.filter((t) => t.code === a.code || !used.has(t.code)).map((t) => <option key={t.code} value={t.code}>{lang === "ms" ? t.nameMs : t.name}</option>)}
+            </select>
+          </div>
+          <Text label="Status" value={a.status} onChange={(v) => onChange({ ...map, areas: map.areas.map((x, j) => (j === i ? { ...x, status: v } : x)) })} />
+          <Text label="Note" value={a.note} onChange={(v) => onChange({ ...map, areas: map.areas.map((x, j) => (j === i ? { ...x, note: v || undefined } : x)) })} />
+          <button className="btn btn-quiet btn-xs" style={{ marginBottom: 12 }} onClick={() => onChange({ ...map, areas: map.areas.filter((_, j) => j !== i) })} disabled={map.areas.length < 2}>✕</button>
+        </div>
+      ))}
+      <div className="row"><button className="btn btn-ghost btn-xs" onClick={() => free[0] && onChange({ ...map, areas: [...map.areas, { code: free[0].code, status: "" }] })} disabled={!free.length}>Add country</button></div>
+      <Text label="What the colours show" value={map.legend} onChange={(v) => onChange({ ...map, legend: v || undefined })} />
+      <Text label="Source" value={map.source} onChange={(v) => onChange({ ...map, source: v || undefined })} />
+    </div>
+  );
+}
+
+function GalleryEditor({ deckId, items, onChange }: { deckId: string; items: ImageRef[]; onChange: (g: ImageRef[]) => void }) {
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [pick, setPick] = useState<number | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  const load = () => api.media(deckId).then(setMedia).catch(() => {});
+  useEffect(() => {
+    load();
+  }, [deckId]);
+  const setItem = (i: number, patch: Partial<ImageRef>) => onChange(items.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    try {
+      const m = await api.uploadMedia(deckId, Array.from(files));
+      // New pictures fill the empty frames first, then are added as frames of their own.
+      const next = items.slice();
+      for (const x of m) {
+        const empty = next.findIndex((g) => !g.mediaId && !g.url);
+        if (empty >= 0) next[empty] = { ...next[empty], mediaId: x.id };
+        else if (next.length < 6) next.push({ mediaId: x.id, caption: "" });
+      }
+      onChange(next);
+      load();
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+  };
+  return (
+    <div className="field">
+      <label>Gallery<span className="help">2 to 6 pictures, each with a caption</span></label>
+      {items.map((g, i) => (
+        <div key={i} className="grid" style={{ gridTemplateColumns: "64px 1fr auto auto", gap: 6, alignItems: "center" }}>
+          {g.mediaId ? <img src={`/api/media/${g.mediaId}`} alt="" style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }} /> : <span className="small muted" style={{ width: 64 }}>empty</span>}
+          <input type="text" value={g.caption ?? ""} placeholder="Caption" onChange={(e) => setItem(i, { caption: e.target.value || undefined })} />
+          <button className="btn btn-ghost btn-xs" onClick={() => setPick(pick === i ? null : i)}>{pick === i ? "Close" : "Pick"}</button>
+          <button className="btn btn-quiet btn-xs" onClick={() => onChange(items.filter((_, j) => j !== i))} disabled={items.length < 3}>✕</button>
+          {pick === i && (
+            <div className="row" style={{ gap: 6, gridColumn: "1 / -1" }}>
+              {media.length ? media.map((m) => (
+                <img key={m.id} src={`/api/media/${m.id}`} alt={m.name} title={m.name} onClick={() => { setItem(i, { mediaId: m.id, url: undefined }); setPick(null); }}
+                  style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 6, cursor: "pointer", border: g.mediaId === m.id ? "2px solid var(--brand)" : "1px solid var(--line)" }} />
+              )) : <span className="small muted">No pictures in this deck yet. Upload some.</span>}
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="row">
+        <button className="btn btn-ghost btn-xs" onClick={() => ref.current?.click()}>Upload pictures</button>
+        <button className="btn btn-ghost btn-xs" onClick={() => onChange([...items, { caption: "" }])} disabled={items.length >= 6}>Add frame</button>
+        <input ref={ref} type="file" accept="image/*" multiple hidden onChange={(e) => upload(e.target.files)} />
+      </div>
+    </div>
+  );
+}
+
+function AsideEditor({ aside, onChange }: { aside: AsidePanel[]; onChange: (a: AsidePanel[] | undefined) => void }) {
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      {aside.map((a, i) => (
+        <div key={i} className="stack" style={{ gap: 4, borderLeft: "3px solid var(--line)", paddingLeft: 8 }}>
+          <div className="grid" style={{ gridTemplateColumns: "1fr auto", gap: 6, alignItems: "end" }}>
+            <Text label={`Side panel ${i + 1}`} value={a.heading} onChange={(v) => onChange(aside.map((x, j) => (j === i ? { ...x, heading: v } : x)))} />
+            <button className="btn btn-quiet btn-xs" style={{ marginBottom: 12 }} onClick={() => { const next = aside.filter((_, j) => j !== i); onChange(next.length ? next : undefined); }}>✕</button>
+          </div>
+          <Lines label="Points" value={a.items} onChange={(v) => onChange(aside.map((x, j) => (j === i ? { ...x, items: v.slice(0, 5) } : x)))} rows={3} />
+        </div>
+      ))}
+      {aside.length < 2 && <div className="row"><button className="btn btn-ghost btn-xs" onClick={() => onChange([...aside, { heading: aside.length ? "Watch-outs" : "Reading", items: [] }])}>Add side panel</button></div>}
+    </div>
+  );
+}
+
+/** Everything a slide can carry, as one choice each: pick it and the slide shows it. */
+type AddChoice = { id: string; label: string; help: string; apply: (s: Slide, lang: "en" | "ms") => Partial<Slide>; on: (s: Slide) => boolean };
+
+const asLayout = (l: Layout, extra?: (s: Slide) => Partial<Slide>) => (s: Slide) => ({ ...fillFor(s, l), layout: l, ...(extra ? extra(s) : {}) });
+const asDiagram = (k: DiagramSpec["kind"]) => (s: Slide): Partial<Slide> => ({ layout: "diagram", diagram: s.diagram?.kind === k ? s.diagram : sampleDiagram(k) });
+
+const ADD_VISUALS: AddChoice[] = [
+  { id: "chart", label: "Chart", help: "Column, bar, line, area, pie or doughnut", apply: asLayout("chart"), on: (s) => s.layout === "chart" },
+  { id: "table", label: "Table", help: "Rows and columns with verdict colours", apply: asLayout("table"), on: (s) => s.layout === "table" },
+  { id: "flow", label: "Flow", help: "A process in numbered steps", apply: asDiagram("flow"), on: (s) => s.layout === "diagram" && s.diagram?.kind === "flow" },
+  { id: "timeline", label: "Timeline", help: "Dated events on a line", apply: asDiagram("timeline"), on: (s) => s.layout === "diagram" && s.diagram?.kind === "timeline" },
+  { id: "matrix", label: "Matrix", help: "A comparison grid with ticks", apply: asDiagram("matrix"), on: (s) => s.layout === "diagram" && s.diagram?.kind === "matrix" },
+  { id: "hub", label: "Mechanism map", help: "The product in the centre, benefits around it", apply: asDiagram("hub"), on: (s) => s.layout === "diagram" && s.diagram?.kind === "hub" },
+  { id: "funnel", label: "Funnel", help: "Big numbers dropping stage by stage", apply: asDiagram("funnel"), on: (s) => s.layout === "diagram" && s.diagram?.kind === "funnel" },
+  { id: "equation", label: "Equation", help: "Terms that add up to a result", apply: asDiagram("equation"), on: (s) => s.layout === "diagram" && s.diagram?.kind === "equation" },
+  { id: "map", label: "Country map", help: "ASEAN, Asia Pacific or world, coloured by status", apply: asLayout("map"), on: (s) => s.layout === "map" },
+  { id: "kpi", label: "Big numbers", help: "3 or 4 headline figures as tiles", apply: asLayout("kpi", () => ({ kpiStyle: "tiles" })), on: (s) => s.layout === "kpi" && s.kpiStyle !== "rings" },
+  { id: "rings", label: "Ring gauges", help: "Percentages as rings", apply: asLayout("kpi", () => ({ kpiStyle: "rings" })), on: (s) => s.layout === "kpi" && s.kpiStyle === "rings" },
+  { id: "facts", label: "Fact sheet", help: "Label and value rows, like a study card", apply: asLayout("facts"), on: (s) => s.layout === "facts" },
+  { id: "cards", label: "Numbered cards", help: "2 to 6 points with a tag each", apply: asLayout("cards"), on: (s) => s.layout === "cards" },
+  { id: "image", label: "Figure", help: "One picture with points beside it", apply: asLayout("image"), on: (s) => s.layout === "image" },
+  { id: "gallery", label: "Gallery", help: "2 to 6 pictures with captions", apply: asLayout("gallery"), on: (s) => s.layout === "gallery" },
+  { id: "two-column", label: "Two columns", help: "Before and after, option A and B", apply: asLayout("two-column"), on: (s) => s.layout === "two-column" },
+  { id: "quote", label: "Quote", help: "One quotation, large", apply: asLayout("quote"), on: (s) => s.layout === "quote" },
+];
+
+function AddPanel({ slide, lang, onChange }: { slide: Slide; lang: "en" | "ms"; onChange: (s: Slide) => void }) {
+  const structural = ["title", "section", "closing"].includes(slide.layout);
+  const extras = [
+    { id: "badge", label: "Verdict badge", on: !!slide.badge, add: { badge: "PARTIAL" }, off: { badge: undefined } },
+    { id: "callout", label: "Callout banner", on: !!slide.callout, add: { callout: lang === "ms" ? "Satu ayat yang perlu diingati." : "The one line to remember." }, off: { callout: undefined } },
+    { id: "aside", label: "Side panels", on: !!slide.aside?.length, add: { aside: [{ heading: "Reading", items: [lang === "ms" ? "Apa yang ditunjukkan" : "What it shows"] }, { heading: "Watch-outs", items: [lang === "ms" ? "Had dan kaveat" : "Limits and caveats"] }] }, off: { aside: undefined } },
+  ] as const;
+  return (
+    <div className="field">
+      <label>Add to this slide <span className="help">Pick what the slide should show. What you typed for another layout is kept and comes back if you switch again.</span></label>
+      <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {ADD_VISUALS.map((c) => (
+          <button key={c.id} type="button" title={c.help} className={"btn btn-ghost btn-xs" + (c.on(slide) ? " active" : "")} onClick={() => onChange({ ...slide, ...c.apply(slide, lang) })}>{c.label}</button>
+        ))}
+      </div>
+      {slide.layout === "title" && (
+        <button type="button" className={"btn btn-ghost btn-xs" + (slide.kpi?.length ? " active" : "")} style={{ alignSelf: "flex-start", marginTop: 6 }} title="3 or 4 figures in a row under the subtitle"
+          onClick={() => onChange({ ...slide, kpi: slide.kpi?.length ? undefined : [{ label: "Metric", value: "0" }, { label: "Metric", value: "0" }, { label: "Metric", value: "0" }] })}>{slide.kpi?.length ? "Remove hero figures" : "Hero figures"}</button>
+      )}
+      {!structural && (
+        <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+          {extras.map((x) => (
+            <button key={x.id} type="button" className={"btn btn-ghost btn-xs" + (x.on ? " active" : "")} onClick={() => onChange({ ...slide, ...(x.on ? x.off : x.add) } as Slide)}>{x.on ? `Remove ${x.label.toLowerCase()}` : `+ ${x.label}`}</button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -299,10 +531,11 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
           </>
         )}
       </div>
+      <AddPanel slide={slide} lang={lang} onChange={onChange} />
       {L !== "title" && L !== "closing" && L !== "section" && <Text label="Kicker" help="Small label above the title, e.g. AT A GLANCE" value={slide.kicker} onChange={(v) => set({ kicker: v || undefined })} />}
       <Text label="Title" value={slide.title} onChange={(v) => set({ title: v })} rows={2} />
       <Text label={L === "title" || L === "closing" || L === "section" ? "Subtitle" : "Reading line"} help={L === "title" || L === "closing" || L === "section" ? undefined : "One sentence under the title: how to read this slide"} value={slide.subtitle} onChange={(v) => set({ subtitle: v || undefined })} rows={2} />
-      {(L === "bullets" || L === "kpi" || L === "diagram" || L === "cards" || L === "title" || L === "closing") && <Text label="Body text" help={L === "bullets" ? "One sentence above the bullets" : "Optional line under the content"} value={slide.body} onChange={(v) => set({ body: v || undefined })} rows={2} />}
+      {(L === "bullets" || L === "kpi" || L === "diagram" || L === "cards" || L === "facts" || L === "gallery" || L === "title" || L === "closing") && <Text label="Body text" help={L === "bullets" ? "One sentence above the bullets" : "Optional line under the content"} value={slide.body} onChange={(v) => set({ body: v || undefined })} rows={2} />}
       {(L === "bullets" || L === "chart" || L === "image") && <Lines label={L === "bullets" ? "Bullets" : "Points beside the figure"} value={slide.bullets} onChange={(v) => set({ bullets: v })} rows={L === "bullets" ? 7 : 4} />}
       {L === "two-column" && (
         <>
@@ -319,7 +552,17 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
       {L === "diagram" && <DiagramEditor d={slide.diagram ?? { kind: "flow", steps: [{ label: "Step 1" }, { label: "Step 2" }] }} onChange={(d) => set({ diagram: d })} />}
       {L === "kpi" && (
         <div className="field">
-          <label>KPI tiles</label>
+          <label>Draw figures as</label>
+          <select value={slide.kpiStyle ?? ""} onChange={(e) => set({ kpiStyle: (e.target.value || undefined) as Slide["kpiStyle"] })}>
+            <option value="">As the design says{theme.kpiStyle === "rings" ? " (ring gauges)" : " (tiles)"}</option>
+            <option value="tiles">Tiles</option>
+            <option value="rings">Ring gauges (percentages fill the ring)</option>
+          </select>
+        </div>
+      )}
+      {(L === "kpi" || (L === "title" && !!slide.kpi?.length)) && (
+        <div className="field">
+          <label>{L === "title" ? "Hero figures" : "KPI tiles"}</label>
           {(slide.kpi ?? []).map((k, i) => (
             <div key={i} className="grid" style={{ gridTemplateColumns: "0.8fr 1.2fr 1fr auto", gap: 6, alignItems: "end" }}>
               <Text label="Value" value={k.value} onChange={(v) => set({ kpi: slide.kpi!.map((x, j) => (j === i ? { ...x, value: v } : x)) })} />
@@ -339,6 +582,12 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
         </>
       )}
       {L === "image" && <ImagePicker deckId={deckId} slide={slide} onChange={onChange} />}
+      {L === "facts" && <FactsEditor facts={slide.facts ?? []} onChange={(facts) => set({ facts })} />}
+      {L === "gallery" && <GalleryEditor deckId={deckId} items={slide.gallery ?? []} onChange={(gallery) => set({ gallery })} />}
+      {L === "map" && <MapEditor map={slide.map ?? { region: "asean", areas: [{ code: "MY", status: "" }] }} lang={lang} onChange={(map) => set({ map })} />}
+      {slide.badge !== undefined && L !== "title" && L !== "closing" && L !== "section" && <Text label="Verdict badge" help="YES, PARTLY, NO and HIGH, MEDIUM, LOW are coloured" value={slide.badge} onChange={(v) => set({ badge: v })} />}
+      {slide.callout !== undefined && L !== "title" && L !== "closing" && L !== "section" && <Text label="Callout banner" help="One sentence in a dark banner under the content" value={slide.callout} onChange={(v) => set({ callout: v })} rows={2} />}
+      {!!slide.aside?.length && L !== "title" && L !== "closing" && L !== "section" && <AsideEditor aside={slide.aside} onChange={(aside) => set({ aside })} />}
       <hr />
       <Lines label="Citations" help="One per line. Instrument and clause, paper, dataset or file." value={slide.citations} onChange={(v) => set({ citations: v })} rows={3} />
       <Text label="Speaker notes" value={slide.notes} onChange={(v) => set({ notes: v || undefined })} rows={6} help={lang === "ms" ? "Apa yang dikatakan penyampai" : "What the presenter says"} />

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, type Deck, type FitResult, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, LENGTH_CHOICES, VISUAL_FEATURES, newId, scanDeck, type Deck, type FitResult, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
 import { api, type Job } from "../api";
 import { SlideFrame } from "../components/SlideFrame";
 import { SlideInspector } from "../components/SlideInspector";
@@ -10,6 +10,7 @@ import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../
 import { ConfirmButton } from "../components/ConfirmButton";
 import { ReviewBar } from "../components/ReviewBar";
 import { LayoutPicker } from "../components/LayoutPicker";
+import { FeatureChoices } from "../components/FeatureChoices";
 import { DropZone } from "../components/DropZone";
 import { OneDriveBox } from "../components/OneDriveBox";
 import type { PathedFile } from "../lib/files";
@@ -354,6 +355,11 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(!!stored?.auto);
+  // Auto's own ticks: every device on unless the last Auto run had it off.
+  const [autoFeatures, setAutoFeatures] = useState<Features>(() => {
+    const was = (stored?.auto ? stored.features : undefined) as Partial<Features> | undefined;
+    return { ...features, ...Object.fromEntries(VISUAL_FEATURES.map((k) => [k, was?.[k] !== false])) };
+  });
   const prompt = composeBrief(brief);
   const reload = () => api.sources(deck.id).then(setSources).catch(() => {});
   const add = async (files: PathedFile[]) => {
@@ -376,7 +382,7 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
     }
     try {
       const audience = composeAudience(brief.audiences, brief.audienceText) || deck.audience;
-      const { jobId } = await api.generate(deck.id, { prompt, auto, title: deck.title, lang: deck.lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
+      const { jobId } = await api.generate(deck.id, { prompt, auto, title: deck.title, lang: deck.lang, angle, audience, slides, features: auto ? autoFeatures : features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
         try {
           const j = await api.job(jobId);
@@ -422,16 +428,13 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
         <b>Auto: let the AI decide</b> the angle, length and layouts
       </label>
       <BriefPicker value={brief} onChange={setBrief} compact />
+      {auto && <FeatureChoices features={autoFeatures} onChange={setAutoFeatures} auto compact />}
       {!auto && <>
       <div className="grid c2" style={{ gap: 8 }}>
         <select value={slides} onChange={(e) => setSlides(Number(e.target.value))}>{LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}</select>
         <select value={angle} onChange={(e) => setAngle(e.target.value)}>{ANGLES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
       </div>
-      <div className="grid c2" style={{ gap: 4 }}>
-        {(Object.keys(FEATURE_LABELS) as (keyof Features)[]).map((k) => (
-          <label key={k} className="row small" style={{ gap: 6 }}><input type="checkbox" checked={features[k]} onChange={(e) => setFeatures({ ...features, [k]: e.target.checked })} />{FEATURE_LABELS[k].label}</label>
-        ))}
-      </div>
+      <FeatureChoices features={features} onChange={setFeatures} auto={false} compact />
       {features.images && (
         <select value={imageMode} onChange={(e) => setImageMode(e.target.value as typeof imageMode)}>
           <option value="uploaded">Pictures from sources (uploads and OneDrive)</option>

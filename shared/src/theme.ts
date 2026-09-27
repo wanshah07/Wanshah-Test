@@ -92,6 +92,107 @@ export const THEME_PRESETS: Theme[] = [
     slideStyle: "clean",
   },
   {
+    // Tokens read off a clinical benchmark deck: navy titles, brand blue against grey comparators.
+    id: "clinical-evidence",
+    name: "Clinical Evidence",
+    fontDisplay: "Cambria",
+    fontBody: "Calibri",
+    radius: 8,
+    slideNumbers: true,
+    colors: {
+      bg: "#F8FAFC",
+      surface: "#FFFFFF",
+      ink: "#1F2937",
+      ink2: "#4B5563",
+      muted: "#6B7280",
+      line: "#E5E7EB",
+      brand: "#479CDF",
+      brandDeep: "#0F2B4C",
+      accent: "#D97706",
+      gold: "#15803D",
+    },
+    series: ["#479CDF", "#9CA3AF", "#D97706", "#15803D", "#0F2B4C"],
+    slideStyle: "clean",
+    darkTitle: true,
+    kpiStyle: "tiles",
+  },
+  {
+    // A bright training and booth deck: capital titles, many accents, ring gauges.
+    id: "booth-bright",
+    name: "Booth Bright",
+    fontDisplay: "Aptos",
+    fontBody: "Aptos",
+    radius: 20,
+    slideNumbers: true,
+    colors: {
+      bg: "#F4F9FE",
+      surface: "#FFFFFF",
+      ink: "#0B2D4D",
+      ink2: "#50697F",
+      muted: "#8FA2B3",
+      line: "#E4EEF6",
+      brand: "#2E8BD6",
+      brandDeep: "#0B2D4D",
+      accent: "#F0A32B",
+      gold: "#0E9E8A",
+    },
+    series: ["#2E8BD6", "#0E9E8A", "#F0A32B", "#6F5AE0", "#F2664F", "#8FA2B3"],
+    slideStyle: "gradient",
+    upperTitles: true,
+    darkTitle: true,
+    kpiStyle: "rings",
+  },
+  {
+    // An aesthetic clinical deck: burgundy title slides, rose accents.
+    id: "rose-aesthetic",
+    name: "Rose Aesthetic",
+    fontDisplay: "Arial",
+    fontBody: "Calibri",
+    radius: 24,
+    slideNumbers: true,
+    colors: {
+      bg: "#FFF5F8",
+      surface: "#FFFFFF",
+      ink: "#3B1220",
+      ink2: "#7B4A5C",
+      muted: "#A98090",
+      line: "#FFE3EC",
+      brand: "#E4708A",
+      brandDeep: "#3B1220",
+      accent: "#C9506B",
+      gold: "#F2A9BF",
+    },
+    series: ["#E4708A", "#C9506B", "#F2A9BF", "#7B4A5C", "#A98090"],
+    slideStyle: "gradient",
+    darkTitle: true,
+    kpiStyle: "rings",
+  },
+  {
+    // A post-mortem or audit report: navy title slides, one colour per segment.
+    id: "audit-report",
+    name: "Audit Report",
+    fontDisplay: "Cambria",
+    fontBody: "Calibri",
+    radius: 12,
+    slideNumbers: true,
+    colors: {
+      bg: "#F5F8FC",
+      surface: "#FFFFFF",
+      ink: "#1B2533",
+      ink2: "#5B6B80",
+      muted: "#8A97A8",
+      line: "#C9D6EA",
+      brand: "#2A6FDB",
+      brandDeep: "#0B2D63",
+      accent: "#2E9E6A",
+      gold: "#D9822B",
+    },
+    series: ["#2A6FDB", "#2E9E6A", "#D9822B", "#7A4FD0", "#B8336A", "#E8174B"],
+    slideStyle: "clean",
+    darkTitle: true,
+    kpiStyle: "tiles",
+  },
+  {
     id: "mono",
     name: "Mono",
     ...base,
@@ -113,6 +214,26 @@ export const THEME_PRESETS: Theme[] = [
     slideStyle: "clean",
   },
 ];
+
+/**
+ * How each built-in design is used, for the writer: which devices it leans on
+ * and its habits. The theme itself (colours, fonts, capitals, dark title slides,
+ * ring gauges) is applied by the renderer, so those never depend on the writer.
+ */
+export const THEME_GUIDES: Record<string, string> = {
+  "clinical-evidence":
+    "Evidence deck for healthcare professionals. Calm and dense. Horizontal bar charts that show our product in the brand colour against grey comparators (set chart.highlight to our product's category). A verdict badge beside the title wherever the slide judges (DIRECT, PARTIAL, NO CLAIM). Reading and Watch-outs side panels beside charts and tables. Evidence tables with verdict cells. One fact sheet per study: design, subjects, method, result (highlighted), rating, reference. A dark callout banner for the one line the reader must keep.",
+  "booth-bright":
+    "Training and booth deck. Short capital titles under a letter-spaced kicker. Figures as ring gauges. A mechanism map with the product in the centre and its benefits around it, with metric pills under it. Equation slides (number + measure + days + users = the claim) with a dark callout banner. Three-step flows. A hero row of 3 or 4 stats on the title slide. Checklists as numbered cards. Picture galleries of the products.",
+  "rose-aesthetic":
+    "Aesthetic clinical deck. Dark title and results slides. Big stat tiles and ring gauges for results. A timeline for the study weeks. Before and after picture galleries. The routine as a numbered flow. The mechanism as a 4-step flow or a mechanism map. At most one chart, clustered columns.",
+  "audit-report":
+    "Post-mortem or audit report. Dark title slides. A funnel of big numbers for the drop-off. A doughnut of shares with the channels listed. Stat tiles. Tables with verdict colours. A numbered pipeline as a flow. Picture galleries with captions for the audit evidence. Segment charts, each with one summary tile. A verdict badge on each finding.",
+};
+
+export function themeGuide(id: string | undefined): string | undefined {
+  return id ? THEME_GUIDES[id] : undefined;
+}
 
 export function themePreset(id: string): Theme {
   const t = THEME_PRESETS.find((p) => p.id === id) ?? THEME_PRESETS[0];
@@ -263,5 +384,19 @@ export function sanitizeTheme(raw: unknown): Theme {
   if (typeof t.footer === "string" && t.footer.trim()) out.footer = t.footer.slice(0, 160);
   if (typeof t.logoMediaId === "string" && /^[\w-]{1,80}$/.test(t.logoMediaId)) out.logoMediaId = t.logoMediaId;
   if (typeof t.logoUrl === "string" && /^https?:\/\//i.test(t.logoUrl)) out.logoUrl = t.logoUrl.slice(0, 2000);
+  if (typeof t.tag === "string" && t.tag.trim()) out.tag = t.tag.replace(/[<>]/g, "").trim().slice(0, 80);
+  // A preset's extras carry over when a saved theme does not say otherwise.
+  const series = Array.isArray(t.series) ? t.series : base.series;
+  if (Array.isArray(series)) {
+    const ok = series.filter((x): x is string => typeof x === "string" && COLOUR.test(x.trim())).map((x) => x.trim()).slice(0, 8);
+    if (ok.length) out.series = ok;
+  }
+  const flag = (v: unknown, fallback: boolean | undefined) => (typeof v === "boolean" ? v : fallback);
+  const upper = flag(t.upperTitles, base.upperTitles);
+  if (upper !== undefined) out.upperTitles = upper;
+  const dark = flag(t.darkTitle, base.darkTitle);
+  if (dark !== undefined) out.darkTitle = dark;
+  const ks = t.kpiStyle === "tiles" || t.kpiStyle === "rings" ? t.kpiStyle : base.kpiStyle;
+  if (ks) out.kpiStyle = ks;
   return out;
 }

@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
+import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Design, type Job } from "../api";
 import { toast } from "../components/Toast";
 import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
+import { allVisuals, FeatureChoices } from "../components/FeatureChoices";
 import { ThemeCards } from "../components/ThemeCards";
 import { DropZone } from "../components/DropZone";
 import { OneDriveBox } from "../components/OneDriveBox";
@@ -27,6 +28,7 @@ export default function NewDeck() {
   const [lang, setLang] = useState<"en" | "ms">("en");
   const [angle, setAngle] = useState("regulatory-briefing");
   const [features, setFeatures] = useState<Features>({ ...DEFAULT_FEATURES, ...ANGLES[0].defaults });
+  const [autoFeatures, setAutoFeatures] = useState<Features>(() => allVisuals(DEFAULT_FEATURES));
   const [slides, setSlides] = useState(10);
   const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
   const [themeId, setThemeId] = useState("facerinna");
@@ -117,7 +119,7 @@ export default function NewDeck() {
         if (designId) await api.applyDesign(id, designId);
         else await api.applyPreset(id, themeId);
       }
-      const { jobId } = await api.generate(id, { prompt, auto, title, lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
+      const { jobId } = await api.generate(id, { prompt, auto, title, lang, angle, audience, slides, features: auto ? autoFeatures : features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
         try {
           const j = await api.job(jobId);
@@ -257,17 +259,10 @@ export default function NewDeck() {
             <span className="small muted">Your designs also carry notes the writer follows (title length, text per slide). Colours and fonts can be changed later in the editor.</span>
           </div>
           {auto && <p className="small muted">Auto chooses the length and the layouts from your material, and uses your uploaded pictures if there are any. Untick Auto on the first step to choose them yourself.</p>}
-          {!auto && <div className="card stack">
+          <div className="card stack">
             <h3>Features</h3>
-            <div className="grid c2">
-              {(Object.keys(FEATURE_LABELS) as (keyof Features)[]).map((k) => (
-                <label key={k} className={"toggle" + (features[k] ? " on" : "")}>
-                  <input type="checkbox" checked={features[k]} onChange={(e) => setFeatures({ ...features, [k]: e.target.checked })} />
-                  <div><b>{FEATURE_LABELS[k].label}</b><span>{FEATURE_LABELS[k].help}</span></div>
-                </label>
-              ))}
-            </div>
-            {features.images && (
+            <FeatureChoices features={auto ? autoFeatures : features} onChange={auto ? setAutoFeatures : setFeatures} auto={auto} />
+            {!auto && features.images && (
               <label className="f" style={{ maxWidth: 420 }}>
                 Pictures come from
                 <select value={imageMode} onChange={(e) => setImageMode(e.target.value as typeof imageMode)}>
@@ -277,7 +272,7 @@ export default function NewDeck() {
                 </select>
               </label>
             )}
-          </div>}
+          </div>
         </div>
       )}
 

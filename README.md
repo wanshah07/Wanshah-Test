@@ -61,8 +61,25 @@ single HTML file. Runs on your own machine or server, with your own key.
   then redrawn from its own words: points that each carry a figure become
   number tiles, numbered steps a flow, dated points a timeline, labelled
   points cards. The run log says what was redrawn.
+- **Everything a slide can carry, as a choice.** Charts (with one category
+  in the brand colour against grey comparators), tables, flows, timelines,
+  matrices, mechanism maps (the product in the centre, benefits around it,
+  metric pills under it), funnels of big numbers, equations (terms adding
+  up to a result), country maps (ASEAN, Asia Pacific or world, each country
+  coloured by its status), big-number tiles or ring gauges, fact sheets,
+  figures and picture galleries, plus a verdict badge beside the title, a
+  callout banner and Reading / Watch-outs side panels. New deck and
+  Regenerate list them as ticks, in Auto too; the writer uses each ticked
+  device at least once where the sources can fill it, and never one that is
+  unticked. In the editor, **Add to this slide** puts any of them on the
+  slide in one click. All of them are drawn the same in the browser, the
+  web deck and native PowerPoint.
 - **Themes.** Colours, fonts, radius, slide style, footer and logo per deck,
-  with presets. The default preset is the token set of my.facerinna.com
+  plus series colours, capital titles, dark title slides, tiles or ring
+  gauges, and a tag on every slide (e.g. For healthcare professionals only),
+  with presets. Four presets were built from reference decks: Clinical
+  Evidence, Booth Bright, Rose Aesthetic and Audit Report; each also tells
+  the writer which devices that design leans on. The default preset is the token set of my.facerinna.com
   (Fraunces and Inter, brand `#4898D8` on ink `#1D344E`, 20px radius); the
   app chrome uses the same tokens, light and dark.
 - **Brief by ticking.** What the deck is for, what it must include, the

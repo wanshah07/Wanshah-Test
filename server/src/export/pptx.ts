@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import PptxGenJSImport from "pptxgenjs";
-import { sanitizeSlide, sanitizeTheme, seriesPalette, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type Slide, type Theme } from "@slidecraft/shared";
+import { mapGrid, mapTiles, mapTone, ringPercent, sanitizeSlide, sanitizeTheme, seriesPalette, stepRate, tileName, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type ImageRef, type Slide, type Theme } from "@slidecraft/shared";
 import { fetchPicture } from "./fetchPicture.js";
 import { getMedia } from "../store.js";
 import { fitFont, textHeightIn } from "./textfit.js";
@@ -80,6 +80,10 @@ function chrome(ps: PSlide, s: Slide, i: number, c: Ctx, dark = false): void {
     const data = mediaData(c.userId, t.logoMediaId);
     if (data) ps.addImage({ data, x: px(120), y: px(44), h: px(56), w: px(200), sizing: { type: "contain", w: px(200), h: px(56) } });
   }
+  if (t.tag) {
+    const tag = t.tag.toUpperCase();
+    ps.addText(tag, { x: W - px(120) - 6, y: px(28), w: 6, h: px(40), fontSize: fitFont(tag, 6, px(40), 9, 6, { bold: true, maxLines: 1 }), bold: true, charSpacing: 2, color: col, fontFace: fontOk(t.fontBody), align: "right", valign: "middle" });
+  }
   if (s.notes) ps.addNotes(plain(s.notes));
 }
 
@@ -112,12 +116,14 @@ function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: num
     const cx = x + (i % cols) * (cw + gap);
     const cy = y + Math.floor(i / cols) * (ch + gap);
     panel(ps, cx, cy, cw, ch, c);
-    ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
-    ps.addShape(c.pres.ShapeType.ellipse, { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
+    // A design with its own series colours gives each card its own header colour.
+    const cc = c.theme.series?.length ? hex(c.theme.series[i % c.theme.series.length]) : hex(col.brand);
+    ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: cc }, line: { color: cc } });
+    ps.addShape(c.pres.ShapeType.ellipse, { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fill: { color: cc }, line: { color: cc } });
     ps.addText(String(i + 1), { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fontSize: Math.round(13 * (dot / 0.4)), bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody) });
     if (it.tag) {
       const tone = verdictTone(it.tag);
-      const tagW = Math.min(cw - 0.9, 0.3 + it.tag.length * 0.09);
+      const tagW = Math.min(cw - 0.9, 0.35 + it.tag.length * 0.11);
       ps.addText(it.tag.toUpperCase(), { x: cx + cw - tagW - 0.2, y: cy + (top - 0.3) / 2 + 0.03, w: tagW, h: 0.3, fontSize: fitFont(it.tag.toUpperCase(), tagW, 0.32, 9, 6, { bold: true, maxLines: 1 }), bold: true, align: "center", valign: "middle", color: tone ? TONE[tone].ink : hex(col.brandDeep), fill: { color: tone ? TONE[tone].bg : hex(col.surface) }, fontFace: fontOk(c.theme.fontBody), rectRadius: 0.16, shape: c.pres.ShapeType.roundRect });
     }
     ps.addText(plain(it.heading), { x: cx + 0.2, y: cy + top, w: tw, h: headH, fontSize: hs, bold: true, color: hex(col.ink), fontFace: fontOk(c.theme.fontDisplay), valign: "top", fit: "shrink" });
@@ -125,10 +131,23 @@ function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: num
   });
 }
 
+/** The title as the theme writes it: in capitals when the design says so. */
+function titleText(s: Slide, t: Theme): string {
+  return t.upperTitles ? plain(s.title).toUpperCase() : plain(s.title);
+}
+
 function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; color?: string; kicker?: string } = {}): number {
   const t = c.theme;
   const y = opts.y ?? px(96);
-  const w = W - px(240);
+  let w = W - px(240);
+  if (s.badge) {
+    // The verdict pill sits top right, level with the title; the title wraps before it.
+    const b = plain(s.badge).toUpperCase();
+    const bw = Math.min(3, 0.5 + b.length * 0.11);
+    const tone = verdictTone(s.badge);
+    ps.addText(b, { x: px(120) + w - bw, y: y + (s.kicker ? px(44) : 0), w: bw, h: 0.42, fontSize: fitFont(b, bw - 0.1, 0.42, 12, 7, { bold: true, maxLines: 1 }), bold: true, align: "center", valign: "middle", color: tone ? TONE[tone].ink : hex(t.colors.brandDeep), fill: { color: tone ? TONE[tone].bg : hex(t.colors.surface) }, line: { color: tone ? TONE[tone].bg : hex(t.colors.line), width: 1 }, fontFace: fontOk(t.fontBody), rectRadius: 0.21, shape: c.pres.ShapeType.roundRect });
+    w -= bw + 0.25;
+  }
   let yy = y;
   const kicker = s.kicker || opts.kicker;
   if (kicker) {
@@ -137,11 +156,13 @@ function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; 
   }
   // The title takes at most three lines and a quarter of the slide; its box is as tall as its text.
   const max = opts.size ?? 30;
-  const size = fitFont(plain(s.title), w, 3 * max * 1.2 / 72 + 0.1, max, 14, { bold: true, maxLines: 3 });
-  const h = Math.min(textHeightIn([plain(s.title)], w, size, { bold: true }), H * 0.28);
-  ps.addText(plain(s.title), { x: px(120), y: yy, w, h, fontSize: size, bold: true, color: opts.color ?? hex(t.colors.ink), fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
+  const tt = titleText(s, t);
+  const size = fitFont(tt, w, 3 * max * 1.2 / 72 + 0.1, max, 14, { bold: true, maxLines: 3 });
+  const h = Math.min(textHeightIn([tt], w, size, { bold: true }), H * 0.28);
+  ps.addText(tt, { x: px(120), y: yy, w, h, fontSize: size, bold: true, color: opts.color ?? hex(t.colors.ink), fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
   let end = yy + h + px(10);
   // The reading line under a content slide's title: at most two lines.
+  w = W - px(240);
   if (s.subtitle) {
     const ss = fitFont(plain(s.subtitle), w, 2 * 14 * 1.2 / 72 + 0.1, 14, 9, { maxLines: 2 });
     const sh = textHeightIn([plain(s.subtitle)], w, ss);
@@ -171,15 +192,58 @@ function panel(ps: PSlide, x: number, y: number, w: number, h: number, c: Ctx): 
   ps.addShape(c.pres.ShapeType.roundRect, { x, y, w, h, fill: { color: hex(c.theme.colors.surface) }, line: { color: hex(c.theme.colors.line), width: 1 }, rectRadius: Math.min(0.2, px(c.theme.radius)) });
 }
 
+/**
+ * PowerPoint draws bar categories bottom up; the slide reads top down, as in the editor. pptxgenjs
+ * writes the value into <c:orientation> as given, though its type file only names "minMax".
+ */
+function barOrder(ch: ChartSpec): "minMax" {
+  return (ch.kind === "bar" ? "maxMin" : "minMax") as "minMax";
+}
+
 function chart(ps: PSlide, ch: ChartSpec, x: number, y: number, w: number, h: number, c: Ctx): void {
   const P = c.pres;
   const kindMap: Record<ChartSpec["kind"], string> = { column: P.ChartType.bar, bar: P.ChartType.bar, line: P.ChartType.line, area: P.ChartType.area, pie: P.ChartType.pie, doughnut: P.ChartType.doughnut };
-  const data = ch.series.map((s) => ({ name: s.name, labels: ch.categories, values: s.values }));
-  const pal = seriesPalette(c.theme.colors).map(hex);
+  const pal = seriesPalette(c.theme.colors, c.theme.series).map(hex);
   const pie = ch.kind === "pie" || ch.kind === "doughnut";
+  // Brand against comparators: the highlighted category and the rest as two stacked series, one of them zero
+  // at every bar, so each bar takes its own colour in a native chart.
+  if (ch.highlight && ch.series.length === 1 && (ch.kind === "bar" || ch.kind === "column")) {
+    const v = ch.series[0].values;
+    const mine = v.map((n, i) => (ch.categories[i] === ch.highlight ? n : 0));
+    const rest = v.map((n, i) => (ch.categories[i] === ch.highlight ? 0 : n));
+    ps.addChart(P.ChartType.bar as ChartName, [
+      { name: ch.highlight, labels: ch.categories, values: mine },
+      { name: ch.series[0].name || "Others", labels: ch.categories, values: rest },
+    ], {
+      x, y, w, h,
+      barDir: ch.kind === "bar" ? "bar" : "col",
+      barGrouping: "stacked",
+      catAxisOrientation: barOrder(ch),
+      chartColors: [pal[0], "A7B0BC"],
+      showLegend: false,
+      catAxisLabelColor: hex(c.theme.colors.ink2),
+      valAxisLabelColor: hex(c.theme.colors.muted),
+      catAxisLabelFontSize: 11,
+      valAxisLabelFontSize: 10,
+      valGridLine: { color: hex(c.theme.colors.line), style: "solid", size: 0.5 },
+      catGridLine: { style: "none" },
+      showValue: true,
+      dataLabelFontSize: 10,
+      dataLabelColor: hex(c.theme.colors.ink),
+      dataLabelFormatCode: "#,##0.##;-#,##0.##;;",
+      valAxisTitle: ch.unit || undefined,
+      showValAxisTitle: !!ch.unit,
+      valAxisTitleFontSize: 10,
+      valAxisTitleColor: hex(c.theme.colors.muted),
+      fontFace: fontOk(c.theme.fontBody),
+    });
+    return;
+  }
+  const data = ch.series.map((s) => ({ name: s.name, labels: ch.categories, values: s.values }));
   ps.addChart(kindMap[ch.kind] as ChartName, data, {
     x, y, w, h,
     barDir: ch.kind === "bar" ? "bar" : "col",
+    catAxisOrientation: barOrder(ch),
     chartColors: pie ? pal : pal.slice(0, ch.series.length),
     showLegend: pie || ch.series.length > 1,
     legendPos: pie ? "r" : "b",
@@ -281,6 +345,12 @@ function diagram(ps: PSlide, d: DiagramSpec, x: number, y: number, w: number, h:
       const lh = Math.min(h / 2 - 0.75, 1.6);
       ps.addText(plain(e.label), { x: cx - tw / 2, y: up ? cy - 0.8 - lh : cy + 0.65, w: tw, h: lh, fontSize: fitFont(plain(e.label), tw, lh, 11, 6), color: hex(col.ink), align: "center", valign: up ? "bottom" : "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
     });
+  } else if (d.kind === "hub") {
+    hub(ps, d, x, y, w, h, c);
+  } else if (d.kind === "funnel") {
+    funnel(ps, d, x, y, w, h, c);
+  } else if (d.kind === "equation") {
+    equation(ps, d, x, y, w, h, c);
   } else {
     const colW = [2.2, ...Array(d.cols.length).fill((w - 2.2) / Math.max(d.cols.length, 1))];
     const mark = (v: string) => YES_RE.test(v.trim()) || NO_RE.test(v.trim());
@@ -299,28 +369,315 @@ function diagram(ps: PSlide, d: DiagramSpec, x: number, y: number, w: number, h:
   }
 }
 
+
+type Hub = Extract<DiagramSpec, { kind: "hub" }>;
+type Funnel = Extract<DiagramSpec, { kind: "funnel" }>;
+type Equation = Extract<DiagramSpec, { kind: "equation" }>;
+
+/** The mechanism map: a disc in the middle, benefits either side joined to it, metric pills underneath. */
+function hub(ps: PSlide, d: Hub, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const P = c.pres;
+  const col = c.theme.colors;
+  const pillH = d.pills?.length ? 0.45 : 0;
+  const mapH = h - (pillH ? pillH + 0.2 : 0);
+  const disc = Math.min(2.4, mapH * 0.85, w * 0.24);
+  const cx = x + w / 2, cy = y + mapH / 2;
+  const sideW = (w - disc) / 2 - 0.45;
+  const half = Math.ceil(d.nodes.length / 2);
+  const sides = [d.nodes.slice(0, half), d.nodes.slice(half)];
+  const most = Math.max(sides[0].length, sides[1].length, 1);
+  const gap = 0.14;
+  const nh = Math.min(1.1, (mapH - gap * (most - 1)) / most);
+  const labH = Math.min(0.4, nh * 0.42);
+  const ls = Math.min(...d.nodes.map((n) => fitFont(plain(n.label), sideW - 0.3, labH, 13, 7, { bold: true })));
+  const ds = Math.min(10, ...d.nodes.map((n) => (n.detail ? fitFont(plain(n.detail), sideW - 0.3, nh - labH - 0.12, 10, 6) : 10)));
+  sides.forEach((list, si) => {
+    const left = si === 0;
+    const nx = left ? x : x + w - sideW;
+    const top = cy - (list.length * nh + gap * (list.length - 1)) / 2;
+    list.forEach((n, i) => {
+      const ny = top + i * (nh + gap);
+      panel(ps, nx, ny, sideW, nh, c);
+      ps.addShape(P.ShapeType.rect, { x: left ? nx + sideW - 0.06 : nx, y: ny, w: 0.06, h: nh, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
+      ps.addText(plain(n.label), { x: nx + 0.15, y: ny + 0.06, w: sideW - 0.3, h: labH, fontSize: ls, bold: true, color: hex(col.ink), align: left ? "right" : "left", valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+      if (n.detail) ps.addText(plain(n.detail), { x: nx + 0.15, y: ny + 0.06 + labH, w: sideW - 0.3, h: Math.max(0.2, nh - labH - 0.12), fontSize: ds, color: hex(col.ink2), align: left ? "right" : "left", valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+      const ly = ny + nh / 2;
+      const x1 = left ? nx + sideW : cx + disc / 2;
+      const x2 = left ? cx - disc / 2 : nx;
+      ps.addShape(P.ShapeType.line, { x: Math.min(x1, x2), y: ly, w: Math.abs(x2 - x1), h: 0, line: { color: hex(col.line), width: 1.5 } });
+    });
+  });
+  ps.addShape(P.ShapeType.ellipse, { x: cx - disc / 2 - 0.12, y: cy - disc / 2 - 0.12, w: disc + 0.24, h: disc + 0.24, fill: { color: hex(col.brand), transparency: 80 }, line: { color: hex(col.brand), transparency: 100 } });
+  ps.addShape(P.ShapeType.ellipse, { x: cx - disc / 2, y: cy - disc / 2, w: disc, h: disc, fill: { color: hex(col.brandDeep) }, line: { color: hex(col.brandDeep) } });
+  const ct = plain(d.center);
+  ps.addText(ct, { x: cx - disc / 2 + 0.2, y: cy - disc / 2 + 0.2, w: disc - 0.4, h: disc - 0.4, fontSize: fitFont(ct, disc - 0.4, disc - 0.4, 20, 8, { bold: true }), bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(c.theme.fontDisplay), fit: "shrink" });
+  if (d.pills?.length) {
+    const n = d.pills.length;
+    const pw = Math.min(3, (w - 0.2 * (n - 1)) / n);
+    const px0 = x + (w - (pw * n + 0.2 * (n - 1))) / 2;
+    d.pills.forEach((p, i) => {
+      const tx = plain(p);
+      ps.addText(tx, { x: px0 + i * (pw + 0.2), y: y + h - pillH, w: pw, h: pillH, fontSize: fitFont(tx, pw - 0.2, pillH, 12, 7, { bold: true, maxLines: 1 }), bold: true, align: "center", valign: "middle", color: hex(col.brandDeep), fill: { color: hex(col.surface) }, line: { color: hex(col.brand), width: 1 }, rectRadius: pillH / 2, shape: P.ShapeType.roundRect, fontFace: fontOk(c.theme.fontBody) });
+    });
+  }
+}
+
+/** Chevrons with a big number in each, what it counts underneath, and how many carried over. */
+function funnel(ps: PSlide, d: Funnel, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const P = c.pres;
+  const col = c.theme.colors;
+  const pal = seriesPalette(col, c.theme.series).map(hex);
+  const n = d.stages.length;
+  const sw = w / n;
+  const ch = Math.min(1.3, h * 0.45);
+  const top = y + (h - ch - 1.2) / 2;
+  const vs = Math.min(...d.stages.map((st) => fitFont(st.value, sw - 0.7, ch - 0.2, 36, 10, { bold: true, maxLines: 1 })));
+  const ls = Math.min(...d.stages.map((st) => fitFont(plain(st.label), sw - 0.2, 0.7, 13, 7)));
+  d.stages.forEach((st, i) => {
+    const sx = x + i * sw;
+    const shade = n > 1 && !c.theme.series?.length ? (i * 60) / (n - 1) : 0;
+    const fill = c.theme.series?.length ? pal[i % pal.length] : hex(col.brandDeep);
+    ps.addText(st.value, { x: sx, y: top, w: sw + 0.05, h: ch, shape: i === 0 ? P.ShapeType.homePlate : P.ShapeType.chevron, fill: { color: fill, transparency: shade }, line: { color: fill, transparency: 100 }, fontSize: vs, bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(c.theme.fontDisplay) });
+    ps.addText(plain(st.label), { x: sx + 0.1, y: top + ch + 0.12, w: sw - 0.2, h: 0.7, fontSize: ls, bold: true, color: hex(col.ink), align: "center", valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    const rate = i > 0 ? stepRate(d.stages[i - 1].value, st.value) : "";
+    if (rate) ps.addText(rate, { x: sx + 0.1, y: top + ch + 0.84, w: sw - 0.2, h: 0.32, fontSize: 10, color: hex(col.muted), align: "center", valign: "top", fontFace: fontOk(c.theme.fontBody) });
+  });
+}
+
+/** Terms joined by + and = into a result, the result filled in the deep brand colour. */
+function equation(ps: PSlide, d: Equation, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const P = c.pres;
+  const col = c.theme.colors;
+  const items = [...d.terms.map((t) => ({ ...t, res: false })), ...(d.result ? [{ ...d.result, res: true }] : [])];
+  const ops = items.length - 1;
+  const opW = 0.5;
+  const bw = (w - ops * opW) / items.length;
+  const bh = Math.min(2.4, h * 0.8);
+  const by = y + (h - bh) / 2;
+  const vs = Math.min(...items.map((t) => fitFont(t.value, bw - 0.3, bh * 0.45, 36, 10, { bold: true, maxLines: 1 })));
+  const ls = Math.min(...items.map((t) => fitFont(plain(t.label), bw - 0.3, bh * 0.4, 13, 7)));
+  items.forEach((t, i) => {
+    const bx = x + i * (bw + opW);
+    if (t.res) ps.addShape(P.ShapeType.roundRect, { x: bx, y: by, w: bw, h: bh, fill: { color: hex(col.brandDeep) }, line: { color: hex(col.brandDeep) }, rectRadius: Math.min(0.2, px(c.theme.radius)) });
+    else panel(ps, bx, by, bw, bh, c);
+    ps.addText(t.value, { x: bx + 0.15, y: by + bh * 0.1, w: bw - 0.3, h: bh * 0.45, fontSize: vs, bold: true, color: t.res ? "FFFFFF" : hex(col.brandDeep), align: "center", valign: "bottom", fontFace: fontOk(c.theme.fontDisplay) });
+    ps.addText(plain(t.label), { x: bx + 0.15, y: by + bh * 0.57, w: bw - 0.3, h: bh * 0.38, fontSize: ls, color: t.res ? "FFFFFF" : hex(col.ink2), align: "center", valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    if (i < ops) ps.addText(i === ops - 1 && d.result ? "=" : "+", { x: bx + bw, y: by, w: opW, h: bh, fontSize: 30, bold: true, color: hex(col.brand), align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody) });
+  });
+}
+
+/** Figures as ring gauges: a native doughnut per figure, the figure in its hole. */
+function rings(ps: PSlide, items: NonNullable<Slide["kpi"]>, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const P = c.pres;
+  const col = c.theme.colors;
+  const pal = seriesPalette(col, c.theme.series).map(hex);
+  const n = Math.min(Math.max(items.length, 1), 4);
+  const rowsN = Math.max(1, Math.ceil(items.length / 4));
+  const cw = w / n;
+  const rowH = h / rowsN;
+  const d = Math.min(cw - 0.4, rowH - 1.1, 2.4);
+  items.forEach((k, i) => {
+    const cx = x + (i % 4) * cw + cw / 2;
+    const top = y + Math.floor(i / 4) * rowH + (rowH - d - 1) / 2;
+    const p = ringPercent(k.value);
+    ps.addChart(P.ChartType.doughnut as ChartName, [{ name: plain(k.label), labels: ["", ""], values: p === null ? [0, 100] : [p, 100 - p] }], {
+      x: cx - d / 2, y: top, w: d, h: d,
+      holeSize: 72,
+      chartColors: [pal[i % pal.length], hex(col.line)],
+      showLegend: false,
+      showValue: false,
+      showPercent: false,
+      showLabel: false,
+      showTitle: false,
+      dataBorder: { pt: 0.5, color: hex(col.bg) },
+    });
+    const v = plain(k.value);
+    ps.addText(v, { x: cx - d * 0.34, y: top + d * 0.3, w: d * 0.68, h: d * 0.4, fontSize: fitFont(v, d * 0.68, d * 0.4, 30, 9, { bold: true, maxLines: 1 }), bold: true, color: hex(col.brandDeep), align: "center", valign: "middle", fontFace: fontOk(c.theme.fontDisplay) });
+    ps.addText(plain(k.label), { x: cx - cw / 2 + 0.1, y: top + d + 0.08, w: cw - 0.2, h: 0.5, fontSize: fitFont(plain(k.label), cw - 0.2, 0.5, 13, 7, { bold: true }), bold: true, color: hex(col.ink), align: "center", valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    if (k.note) ps.addText(plain(k.note), { x: cx - cw / 2 + 0.1, y: top + d + 0.58, w: cw - 0.2, h: 0.4, fontSize: fitFont(plain(k.note), cw - 0.2, 0.4, 10, 6), color: hex(col.muted), align: "center", valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+  });
+}
+
+/** Label and value rows; the highlighted row shaded in the accent. */
+function facts(ps: PSlide, items: NonNullable<Slide["facts"]>, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const col = c.theme.colors;
+  const lw = Math.max(2.2, w * 0.3);
+  const colW = [lw, w - lw];
+  const text = items.map((f) => [plain(f.label).toUpperCase(), plain(f.value)]);
+  const { size, heights } = fitTable(text, colW, h, 14);
+  const rows: TableRows = items.map((f, i) => {
+    const tone = verdictTone(plain(f.value));
+    const shade = f.highlight ? tint(col.accent, col.surface, 0.18) : hex(col.surface);
+    return [
+      { text: text[i][0], options: { bold: true, color: hex(col.brandDeep), fill: { color: f.highlight ? tint(col.accent, col.surface, 0.3) : tint(col.brand, col.surface, 0.1) }, fontSize: Math.max(5, size - 2), charSpacing: 1 } },
+      { text: text[i][1], options: tone ? { bold: true, color: TONE[tone].ink, fill: { color: TONE[tone].bg }, fontSize: size } : { color: hex(col.ink), fill: { color: shade }, bold: !!f.highlight, fontSize: size } },
+    ];
+  });
+  ps.addTable(rows, { x, y, w, colW, border: { type: "solid", color: hex(col.line), pt: 0.75 }, fontFace: fontOk(c.theme.fontBody), valign: "middle", autoPage: false, rowH: heights });
+}
+
+/** A colour mixed toward another: amount 0 is the second colour, 1 the first. */
+function tint(a: string, b: string, amount: number): string {
+  const pa = hex(a), pb = hex(b);
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  return [0, 2, 4].map((i) => Math.round(ch(pa, i) * amount + ch(pb, i) * (1 - amount)).toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+function pictureData(img: ImageRef | undefined, c: Ctx): string | null {
+  if (!img) return null;
+  if (img.mediaId) return mediaData(c.userId, img.mediaId);
+  return img.url ? c.urls.get(img.url) ?? null : null;
+}
+
+/** Pictures in a grid, each with its caption under it. */
+function gallery(ps: PSlide, items: ImageRef[], x: number, y: number, w: number, h: number, c: Ctx): void {
+  const col = c.theme.colors;
+  const n = items.length;
+  const cols = n <= 4 ? Math.max(n, 1) : 3;
+  const rowsN = Math.ceil(n / cols);
+  const gap = 0.2;
+  const cw = (w - gap * (cols - 1)) / cols;
+  const rh = (h - gap * (rowsN - 1)) / rowsN;
+  const capH = items.some((g) => g.caption) ? Math.min(0.45, rh * 0.22) : 0;
+  items.forEach((g, i) => {
+    const gx = x + (i % cols) * (cw + gap);
+    const gy = y + Math.floor(i / cols) * (rh + gap);
+    const ph = rh - capH - (capH ? 0.06 : 0);
+    const data = pictureData(g, c);
+    if (data) ps.addImage({ data, x: gx, y: gy, w: cw, h: ph, sizing: { type: "cover", w: cw, h: ph } });
+    else {
+      ps.addShape(c.pres.ShapeType.roundRect, { x: gx, y: gy, w: cw, h: ph, fill: { color: hex(col.surface) }, line: { color: hex(col.line), width: 1.5, dashType: "dash" }, rectRadius: 0.1 });
+      const t = plain(g.prompt || (c.lang === "ms" ? "Tiada gambar" : "No picture"));
+      ps.addText(t, { x: gx + 0.1, y: gy, w: cw - 0.2, h: ph, fontSize: fitFont(t, cw - 0.2, ph, 11, 6), color: hex(col.muted), align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    }
+    if (g.caption) ps.addText(plain(g.caption), { x: gx, y: gy + ph + 0.06, w: cw, h: capH, fontSize: fitFont(plain(g.caption), cw, capH, 11, 6), color: hex(col.ink2), valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+  });
+}
+
+const MAP_FILL = { good: { bg: "2E9E6A", ink: "FFFFFF" }, mid: { bg: "E8A13B", ink: "2B1B00" }, bad: { bg: "D64545", ink: "FFFFFF" } } as const;
+
+/** The tile map on the left, the countries with their status and note on the right. */
+function countryMap(ps: PSlide, m: NonNullable<Slide["map"]>, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const col = c.theme.colors;
+  const tiles = mapTiles(m.region, m.areas.map((a) => a.code));
+  const grid = mapGrid(tiles);
+  const by = new Map(m.areas.map((a) => [a.code, a]));
+  const mapW = w * 0.56;
+  const gap = 0.06;
+  const cell = Math.min((mapW - gap * (grid.cols - 1)) / grid.cols, (h - gap * (grid.rows - 1)) / grid.rows);
+  const gx = x + (mapW - (cell * grid.cols + gap * (grid.cols - 1))) / 2;
+  const gy = y + (h - (cell * grid.rows + gap * (grid.rows - 1))) / 2;
+  const fillOf = (status: string | undefined) => {
+    const tone = status === undefined ? "none" : mapTone(status);
+    if (tone === "good" || tone === "mid" || tone === "bad") return MAP_FILL[tone];
+    if (tone === "info") return { bg: hex(col.brand), ink: "FFFFFF" };
+    return { bg: tint(col.line, col.surface, 0.7), ink: hex(col.muted) };
+  };
+  for (const t of tiles) {
+    const a = by.get(t.code);
+    const f = fillOf(a?.status);
+    const at = grid.at(t);
+    const tx = gx + at.col * (cell + gap), ty = gy + at.row * (cell + gap);
+    ps.addShape(c.pres.ShapeType.roundRect, { x: tx, y: ty, w: cell, h: cell, fill: { color: f.bg }, line: { color: f.bg }, rectRadius: Math.min(0.08, cell * 0.12) });
+    const lines = a?.status ? [{ text: t.code, options: { bold: true, fontSize: Math.max(6, Math.min(14, cell * 14)), breakLine: true } }, { text: plain(a.status), options: { fontSize: Math.max(5, Math.min(8, cell * 8)) } }] : [{ text: t.code, options: { bold: true, fontSize: Math.max(6, Math.min(14, cell * 14)) } }];
+    ps.addText(lines, { x: tx, y: ty, w: cell, h: cell, color: f.ink, align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody), fit: "shrink", margin: 1 });
+  }
+  const kx = x + mapW + 0.35;
+  const kw = w - mapW - 0.35;
+  let ky = y;
+  if (m.legend) {
+    const lh = Math.min(0.6, textHeightIn([plain(m.legend)], kw, 12, { bold: true }));
+    ps.addText(plain(m.legend), { x: kx, y: ky, w: kw, h: lh, fontSize: fitFont(plain(m.legend), kw, lh, 12, 7, { bold: true }), bold: true, color: hex(col.ink2), valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    ky += lh + 0.12;
+  }
+  // One size for every row, the largest at which the rows, each one text box as tall as its own text, fill the column.
+  const room = y + h - ky;
+  const sw = 0.16;
+  const tw = kw - sw - 0.08;
+  const head = (a: (typeof m.areas)[number]) => `${tileName(a.code, c.lang)}${a.status ? `: ${plain(a.status)}` : ""}`;
+  // A row's box: the name line at the size, the note under it two points smaller, one set of insets.
+  const rowH = (a: (typeof m.areas)[number], size: number) => {
+    const ns = Math.max(3, size - 2);
+    return textHeightIn([head(a)], tw, size, { bold: true }) + (a.note ? textHeightIn([plain(a.note)], tw, ns) - 0.1 : 0);
+  };
+  let size = 13;
+  while (size > 3 && m.areas.reduce((sum, a) => sum + rowH(a, size), 0) > room) size -= 0.5;
+  let ry = ky;
+  m.areas.forEach((a) => {
+    const f = fillOf(a.status);
+    const ns = Math.max(3, size - 2);
+    const hh = rowH(a, size);
+    // The swatch is as tall as the name line, never taller.
+    const sq = Math.min(sw, (size * 0.9) / 72);
+    ps.addShape(c.pres.ShapeType.roundRect, { x: kx + (sw - sq), y: ry + 0.05 + ((size * 1.2) / 72 - sq) / 2, w: sq, h: sq, fill: { color: f.bg }, line: { color: f.bg }, rectRadius: 0.03 });
+    const parts = [
+      { text: head(a), options: { bold: true, color: hex(col.ink), fontSize: size, breakLine: !!a.note } },
+      ...(a.note ? [{ text: plain(a.note), options: { color: hex(col.muted), fontSize: ns } }] : []),
+    ];
+    ps.addText(parts, { x: kx + sw + 0.08, y: ry, w: tw, h: hh, valign: "top", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    ry += hh;
+  });
+}
+
+/** Side panels, stacked in the right column: a brand tint, then an accent tint. */
+function asides(ps: PSlide, list: NonNullable<Slide["aside"]>, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const col = c.theme.colors;
+  const gap = 0.2;
+  const each = (h - gap * (list.length - 1)) / list.length;
+  list.forEach((a, i) => {
+    const ay = y + i * (each + gap);
+    const edge = i === 0 ? col.brand : col.accent;
+    ps.addShape(c.pres.ShapeType.roundRect, { x, y: ay, w, h: each, fill: { color: tint(edge, col.surface, 0.1) }, line: { color: tint(edge, col.surface, 0.1) }, rectRadius: Math.min(0.15, px(c.theme.radius)) });
+    ps.addShape(c.pres.ShapeType.rect, { x, y: ay, w: 0.06, h: each, fill: { color: hex(edge) }, line: { color: hex(edge) } });
+    let ty = ay + 0.15;
+    if (a.heading) {
+      const hd = plain(a.heading).toUpperCase();
+      ps.addText(hd, { x: x + 0.22, y: ty, w: w - 0.35, h: 0.32, fontSize: fitFont(hd, w - 0.35, 0.32, 11, 7, { bold: true, maxLines: 1 }), bold: true, charSpacing: 2, color: hex(col.brandDeep), fontFace: fontOk(c.theme.fontBody), valign: "top" });
+      ty += 0.38;
+    }
+    if (a.items.length) bullets(ps, a.items, x + 0.2, ty, w - 0.35, ay + each - ty - 0.1, c, 12);
+  });
+}
+
 function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
   const t = c.theme;
   const col = t.colors;
   const ps = c.pres.addSlide();
-  const contentX = px(120), contentW = W - px(240);
-  const bodyBottom = H - px(140);
+  const contentX = px(120);
+  let contentW = W - px(240);
+  let bodyBottom = H - px(140);
   switch (s.layout) {
     case "title":
     case "closing": {
-      ps.background = { color: hex(col.bg) };
-      ps.addShape(c.pres.ShapeType.ellipse, { x: W - 3.2, y: -2.2, w: 5, h: 5, fill: { color: hex(col.brand), transparency: 82 }, line: { color: hex(col.brand), transparency: 100 } });
-      ps.addText(plain(s.title), { x: px(160), y: 1.9, w: W - px(320), h: 2.2, fontSize: fitFont(plain(s.title), W - px(320), 2.2, 44, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: hex(col.ink), fontFace: fontOk(t.fontDisplay), valign: "bottom", fit: "shrink" });
-      ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.25, w: 0.85, h: 0.06, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
+      const dark = !!t.darkTitle;
+      const ink = dark ? "FFFFFF" : hex(col.ink);
+      ps.background = { color: dark ? hex(col.brandDeep) : hex(col.bg) };
+      ps.addShape(c.pres.ShapeType.ellipse, { x: W - 3.2, y: -2.2, w: 5, h: 5, fill: { color: hex(col.brand), transparency: dark ? 70 : 82 }, line: { color: hex(col.brand), transparency: 100 } });
+      // A hero row of figures moves the title up to make room.
+      const hero = s.layout === "title" ? (s.kpi ?? []).slice(0, 4) : [];
+      const up = hero.length ? 0.85 : 0;
+      const tt = titleText(s, t);
+      ps.addText(tt, { x: px(160), y: 1.9 - up, w: W - px(320), h: 2.2, fontSize: fitFont(tt, W - px(320), 2.2, 44, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: ink, fontFace: fontOk(t.fontDisplay), valign: "bottom", fit: "shrink" });
+      ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.25 - up, w: 0.85, h: 0.06, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
       const sub = [s.subtitle, s.body].filter(Boolean).map((x) => plain(x!)).join("\n");
-      if (sub) ps.addText(sub, { x: px(160), y: 4.45, w: W - px(320), h: 1.4, fontSize: fitFont(sub, W - px(320), 1.4, 18, 8), color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
-      chrome(ps, s, i, c);
+      const subH = hero.length ? 1.0 : 1.4;
+      if (sub) ps.addText(sub, { x: px(160), y: 4.45 - up, w: W - px(320), h: subH, fontSize: fitFont(sub, W - px(320), subH, 18, 8), color: dark ? "E6ECF3" : hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
+      if (hero.length) {
+        const hw = (W - px(320) - 0.3 * (hero.length - 1)) / hero.length;
+        hero.forEach((k, j) => {
+          const hx = px(160) + j * (hw + 0.3);
+          ps.addShape(c.pres.ShapeType.roundRect, { x: hx, y: 4.75, w: hw, h: 1.25, fill: { color: dark ? "FFFFFF" : hex(col.surface), transparency: dark ? 90 : 0 }, line: { color: dark ? "FFFFFF" : hex(col.line), transparency: dark ? 75 : 0, width: 1 }, rectRadius: Math.min(0.15, px(t.radius)) });
+          ps.addText(plain(k.value), { x: hx + 0.15, y: 4.82, w: hw - 0.3, h: 0.6, fontSize: fitFont(plain(k.value), hw - 0.3, 0.6, 28, 10, { bold: true, maxLines: 1 }), bold: true, color: dark ? "FFFFFF" : hex(col.brandDeep), fontFace: fontOk(t.fontDisplay), valign: "middle" });
+          ps.addText(plain(k.label), { x: hx + 0.15, y: 5.42, w: hw - 0.3, h: 0.5, fontSize: fitFont(plain(k.label), hw - 0.3, 0.5, 11, 6), color: dark ? "E6ECF3" : hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
+        });
+      }
+      chrome(ps, s, i, c, dark);
       return;
     }
     case "section": {
       ps.background = { color: hex(col.brandDeep) };
       ps.addText((c.lang === "ms" ? "BAHAGIAN" : "SECTION"), { x: px(160), y: 2.3, w: 6, h: 0.4, fontSize: 12, bold: true, charSpacing: 3, color: "FFFFFF", transparency: 25, fontFace: fontOk(t.fontBody) });
-      ps.addText(plain(s.title), { x: px(160), y: 2.7, w: W - px(320), h: 1.6, fontSize: fitFont(plain(s.title), W - px(320), 1.6, 40, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: "FFFFFF", fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
+      ps.addText(titleText(s, t), { x: px(160), y: 2.7, w: W - px(320), h: 1.6, fontSize: fitFont(titleText(s, t), W - px(320), 1.6, 40, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: "FFFFFF", fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
       ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.4, w: 0.85, h: 0.06, fill: { color: "FFFFFF" }, line: { color: "FFFFFF" } });
       if (s.subtitle) fitText(ps, s.subtitle, { x: px(160), y: 4.6, w: W - px(320), h: 1 }, 16, { color: "FFFFFF", fontFace: fontOk(t.fontBody), valign: "top" }, 8);
       chrome(ps, s, i, c, true);
@@ -332,6 +689,18 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
   ps.background = { color: hex(col.bg) };
   if (t.slideStyle === "panel") panel(ps, px(96), px(72), W - px(192), H - px(176), c);
   const y0 = title(ps, s, c);
+  // A callout banner takes the foot of the body, side panels the right of it; the content fits in what is left.
+  if (s.callout) {
+    const txt = plain(s.callout);
+    const ch = Math.min(0.9, Math.max(0.5, textHeightIn([txt], W - px(240) - 0.6, 14, { bold: true }) + 0.2));
+    ps.addText(txt, { x: contentX, y: bodyBottom - ch, w: W - px(240), h: ch, fontSize: fitFont(txt, W - px(240) - 0.6, ch - 0.1, 14, 8, { bold: true }), bold: true, color: "FFFFFF", fill: { color: hex(col.brandDeep) }, line: { color: hex(col.brandDeep) }, valign: "middle", margin: [4, 18, 4, 18], fontFace: fontOk(t.fontBody), shape: c.pres.ShapeType.roundRect, rectRadius: Math.min(0.15, px(t.radius)), fit: "shrink" });
+    bodyBottom -= ch + 0.15;
+  }
+  if (s.aside?.length && !["two-column", "quote"].includes(s.layout)) {
+    const aw = 3.5;
+    asides(ps, s.aside, contentX + contentW - aw, y0, aw, bodyBottom - y0, c);
+    contentW -= aw + 0.3;
+  }
   const availH = bodyBottom - y0;
   switch (s.layout) {
     case "bullets": {
@@ -404,6 +773,11 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     }
     case "kpi": {
       const items = s.kpi ?? [];
+      if ((s.kpiStyle ?? t.kpiStyle) === "rings") {
+        rings(ps, items, contentX, y0, contentW, availH - (s.body ? 0.5 : 0), c);
+        if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
+        break;
+      }
       // Every figure is drawn: rows of up to four, as on screen.
       const perRow = Math.min(Math.max(items.length, 1), 4);
       const rowsN = Math.max(1, Math.ceil(items.length / 4));
@@ -426,6 +800,21 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
       if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
       break;
     }
+    case "facts": {
+      if (s.facts?.length) facts(ps, s.facts, contentX, y0, contentW, availH - (s.body ? 0.5 : 0), c);
+      if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
+      break;
+    }
+    case "gallery": {
+      if (s.gallery?.length) gallery(ps, s.gallery, contentX, y0, contentW, availH - (s.body ? 0.5 : 0), c);
+      if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
+      break;
+    }
+    case "map": {
+      if (s.map) countryMap(ps, s.map, contentX, y0, contentW, availH - (s.map.source ? 0.4 : 0), c);
+      if (s.map?.source) fitText(ps, s.map.source, { x: contentX, y: bodyBottom - 0.35, w: contentW, h: 0.3 }, 10, { color: hex(col.muted), fontFace: fontOk(t.fontBody), valign: "top" });
+      break;
+    }
     case "cards": {
       cards(ps, s.cards ?? [], contentX, y0, contentW, availH - (s.body ? 0.5 : 0), c);
       if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
@@ -445,7 +834,7 @@ export async function deckToPptx(rawDeck: Deck, userId: string): Promise<Buffer>
   // A picture given by address is fetched here, under rules, never handed to pptxgenjs to fetch:
   // it would read a local path from disk and crash the process on an unreachable host.
   const urls = new Map<string, string>();
-  const wanted = [...new Set(deck.slides.map((x) => (x.layout === "image" && !x.image?.mediaId ? x.image?.url : undefined)).filter((u): u is string => !!u))].slice(0, 20);
+  const wanted = [...new Set(deck.slides.flatMap((x) => [x.layout === "image" && !x.image?.mediaId ? x.image?.url : undefined, ...(x.layout === "gallery" ? (x.gallery ?? []).map((g) => (g.mediaId ? undefined : g.url)) : [])]).filter((u): u is string => !!u))].slice(0, 20);
   await Promise.all(wanted.map(async (u) => {
     const d = await fetchPicture(u);
     if (d) urls.set(u, d);

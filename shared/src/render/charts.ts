@@ -4,8 +4,16 @@ import { esc } from "./escape.js";
 // SVG charts drawn from the spec. Deterministic, no library, same picture in the
 // editor and in the HTML export. PPTX gets native charts from the same spec.
 
-export function seriesPalette(c: ThemeColors): string[] {
-  return [c.brand, c.accent, c.gold, c.brandDeep, c.ink2, c.muted];
+export function seriesPalette(c: ThemeColors, extra?: string[]): string[] {
+  const base = [c.brand, c.accent, c.gold, c.brandDeep, c.ink2, c.muted];
+  return extra?.length ? [...extra, ...base.filter((x) => !extra.includes(x))] : base;
+}
+
+/** The colour of each bar in a one-series chart: the highlighted category in the brand, the rest quiet. */
+export function barColours(chart: ChartSpec, c: ThemeColors, pal: string[]): string[] | null {
+  if (!chart.highlight || chart.series.length !== 1) return null;
+  const quiet = "#A7B0BC";
+  return chart.categories.map((x) => (x === chart.highlight ? pal[0] ?? c.brand : quiet));
 }
 
 function niceMax(v: number): number {
@@ -22,8 +30,8 @@ function fmt(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-export function chartSvg(chart: ChartSpec, colors: ThemeColors, W = 1400, H = 640, fontName = "Inter"): string {
-  const pal = seriesPalette(colors);
+export function chartSvg(chart: ChartSpec, colors: ThemeColors, W = 1400, H = 640, fontName = "Inter", series?: string[]): string {
+  const pal = seriesPalette(colors, series);
   const font = `${fontName}, system-ui, sans-serif`;
   const kind = chart.kind;
   if (kind === "pie" || kind === "doughnut") return pieSvg(chart, colors, pal, W, H, font);
@@ -69,6 +77,7 @@ function columnLineSvg(chart: ChartSpec, colors: ThemeColors, pal: string[], W: 
     g += `<text x="${x}" y="${H - padB + 40}" text-anchor="middle" font-family="${font}" font-size="28" fill="${colors.ink2}">${esc(truncate(c, 16))}</text>`;
   });
   const sCount = chart.series.length;
+  const bars = barColours(chart, colors, pal);
   if (chart.kind === "column") {
     const groupW = slot * 0.7;
     const bw = groupW / sCount;
@@ -77,7 +86,7 @@ function columnLineSvg(chart: ChartSpec, colors: ThemeColors, pal: string[], W: 
         const x = padL + slot * i + (slot - groupW) / 2 + bw * si;
         const y0 = yOf(0), y1 = yOf(v);
         const top = Math.min(y0, y1), h = Math.abs(y0 - y1);
-        g += `<rect x="${x + 2}" y="${top}" width="${bw - 4}" height="${h}" rx="6" fill="${pal[si % pal.length]}"/>`;
+        g += `<rect x="${x + 2}" y="${top}" width="${bw - 4}" height="${h}" rx="6" fill="${bars ? bars[i] : pal[si % pal.length]}"/>`;
         if (sCount === 1) g += `<text x="${x + bw / 2}" y="${top - 10}" text-anchor="middle" font-family="${font}" font-size="28" fill="${colors.ink}">${fmt(v)}</text>`;
       });
     });
@@ -110,16 +119,18 @@ function barSvgHorizontal(chart: ChartSpec, colors: ThemeColors, pal: string[], 
   const sCount = chart.series.length;
   const groupH = slot * 0.7;
   const bh = groupH / sCount;
+  const bars = barColours(chart, colors, pal);
   let g = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" role="img">`;
   chart.categories.forEach((c, i) => {
     const y = padT + slot * i + slot / 2;
-    g += `<text x="${padL - 20}" y="${y + 8}" text-anchor="end" font-family="${font}" font-size="30" fill="${colors.ink2}">${esc(truncate(c, 26))}</text>`;
+    const hl = chart.highlight === c;
+    g += `<text x="${padL - 20}" y="${y + 8}" text-anchor="end" font-family="${font}" font-size="30"${hl ? ` font-weight="700"` : ""} fill="${hl ? colors.ink : colors.ink2}">${esc(truncate(c, 26))}</text>`;
   });
   chart.series.forEach((s, si) => {
     s.values.forEach((v, i) => {
       const y = padT + slot * i + (slot - groupH) / 2 + bh * si;
       const w = (Math.max(v, 0) / max) * iw;
-      g += `<rect x="${padL}" y="${y + 2}" width="${w}" height="${bh - 4}" rx="6" fill="${pal[si % pal.length]}"/>`;
+      g += `<rect x="${padL}" y="${y + 2}" width="${w}" height="${bh - 4}" rx="6" fill="${bars ? bars[i] : pal[si % pal.length]}"/>`;
       g += `<text x="${padL + w + 14}" y="${y + bh / 2 + 8}" font-family="${font}" font-size="28" fill="${colors.ink}">${fmt(v)}${chart.unit && sCount === 1 ? " " + esc(chart.unit) : ""}</text>`;
     });
   });

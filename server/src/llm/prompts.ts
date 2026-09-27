@@ -15,6 +15,8 @@ export interface GenerateParams {
   designNotes?: string;
   /** The AI chose the angle, audience, length and features itself. */
   auto?: boolean;
+  /** Visual devices the person unticked: Auto never turns these back on. */
+  off?: string[];
 }
 
 function houseLines(house: GenerateParams["house"], designNotes: string | undefined): string[] {
@@ -25,7 +27,7 @@ function houseLines(house: GenerateParams["house"], designNotes: string | undefi
     out.push("");
   }
   if (designNotes?.trim()) {
-    out.push(`DESIGN REFERENCE (the user chose this design; match its density and visual habits): ${designNotes.trim()}`);
+    out.push(`DESIGN REFERENCE (the user chose this design; follow its devices and habits on every slide the sources allow, and match its density): ${designNotes.trim()}`);
     out.push("");
   }
   return out;
@@ -46,7 +48,10 @@ export function systemPrompt(p: GenerateParams): string {
   if (f.tables) allowed.push("table");
   if (f.diagrams) allowed.push("diagram");
   if (f.kpis) allowed.push("kpi");
+  if (f.facts) allowed.push("facts");
+  if (f.maps) allowed.push("map");
   if (f.images && p.imageMode !== "none") allowed.push("image");
+  if (f.gallery && f.images && p.imageMode !== "none") allowed.push("gallery");
 
   const lines: string[] = [];
   lines.push("You write slide decks for a regulatory and scientific professional. The reader is expert. Every slide must earn its place with a fact, a number, a decision or a step.");
@@ -76,14 +81,14 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("- `kicker` on every content slide: a short uppercase label of 1 to 4 words naming the part of the argument, e.g. AT A GLANCE, THE EVIDENCE, COSTING, YEAR 1, NEXT STEPS. Null on title, section and closing slides.");
   lines.push("- Titles are action titles: the conclusion of the slide in under 12 words, carrying its number where there is one ('3 of 5 claims need a clinical study', not 'Claims review').");
   lines.push("- `subtitle` on a content slide is the reading line: one sentence under 20 words that tells the reader how to read the slide or what it means for them.");
-  lines.push("- One visual device per slide, chosen by what the content is: figures to kpi or chart; a process, pathway or plan to diagram; a comparison to table or two-column; a set of points, answers, decisions, risks or next steps to cards. Use plain bullets only when nothing else fits, and never on two slides in a row.");
+  lines.push("- One visual device per slide, chosen by what the content is: figures to kpi or chart; a process, pathway or plan to diagram; a comparison to table or two-column; a set of points, answers, decisions, risks or next steps to cards; a profile of one study or product to facts; how countries differ to map. Use plain bullets only when nothing else fits, and never on two slides in a row.");
   lines.push("- Slide 2 answers first: an at-a-glance slide (kpi or cards) with the conclusion and the 3 or 4 numbers or decisions that carry it, before any background.");
   lines.push("- Put a verdict where there is a judgement: tag cards and table cells with YES / PARTLY / NO, HIGH / MEDIUM / LOW, PASS / FAIL or MET / NOT MET so the reader sees the answer before the reasoning.");
   lines.push("- Every chart and table names its source.");
   lines.push("- If the evidence is thin, contested or from a single study, add one slide of caveats that says so plainly.");
   lines.push("- End on substance: a cards slide of the decisions or next steps (who, what, by when where the sources give it), then a references slide if there are citations, then the closing slide.");
-  const visuals = allowed.filter((l) => ["chart", "diagram", "kpi", "image", "table"].includes(l));
-  lines.push(`- BALANCE TEXT WITH VISUALS: a slide is looked at, not read. At least half of the content slides are visual (${visuals.join(", ") || "cards"}), and never more than two text-led slides (bullets, two-column, cards, quote) in a row. A process, pathway, mechanism or plan is a diagram (flow is a process map, timeline is dates, matrix is a comparison map), never bullets; figures in a series are a chart; headline numbers are kpi.`);
+  const visuals = allowed.filter((l) => ["chart", "diagram", "kpi", "image", "table", "facts", "map", "gallery"].includes(l));
+  lines.push(`- BALANCE TEXT WITH VISUALS: a slide is looked at, not read. At least half of the content slides are visual (${visuals.join(", ") || "cards"}), and never more than two text-led slides (bullets, two-column, cards, quote) in a row. A process, pathway, mechanism or plan is a diagram (flow is a process map, timeline is dates, matrix is a comparison map, hub is a mechanism map, funnel is a drop-off, equation is terms adding up to a result), never bullets; figures in a series are a chart; headline numbers are kpi.`);
   if (allowed.includes("image")) lines.push(p.imageMode === "uploaded" ? "- Put the uploaded pictures to work: every picture that fits the story gets an image slide, with at most 3 short points beside it." : "- Use image slides where a photograph or illustration carries the point better than words (at most 3).");
   lines.push("- Keep the slide face short: at most 60 words per content slide across title, reading line, body and items (at most 80 for experts, clinicians, regulators or management). A card detail is one sentence under 20 words. Everything else goes in the notes, which carry the full argument.");
   lines.push("");
@@ -97,7 +102,16 @@ export function systemPrompt(p: GenerateParams): string {
   if (f.charts) lines.push("- chart: ONLY when the sources carry the numbers. categories and series values must come from the sources; unit and source filled. Use column for categories, line/area for time, bar for ranked items, pie/doughnut for shares that sum to a whole. bullets may hold 2 or 3 readings of the chart.");
   if (f.tables) lines.push("- table: header plus 2 to 8 rows, at most 5 columns, cells under 12 words. Fill source.");
   if (f.diagrams) lines.push("- diagram: flow (3 to 7 steps with a short detail each) for a process or pathway; timeline (3 to 7 events with when + label) for dates; matrix (rows x cols, cells short, 'yes'/'no' where binary) for a comparison. Fill only the arrays the kind uses; leave the others empty.");
-  if (f.kpis) lines.push("- kpi: 3 or 4 items, value is the figure as a short string with its unit, label what it is, note the source or period.");
+  if (f.kpis) lines.push("- kpi: 3 or 4 items, value is the figure as a short string with its unit, label what it is, note the source or period." + (f.gauges ? " kpiStyle 'rings' draws each percentage as a ring gauge: use it when every value is a percentage; else 'tiles' or null (the design decides)." : " kpiStyle: null."));
+  if (f.kpis) lines.push("- On the title slide, kpi may hold 3 or 4 hero figures from the sources, drawn as a row under the subtitle. Leave it empty when the sources give no headline numbers.");
+  if (f.diagrams) lines.push("- diagram, three more kinds: hub is a mechanism map (center: the product, ingredient or claim in 1 to 4 words; nodes: 4 to 8 benefits or effects, label 2 to 5 words, detail one short line; pills: 0 to 4 short metrics like '+45% hydration'); funnel is a drop-off of big numbers (stages: 3 to 6, value the figure, label what it counts, e.g. 400 visited, 120 engaged, 36 leads, 30 sales); equation adds terms into a result (terms: 2 to 4, each value plus label, e.g. 3 actives + 28 days + 120 users; result: the value and label they add up to). Fill only the arrays the kind uses.");
+  if (f.facts) lines.push("- facts: a fact sheet of 4 to 8 rows, label in 1 to 3 words (TITLE, SUBJECTS, STUDY DESIGN, METHOD, RESULT, RATING, REFERENCE), value one line from the sources; set highlight true on the one row that matters most. Use one facts slide per study, product or regulation profiled.");
+  if (f.maps) lines.push("- map: ONLY when the sources say how several countries treat the same thing. region asean, asia or world (the smallest that holds the countries); areas one per country with code (MY, SG, ID, TH, VN, PH, BN, KH, LA, MM, TL, CN, HK, TW, JP, KR, IN, AU, NZ, EU, UK, US, CA, MX, BR, TR, GCC, ZA), status 1 to 3 words (ALLOWED, RESTRICTED 2%, BANNED, YES, NO, PENDING), note one short line with the instrument; legend says what is mapped; source filled.");
+  if (allowed.includes("gallery")) lines.push(p.imageMode === "uploaded" ? "- gallery: 2 to 6 uploaded pictures on one slide (before and after, product range, audit evidence), each item with sourceName set to its file name and a caption of a few words." : "- gallery: at most one per deck, 2 to 4 items, each prompt a photograph to generate and a caption.");
+  if (f.badges) lines.push("- badge: on a slide that judges something, the verdict in 1 to 3 words (DIRECT, PARTIAL, NO CLAIM, Q1, HIGH RISK, MET). Null elsewhere.");
+  if (f.callouts) lines.push("- callout: on at most a third of the content slides, the one sentence the reader must keep, under 20 words. Null elsewhere.");
+  if (f.asides) lines.push("- aside: beside a chart, table, map, figure or fact sheet, up to 2 side panels: heading 'Reading' (what the visual shows) and 'Watch-outs' (limits, caveats), each 2 to 4 items under 12 words. Empty elsewhere.");
+  if (f.charts) lines.push("- chart.highlight: when one category is ours (our product, Malaysia, the proposed option) set it to that category's exact name, so it is drawn in the brand colour against grey comparators. Null otherwise.");
   if (allowed.includes("image")) {
     if (p.imageMode === "uploaded") lines.push("- image: use for an uploaded picture. Set image.sourceName to the file name from the source list that fits, caption what it shows. bullets may hold 2 or 3 points beside it.");
     else lines.push("- image: at most 3 slides in the deck. image.prompt describes a photograph or clean illustration to generate (no text in the picture, no logos, no people's faces), caption what it shows.");
@@ -106,6 +120,16 @@ export function systemPrompt(p: GenerateParams): string {
   else lines.push("- notes: leave null.");
   if (f.summary) lines.push("- Include one bullets slide titled with the decision or takeaways, immediately before the closing slide.");
   if (f.qa) lines.push("- The closing slide invites questions; its notes list three questions the audience is likely to ask, each with a one-line answer.");
+  const chosen = ([
+    ["charts", "chart", "a chart"],
+    ["tables", "table", "a table"],
+    ["diagrams", "diagram", "a diagram"],
+    ["maps", "map", "a country map"],
+    ["kpis", "kpi", "big-number tiles"],
+    ["facts", "facts", "a fact sheet"],
+    ["gallery", "gallery", "a picture gallery"],
+  ] as const).filter(([k, layout]) => f[k] && allowed.includes(layout)).map(([, , name]) => name);
+  if (chosen.length) lines.push(`- The user ticked these devices: ${chosen.join(", ")}. Use each at least once where the sources can fill it honestly; never force one onto material that does not carry it.`);
   lines.push("");
   lines.push(...houseLines(p.house, p.designNotes));
   lines.push(`LENGTH: exactly ${p.slides} slides including the title and closing slides.`);
@@ -144,6 +168,7 @@ export function rewriteSystem(p: { lang: Lang; angle: string; house?: GeneratePa
   return [
     ...houseLines(p.house, p.designNotes).filter(Boolean),
     "You revise one slide of a deck. Keep the slide's layout unless the instruction asks for a change. Keep every fact and citation unless the instruction changes it. Keep the schema shape.",
+    "Layouts you may switch to when asked: bullets, two-column, cards, chart (chart.highlight marks our category), table, diagram (flow, timeline, matrix, hub = mechanism map with center, nodes and pills, funnel = stages of value and label, equation = terms adding to a result), kpi (kpiStyle 'rings' for ring gauges), facts (label and value rows, highlight the key row), map (region asean, asia or world; areas with a country code and a status), gallery, image, quote. Extras on any content slide: badge (a verdict pill), callout (one dark banner sentence), aside (up to 2 side panels, e.g. Reading and Watch-outs).",
     `ANGLE: ${angle.name}. ${angle.brief}`,
     `LANGUAGE: ${LANG_RULES[p.lang]}`,
     "STYLE: no dashes, no emoji, no exclamation marks, no rhetorical questions as titles. Titles state the point. Bullets under 14 words, at most 6. Banned: " + slopBanList(p.lang).join("; ") + ".",

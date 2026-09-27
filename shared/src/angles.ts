@@ -17,8 +17,15 @@ export interface Features {
   charts: boolean;
   tables: boolean;
   diagrams: boolean;
+  maps: boolean;
   kpis: boolean;
+  gauges: boolean;
+  facts: boolean;
   images: boolean;
+  gallery: boolean;
+  callouts: boolean;
+  asides: boolean;
+  badges: boolean;
   notes: boolean;
   citations: boolean;
   sections: boolean;
@@ -30,8 +37,15 @@ export const DEFAULT_FEATURES: Features = {
   charts: true,
   tables: true,
   diagrams: true,
+  maps: true,
   kpis: false,
+  gauges: true,
+  facts: true,
   images: false,
+  gallery: true,
+  callouts: true,
+  asides: true,
+  badges: true,
   notes: true,
   citations: true,
   sections: true,
@@ -42,15 +56,25 @@ export const DEFAULT_FEATURES: Features = {
 export const FEATURE_LABELS: Record<keyof Features, { label: string; help: string }> = {
   charts: { label: "Charts", help: "Column, bar, line, area, pie or doughnut, drawn from numbers in the sources. Native charts in PPTX." },
   tables: { label: "Tables", help: "Comparison and requirement tables." },
-  diagrams: { label: "Diagrams", help: "Process flows, timelines and matrices as vector shapes." },
-  kpis: { label: "KPI tiles", help: "Three to four headline figures on one slide." },
+  diagrams: { label: "Diagrams", help: "Process flows, timelines, matrices, mechanism maps, funnels and equations as vector shapes." },
+  maps: { label: "Country maps", help: "ASEAN, Asia Pacific or world map, each country coloured by its status (allowed, restricted, banned)." },
+  kpis: { label: "KPI tiles", help: "Three to four headline figures on one slide, and a hero row on the title slide." },
+  gauges: { label: "Ring gauges", help: "Percentages drawn as ring gauges instead of plain tiles." },
+  facts: { label: "Fact sheets", help: "Label and value rows, like a study card: design, subjects, method, result, rating." },
   images: { label: "Figures and images", help: "Place uploaded pictures, or generate one per marked slide with the image model." },
+  gallery: { label: "Picture galleries", help: "Two to six pictures on one slide, each with a caption. Needs figures and images on." },
+  callouts: { label: "Callout banners", help: "A dark banner under the content with the one line the reader must keep." },
+  asides: { label: "Side panels", help: "Reading and Watch-outs panels beside a chart, table or figure." },
+  badges: { label: "Verdict badges", help: "A pill beside the title with the slide's verdict: DIRECT, PARTIAL, NO, Q1." },
   notes: { label: "Speaker notes", help: "What to say on each slide. Exported into PPTX notes." },
   citations: { label: "Citations", help: "Instrument, clause, paper or dataset under each slide that states a fact." },
   sections: { label: "Section dividers", help: "A divider slide before each part of the deck." },
   summary: { label: "Summary slide", help: "One slide that restates the decisions or takeaways." },
   qa: { label: "Q&A slide", help: "A closing prompt for questions with three likely ones in the notes." },
 };
+
+/** The devices that put something other than text on a slide, in the order the choices show them. */
+export const VISUAL_FEATURES: (keyof Features)[] = ["charts", "tables", "diagrams", "maps", "kpis", "gauges", "facts", "images", "gallery", "callouts", "asides", "badges"];
 
 export const ANGLES: Angle[] = [
   {
