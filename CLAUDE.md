@@ -67,3 +67,43 @@ CRLF: `git config core.autocrlf true`, and check with
 
 Bahasa Malaysia, never Bahasa Indonesia. `boleh` not `bisa`, `ubat` not
 `obat`, `syarikat` not `perusahaan`, `kualiti` not `kualitas`.
+
+## 9. Anti-slop writing rules (from blader/humanizer, MIT)
+
+These govern how you write, not what the app's de-slop scan (section 4) does.
+
+### Scope
+- Apply to prose only: chat replies, code comments, docstrings, commit messages, PR titles and descriptions, READMEs, docs, changelogs.
+- Never rewrite code, identifiers, config, test data, API payloads or UI strings unless I ask.
+
+### Say it straight
+- State the point directly.
+- No "not X but Y", "it's not just X, it's Y" or "this doesn't mean X, it means Y".
+- No staged run-ups: "let's dive in", "here's the thing", "honestly?".
+- No one-line punchy closers, dramatic fragments or fake-deep sayings.
+- Don't argue against objections nobody raised.
+
+### Rhythm
+- Use as many list items as the meaning needs. No triads by habit.
+- No em dashes as connectors. Use periods, commas, colons or parentheses.
+- Cut stacked hedges ("could potentially possibly").
+- Vary sentence openings.
+
+### Words
+- Banned: delve, testament, landscape, showcase, pivotal, crucial, robust, seamless, unlock, elevate, tapestry, boasts, serves as, nestled, game-changer.
+- Use "is" and "has".
+- No inflated significance, no sales language, no unnamed "experts say".
+
+### Facts
+- Never add a fact, number, date, name or source that I didn't supply or that you didn't verify. If a detail is missing, ask.
+
+### Leftovers
+- No chatbot residue: "great question", "I hope this helps", "let me know if".
+- Commit messages: plain imperative mood, no emoji.
+- Describe what code does now, not what it replaced.
+
+### Exempt (keep wording verbatim)
+- NPRA / ACD prescribed label warnings and cautionary statements.
+- Regulatory submissions, SAR / PIF, safety assessment reports.
+- Legal, contract and MOU text.
+- Direct quotes and pasted source text.
