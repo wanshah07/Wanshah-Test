@@ -36,7 +36,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return { baseUrl: r.baseUrl, model: r.model, key: maskKey(r.key), complete: r.complete };
       })(),
       appTheme: s.app_theme || "system",
-      defaultTheme: s.default_theme || "facerinna",
+      defaultTheme: s.default_theme || "house",
     };
   });
 

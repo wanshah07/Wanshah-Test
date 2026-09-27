@@ -87,6 +87,26 @@ try {
   await fileInput.setInputFiles(path.join(tmp, "notes.md"));
   await page.waitForSelector(".src", { timeout: 10000 });
   check("source uploaded from the wizard", (await page.locator(".src").count()) === 1);
+  check("the wizard says what was read from it", (await page.locator("[data-testid=source-summary]").textContent())?.includes("All 1 source read") && (await page.locator(".src .note").first().textContent())?.startsWith("Read "));
+  // A sheet with nothing in it, and a file that cannot be read at all: Continue waits until both are dealt with.
+  fs.writeFileSync(path.join(tmp, "empty.csv"), ",,\n,,\n");
+  fs.writeFileSync(path.join(tmp, "blob.bin"), Buffer.from([0, 1, 2, 3, 250, 251, 0, 7]));
+  await fileInput.setInputFiles([path.join(tmp, "empty.csv"), path.join(tmp, "blob.bin")]);
+  await page.locator("[data-testid=not-read]").waitFor({ timeout: 10000 }).catch(() => {});
+  check("an unreadable file is named on screen with the reason", (await page.locator("[data-testid=not-read]").textContent())?.includes("blob.bin"));
+  check("a sheet with no data is marked as not readable", (await page.locator(".src[data-level=fail]", { hasText: "empty.csv" }).count()) === 1);
+  check("Continue waits while a source cannot be read", await page.locator("button:has-text('Continue')").isDisabled());
+  await page.click("[data-testid=not-read] button");
+  check("Continue still waits for the empty sheet", await page.locator("button:has-text('Continue')").isDisabled());
+  await page.locator(".src", { hasText: "empty.csv" }).locator("button:has-text('Remove')").click();
+  await page.waitForFunction(() => document.querySelectorAll(".src").length === 1, null, { timeout: 5000 }).catch(() => {});
+  check("Continue opens once every source is read", await page.locator("button:has-text('Continue')").isEnabled());
+  // A Google link that is not a Google link is refused with the reason, before anything is saved.
+  await page.fill("[data-testid=link-source] input", "https://example.com/data.xlsx");
+  await page.click("[data-testid=link-source] button:has-text('Read link')");
+  await page.locator("[data-testid=not-read]").waitFor({ timeout: 10000 }).catch(() => {});
+  check("a link that is not Google's is refused with the reason", (await page.locator("[data-testid=not-read]").textContent())?.includes("not a Google Drive, Docs, Sheets or Slides link") && (await page.locator("button:has-text('Continue')").isDisabled()));
+  await page.click("[data-testid=not-read] button");
   await page.click("text=Continue");
   await page.click("text=Training / workshop");
   await page.click("text=Continue");

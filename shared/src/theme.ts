@@ -213,6 +213,33 @@ export const THEME_PRESETS: Theme[] = [
     },
     slideStyle: "clean",
   },
+  {
+    // The house design system: dark cover and close around light content slides, teal for numbers and
+    // arrows, amber eyebrows, a teal pull-quote band, 22 px cards on a soft white-to-tint wash.
+    id: "house",
+    name: "Teal Explainer",
+    fontDisplay: "Arial",
+    fontBody: "Calibri",
+    fontQuote: "Cambria",
+    radius: 22,
+    slideNumbers: true,
+    colors: {
+      bg: "#FFFFFF",
+      surface: "#FFFFFF",
+      ink: "#0B1B3A",
+      ink2: "#44546A",
+      muted: "#6B7A8F",
+      line: "#DCE8EC",
+      brand: "#0D9488",
+      brandDeep: "#16305E",
+      accent: "#D97706",
+      gold: "#C2410C",
+    },
+    series: ["#0D9488", "#D97706", "#16305E", "#14B8A6", "#C2410C"],
+    slideStyle: "bloom",
+    darkTitle: true,
+    kpiStyle: "tiles",
+  },
 ];
 
 /**
@@ -221,6 +248,8 @@ export const THEME_PRESETS: Theme[] = [
  * ring gauges) is applied by the renderer, so those never depend on the writer.
  */
 export const THEME_GUIDES: Record<string, string> = {
+  house:
+    "The house design system: dark cover and closing slides around light content slides. Every content slide carries an amber UPPERCASE eyebrow (kicker) and a one-line statement title. Vary the layout slide to slide: icon rows of 3 to 5 cards, flows, timelines, equations, before and after as two columns, number tiles, fact sheets, tables with side panels. Most content slides end on the plain-language callout the audience will repeat. The closing slide is a 2-line statement, an italic message as its subtitle, and 4 short takeaways as its bullets.",
   "clinical-evidence":
     "Evidence deck for healthcare professionals. Calm and dense. Horizontal bar charts that show our product in the brand colour against grey comparators (set chart.highlight to our product's category). A verdict badge beside the title wherever the slide judges (DIRECT, PARTIAL, NO CLAIM). Reading and Watch-outs side panels beside charts and tables. Evidence tables with verdict cells. One fact sheet per study: design, subjects, method, result (highlighted), rating, reference. A dark callout banner for the one line the reader must keep.",
   "booth-bright":
@@ -299,6 +328,25 @@ export const WEB_EQUIVALENT: Record<string, string> = {
   "Palatino Linotype": "Lora",
 };
 
+/** A light, saturated version of a colour, for the second line of a title on a dark slide. */
+export function glowOf(hex: string): string {
+  // The house teal's glow is the one the design system names.
+  if (/^#?0D9488$/i.test(hex.trim())) return "#5EEAD4";
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "#5EEAD4";
+  const n = parseInt(m[1], 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (h * 60 + 360) % 360;
+  // The glow keeps the hue, as bright as a pale neon.
+  const s = 0.78, l = 0.64;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), o = l - c / 2;
+  const [rr, gg, bb] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return "#" + [rr, gg, bb].map((v) => Math.round((v + o) * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
 /** Every font name Slidecraft recognises, for matching a name read out of a file. */
 export function knownFonts(): string[] {
   return Array.from(new Set([...Object.keys(GOOGLE), ...Object.keys(WEB_EQUIVALENT), ...FONT_CHOICES]));
@@ -317,7 +365,7 @@ export function fontStack(name: string): string {
 
 /** Google Fonts URL for a theme's two families. Returns "" when both are system fonts. */
 export function fontsUrl(theme: Theme): string {
-  const fams = Array.from(new Set([theme.fontDisplay, theme.fontBody].filter(Boolean).map(webFont)));
+  const fams = Array.from(new Set([theme.fontDisplay, theme.fontBody, theme.fontQuote].filter((x): x is string => !!x).map(webFont)));
   const parts = fams.map((f) => GOOGLE[f]).filter(Boolean);
   if (!parts.length) return "";
   return `https://fonts.googleapis.com/css2?${parts.map((p) => "family=" + p).join("&")}&display=swap`;
@@ -353,7 +401,7 @@ export const FONT_CHOICES = [
 ];
 
 const COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const STYLES = ["clean", "panel", "gradient"];
+const STYLES = ["clean", "panel", "gradient", "bloom"];
 
 /**
  * A theme safe to write into a style attribute, a class and a PPTX colour:
@@ -398,5 +446,7 @@ export function sanitizeTheme(raw: unknown): Theme {
   if (dark !== undefined) out.darkTitle = dark;
   const ks = t.kpiStyle === "tiles" || t.kpiStyle === "rings" ? t.kpiStyle : base.kpiStyle;
   if (ks) out.kpiStyle = ks;
+  const fq = typeof t.fontQuote === "string" ? font(t.fontQuote, "") : base.fontQuote;
+  if (fq) out.fontQuote = fq;
   return out;
 }

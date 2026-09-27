@@ -230,6 +230,39 @@ const RAW_CSS = `
 .sc-slide .sc-eq .term.res{background:var(--brand-deep);border-color:var(--brand-deep)}
 .sc-slide .sc-eq .term.res .v,.sc-slide .sc-eq .term.res .lb{color:#fff}
 .sc-slide .sc-eq .op{align-self:center;font-size:64px;font-weight:700;color:var(--brand);flex:none}
+/* bloom: the house style. Light slides on a white-to-tint wash with a teal bloom top right and an amber
+   one bottom left; dark cover and close with a teal glow; borderless cards with a soft wide shadow. */
+.sc-slide .sc-dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.sc-slide.sc-style-bloom{background:
+  radial-gradient(900px 760px at 100% 0%,color-mix(in srgb,var(--brand) 16%,transparent),transparent 70%),
+  radial-gradient(820px 660px at 0% 100%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 70%),
+  linear-gradient(135deg,#FFFFFF 0%,color-mix(in srgb,var(--brand) 10%,#FFFFFF) 100%)}
+.sc-slide.sc-style-bloom.sc-dark,.sc-slide.sc-style-bloom.sc-section{background:
+  radial-gradient(1200px 900px at 70% 40%,color-mix(in srgb,var(--brand) 40%,transparent),transparent 65%),
+  radial-gradient(900px 640px at 0% 100%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 70%),
+  linear-gradient(120deg,var(--ink) 0%,var(--brand-deep) 50%,var(--ink) 100%)}
+.sc-slide.sc-style-bloom.sc-title::after,.sc-slide.sc-style-bloom.sc-closing::after{display:none}
+.sc-slide.sc-style-bloom .sc-rule{display:none}
+.sc-slide.sc-style-bloom .sc-h .sc-kicker{color:var(--accent);letter-spacing:.16em;font-weight:700}
+.sc-slide.sc-style-bloom.sc-dark .sc-h .sc-kicker,.sc-slide.sc-style-bloom.sc-section .sc-h .sc-kicker{color:color-mix(in srgb,var(--accent) 70%,#FFD27A)}
+.sc-slide.sc-style-bloom.sc-dark .sc-h .l2{color:var(--glow)}
+.sc-slide.sc-style-bloom .sc-card,.sc-slide.sc-style-bloom .sc-kpi,.sc-slide.sc-style-bloom .sc-step,.sc-slide.sc-style-bloom .sc-col,
+.sc-slide.sc-style-bloom .sc-eq .term:not(.res),.sc-slide.sc-style-bloom .sc-hub .node,.sc-slide.sc-style-bloom .sc-facts,.sc-slide.sc-style-bloom table.sc-table{
+  border-color:transparent;box-shadow:0 27px 75px rgba(11,27,58,.09)}
+.sc-slide.sc-style-bloom .sc-card{border-top-width:2px}
+.sc-slide.sc-style-bloom .sc-card:nth-child(even),.sc-slide.sc-style-bloom .sc-kpi:nth-child(even),.sc-slide.sc-style-bloom .sc-step:nth-child(even),.sc-slide.sc-style-bloom .sc-col:nth-child(even){
+  background:color-mix(in srgb,var(--brand) 7%,#FFFFFF);box-shadow:0 18px 50px rgba(11,27,58,.06)}
+.sc-slide.sc-style-bloom .sc-hub .side.l .node,.sc-slide.sc-style-bloom .sc-hub .side.r .node{border-left-width:2px;border-right-width:2px}
+.sc-slide.sc-style-bloom .sc-aside{border-left-width:0;border-radius:var(--radius);background:color-mix(in srgb,var(--brand) 8%,#FFFFFF)}
+.sc-slide.sc-style-bloom .sc-aside.a2{background:color-mix(in srgb,var(--accent) 9%,#FFFFFF)}
+.sc-slide.sc-style-bloom .sc-callout{border-radius:999px;background:linear-gradient(90deg,var(--brand),color-mix(in srgb,var(--brand) 60%,var(--glow)));
+  font-family:var(--font-quote),Georgia,serif;font-style:italic;font-weight:400;font-size:36px;text-align:center;padding:18px 56px}
+.sc-slide.sc-style-bloom .sc-cite{font-style:italic}
+.sc-slide.sc-style-bloom.sc-dark .sc-hero .hs{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
+/* takeaways on the closing slide */
+.sc-slide .sc-chips{display:flex;flex-wrap:wrap;gap:20px;max-width:1600px}
+.sc-slide .sc-chips span{padding:16px 30px;border-radius:999px;font-size:26px;font-weight:600;background:color-mix(in srgb,var(--brand) 10%,var(--surface));color:var(--ink);border:2px solid var(--line)}
+.sc-slide.sc-dark .sc-chips span{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);color:#fff}
 `;
 
 // Every font size is a multiple of --k (and the source lines of --kc), which

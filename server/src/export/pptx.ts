@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import PptxGenJSImport from "pptxgenjs";
-import { mapGrid, mapTiles, mapTone, ringPercent, sanitizeSlide, sanitizeTheme, seriesPalette, stepRate, tileName, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type ImageRef, type Slide, type Theme } from "@slidecraft/shared";
+import { glowOf, mapGrid, mapTiles, mapTone, particles, ringPercent, sanitizeSlide, sanitizeTheme, seriesPalette, stepRate, tileName, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type ImageRef, type Slide, type Theme } from "@slidecraft/shared";
 import { fetchPicture } from "./fetchPicture.js";
+import { bloomBackgrounds } from "./bloom.js";
 import { getMedia } from "../store.js";
 import { fitFont, textHeightIn } from "./textfit.js";
 
@@ -115,10 +116,13 @@ function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: num
   items.forEach((it, i) => {
     const cx = x + (i % cols) * (cw + gap);
     const cy = y + Math.floor(i / cols) * (ch + gap);
-    panel(ps, cx, cy, cw, ch, c);
+    const bloom = c.theme.slideStyle === "bloom";
+    // The bloom style alternates white and tint cards and draws no stripe on them.
+    if (bloom && i % 2) ps.addShape(c.pres.ShapeType.roundRect, { x: cx, y: cy, w: cw, h: ch, fill: { color: tint(col.brand, "#FFFFFF", 0.07) }, line: { color: tint(col.brand, "#FFFFFF", 0.07) }, rectRadius: Math.min(0.2, px(c.theme.radius)) });
+    else panel(ps, cx, cy, cw, ch, c);
     // A design with its own series colours gives each card its own header colour.
     const cc = c.theme.series?.length ? hex(c.theme.series[i % c.theme.series.length]) : hex(col.brand);
-    ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: cc }, line: { color: cc } });
+    if (!bloom) ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: cc }, line: { color: cc } });
     ps.addShape(c.pres.ShapeType.ellipse, { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fill: { color: cc }, line: { color: cc } });
     ps.addText(String(i + 1), { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fontSize: Math.round(13 * (dot / 0.4)), bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody) });
     if (it.tag) {
@@ -151,7 +155,7 @@ function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; 
   let yy = y;
   const kicker = s.kicker || opts.kicker;
   if (kicker) {
-    ps.addText(kicker.toUpperCase(), { x: px(120), y: yy, w, h: px(36), fontSize: fitFont(kicker.toUpperCase(), w, px(36), 12, 8, { bold: true, maxLines: 1 }), bold: true, charSpacing: 3, color: opts.color ?? hex(t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
+    ps.addText(kicker.toUpperCase(), { x: px(120), y: yy, w, h: px(36), fontSize: fitFont(kicker.toUpperCase(), w, px(36), 12, 8, { bold: true, maxLines: 1 }), bold: true, charSpacing: 3, color: opts.color ?? hex(t.slideStyle === "bloom" ? t.colors.accent : t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
     yy += px(44);
   }
   // The title takes at most three lines and a quarter of the slide; its box is as tall as its text.
@@ -189,6 +193,11 @@ function fitText(ps: PSlide, text: string, box: { x: number; y: number; w: numbe
 }
 
 function panel(ps: PSlide, x: number, y: number, w: number, h: number, c: Ctx): void {
+  // The bloom style's card: white, no border, a soft wide shadow.
+  if (c.theme.slideStyle === "bloom") {
+    ps.addShape(c.pres.ShapeType.roundRect, { x, y, w, h, fill: { color: hex(c.theme.colors.surface) }, line: { color: hex(c.theme.colors.surface), width: 0.5 }, rectRadius: Math.min(0.23, px(c.theme.radius)), shadow: { type: "outer", blur: 20, offset: 6, angle: 90, color: "0B1B3A", opacity: 0.1 } });
+    return;
+  }
   ps.addShape(c.pres.ShapeType.roundRect, { x, y, w, h, fill: { color: hex(c.theme.colors.surface) }, line: { color: hex(c.theme.colors.line), width: 1 }, rectRadius: Math.min(0.2, px(c.theme.radius)) });
 }
 
@@ -639,6 +648,25 @@ function asides(ps: PSlide, list: NonNullable<Slide["aside"]>, x: number, y: num
   });
 }
 
+/** The bloom style's faint particle field, the same dots as the editor draws, as native shapes. */
+function bloomDots(ps: PSlide, s: Slide, c: Ctx): void {
+  for (const p of particles(s.id)) {
+    const r = px(p.r);
+    ps.addShape(c.pres.ShapeType.ellipse, { x: px(p.x) - r, y: px(p.y) - r, w: 2 * r, h: 2 * r, fill: { color: hex(c.theme.colors.brand), transparency: Math.round(100 - p.o * 100) }, line: { color: hex(c.theme.colors.brand), transparency: 100 } });
+  }
+}
+
+/** A slide's background: the bloom wash or glow as a picture, or the theme's plain colour. */
+function background(ps: PSlide, s: Slide, c: Ctx, dark: boolean, plainColour: string): void {
+  if (c.theme.slideStyle !== "bloom") {
+    ps.background = { color: plainColour };
+    return;
+  }
+  const bg = bloomBackgrounds(c.theme);
+  ps.background = { data: dark ? bg.dark : bg.light };
+  if (s.layout !== "section") bloomDots(ps, s, c);
+}
+
 function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
   const t = c.theme;
   const col = t.colors;
@@ -650,15 +678,20 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     case "title":
     case "closing": {
       const dark = !!t.darkTitle;
+      const bloom = t.slideStyle === "bloom";
       const ink = dark ? "FFFFFF" : hex(col.ink);
-      ps.background = { color: dark ? hex(col.brandDeep) : hex(col.bg) };
-      ps.addShape(c.pres.ShapeType.ellipse, { x: W - 3.2, y: -2.2, w: 5, h: 5, fill: { color: hex(col.brand), transparency: dark ? 70 : 82 }, line: { color: hex(col.brand), transparency: 100 } });
+      background(ps, s, c, dark, dark ? hex(col.brandDeep) : hex(col.bg));
+      if (!bloom) ps.addShape(c.pres.ShapeType.ellipse, { x: W - 3.2, y: -2.2, w: 5, h: 5, fill: { color: hex(col.brand), transparency: dark ? 70 : 82 }, line: { color: hex(col.brand), transparency: 100 } });
       // A hero row of figures moves the title up to make room.
       const hero = s.layout === "title" ? (s.kpi ?? []).slice(0, 4) : [];
       const up = hero.length ? 0.85 : 0;
       const tt = titleText(s, t);
-      ps.addText(tt, { x: px(160), y: 1.9 - up, w: W - px(320), h: 2.2, fontSize: fitFont(tt, W - px(320), 2.2, 44, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: ink, fontFace: fontOk(t.fontDisplay), valign: "bottom", fit: "shrink" });
-      ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.25 - up, w: 0.85, h: 0.06, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
+      // A two-line title keeps its break, the second line lit on a dark cover.
+      const [l1, ...l2] = tt.split(/\n+/);
+      const runs = l2.length ? [{ text: l1, options: { color: ink, breakLine: true } }, { text: l2.join(" "), options: { color: dark ? hex(glowOf(col.brand)) : hex(col.brand) } }] : tt;
+      if (s.kicker) ps.addText(plain(s.kicker).toUpperCase(), { x: px(160), y: 1.5 - up, w: W - px(320), h: 0.35, fontSize: 12, bold: true, charSpacing: 3, color: dark ? hex(glowOf(col.accent)) : hex(bloom ? col.accent : col.brandDeep), fontFace: fontOk(t.fontBody) });
+      ps.addText(runs, { x: px(160), y: 1.9 - up, w: W - px(320), h: 2.2, fontSize: fitFont(tt.replace(/\n+/g, "\n"), W - px(320), 2.2, 44, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: ink, fontFace: fontOk(t.fontDisplay), valign: "bottom", fit: "shrink" });
+      if (!bloom) ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.25 - up, w: 0.85, h: 0.06, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
       const sub = [s.subtitle, s.body].filter(Boolean).map((x) => plain(x!)).join("\n");
       const subH = hero.length ? 1.0 : 1.4;
       if (sub) ps.addText(sub, { x: px(160), y: 4.45 - up, w: W - px(320), h: subH, fontSize: fitFont(sub, W - px(320), subH, 18, 8), color: dark ? "E6ECF3" : hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
@@ -671,11 +704,18 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
           ps.addText(plain(k.label), { x: hx + 0.15, y: 5.42, w: hw - 0.3, h: 0.5, fontSize: fitFont(plain(k.label), hw - 0.3, 0.5, 11, 6), color: dark ? "E6ECF3" : hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
         });
       }
+      // Takeaways on the closing slide, as a row of chips.
+      const chips = s.layout === "closing" ? (s.bullets ?? []).slice(0, 4).map(plain) : [];
+      if (chips.length) {
+        const cw = (W - px(320) - 0.25 * (chips.length - 1)) / chips.length;
+        const cs = Math.min(...chips.map((x) => fitFont(x, cw - 0.3, 0.55, 13, 7, { bold: true })));
+        chips.forEach((x, j) => ps.addText(x, { x: px(160) + j * (cw + 0.25), y: 5.95, w: cw, h: 0.6, fontSize: cs, bold: true, align: "center", valign: "middle", color: dark ? "FFFFFF" : hex(col.ink), fill: { color: dark ? "FFFFFF" : hex(col.surface), transparency: dark ? 88 : 0 }, line: { color: dark ? "FFFFFF" : hex(col.line), transparency: dark ? 70 : 0, width: 1 }, shape: c.pres.ShapeType.roundRect, rectRadius: 0.3, fontFace: fontOk(t.fontBody), fit: "shrink" }));
+      }
       chrome(ps, s, i, c, dark);
       return;
     }
     case "section": {
-      ps.background = { color: hex(col.brandDeep) };
+      background(ps, s, c, true, hex(col.brandDeep));
       ps.addText((c.lang === "ms" ? "BAHAGIAN" : "SECTION"), { x: px(160), y: 2.3, w: 6, h: 0.4, fontSize: 12, bold: true, charSpacing: 3, color: "FFFFFF", transparency: 25, fontFace: fontOk(t.fontBody) });
       ps.addText(titleText(s, t), { x: px(160), y: 2.7, w: W - px(320), h: 1.6, fontSize: fitFont(titleText(s, t), W - px(320), 1.6, 40, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: "FFFFFF", fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
       ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.4, w: 0.85, h: 0.06, fill: { color: "FFFFFF" }, line: { color: "FFFFFF" } });
@@ -686,14 +726,17 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     default:
       break;
   }
-  ps.background = { color: hex(col.bg) };
+  background(ps, s, c, false, hex(col.bg));
   if (t.slideStyle === "panel") panel(ps, px(96), px(72), W - px(192), H - px(176), c);
   const y0 = title(ps, s, c);
   // A callout banner takes the foot of the body, side panels the right of it; the content fits in what is left.
   if (s.callout) {
     const txt = plain(s.callout);
     const ch = Math.min(0.9, Math.max(0.5, textHeightIn([txt], W - px(240) - 0.6, 14, { bold: true }) + 0.2));
-    ps.addText(txt, { x: contentX, y: bodyBottom - ch, w: W - px(240), h: ch, fontSize: fitFont(txt, W - px(240) - 0.6, ch - 0.1, 14, 8, { bold: true }), bold: true, color: "FFFFFF", fill: { color: hex(col.brandDeep) }, line: { color: hex(col.brandDeep) }, valign: "middle", margin: [4, 18, 4, 18], fontFace: fontOk(t.fontBody), shape: c.pres.ShapeType.roundRect, rectRadius: Math.min(0.15, px(t.radius)), fit: "shrink" });
+    if (t.slideStyle === "bloom") {
+      // The pull-quote band: a teal pill, the line in the quote font, italic, centred.
+      ps.addText(txt, { x: contentX, y: bodyBottom - ch, w: W - px(240), h: ch, fontSize: fitFont(txt, W - px(240) - 0.8, ch - 0.1, 17, 8), italic: true, color: "FFFFFF", fill: { color: hex(col.brand) }, line: { color: hex(col.brand) }, align: "center", valign: "middle", margin: [24, 24, 4, 4], fontFace: fontOk(t.fontQuote ?? t.fontDisplay), shape: c.pres.ShapeType.roundRect, rectRadius: ch / 2, fit: "shrink" });
+    } else ps.addText(txt, { x: contentX, y: bodyBottom - ch, w: W - px(240), h: ch, fontSize: fitFont(txt, W - px(240) - 0.6, ch - 0.1, 14, 8, { bold: true }), bold: true, color: "FFFFFF", fill: { color: hex(col.brandDeep) }, line: { color: hex(col.brandDeep) }, valign: "middle", margin: [18, 18, 4, 4], fontFace: fontOk(t.fontBody), shape: c.pres.ShapeType.roundRect, rectRadius: Math.min(0.15, px(t.radius)), fit: "shrink" });
     bodyBottom -= ch + 0.15;
   }
   if (s.aside?.length && !["two-column", "quote"].includes(s.layout)) {

@@ -224,7 +224,7 @@ export interface ThemeColors {
   gold: string;
 }
 
-export type SlideStyle = "clean" | "panel" | "gradient";
+export type SlideStyle = "clean" | "panel" | "gradient" | "bloom";
 export type KpiStyle = "tiles" | "rings";
 
 export interface Theme {
@@ -251,6 +251,8 @@ export interface Theme {
   darkTitle?: boolean;
   /** How figures are drawn when a slide does not say. */
   kpiStyle?: KpiStyle;
+  /** Font for pull-quotes and the callout band (the bloom style draws it in italics). */
+  fontQuote?: string;
 }
 
 export interface SourceRef {
@@ -258,6 +260,8 @@ export interface SourceRef {
   name: string;
   kind: string;
   chars: number;
+  /** What was read from it, worked out by the server. */
+  check?: import("./sources.js").SourceCheck;
 }
 
 export interface Deck {

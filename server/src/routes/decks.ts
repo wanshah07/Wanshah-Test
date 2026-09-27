@@ -34,7 +34,7 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     for (const k of ["title", "lang", "angle", "themeId", "designId"]) if (b[k] !== undefined && b[k] !== null && typeof b[k] !== "string") return reply.code(400).send({ error: "invalid", message: `${k} must be text` });
     const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string) : undefined);
     const s = readSettings(req.user.id);
-    return newDeck(req.user.id, (str("title") ?? "").slice(0, 300), str("lang") === "ms" ? "ms" : "en", angleById(str("angle") ?? "custom").id, str("themeId") ?? s.default_theme ?? "facerinna", str("designId"));
+    return newDeck(req.user.id, (str("title") ?? "").slice(0, 300), str("lang") === "ms" ? "ms" : "en", angleById(str("angle") ?? "custom").id, str("themeId") ?? s.default_theme ?? "house", str("designId"));
   });
 
   app.get("/api/decks/:id", async (req, reply) => {
@@ -83,7 +83,7 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     if (!d) return reply.code(404).send({ error: "not_found" });
     const b = (req.body ?? {}) as { presetId?: string };
     const keep = { logoMediaId: d.theme.logoMediaId, footer: d.theme.footer };
-    d.theme = { ...themePreset(b.presetId ?? "facerinna"), ...keep };
+    d.theme = { ...themePreset(b.presetId ?? "house"), ...keep };
     delete d.designId;
     saveDeck(req.user.id, d);
     return d;

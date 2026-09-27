@@ -7,16 +7,13 @@ import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../
 import { allVisuals, FeatureChoices } from "../components/FeatureChoices";
 import { ThemeCards } from "../components/ThemeCards";
 import { DropZone } from "../components/DropZone";
+import { LinkSourceBox, NotRead, SourceReview, sourcesBlocker, sourcesSummary } from "../components/SourceReview";
 import { OneDriveBox } from "../components/OneDriveBox";
 import type { PathedFile } from "../lib/files";
 import { explainFailure } from "../lib/errors";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 const STEPS = ["Brief", "Sources", "Angle", "Features", "Generate"];
-
-function fmtChars(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k chars` : `${n} chars`;
-}
 
 export default function NewDeck() {
   const nav = useNavigate();
@@ -31,11 +28,13 @@ export default function NewDeck() {
   const [autoFeatures, setAutoFeatures] = useState<Features>(() => allVisuals(DEFAULT_FEATURES));
   const [slides, setSlides] = useState(10);
   const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
-  const [themeId, setThemeId] = useState("facerinna");
+  const [themeId, setThemeId] = useState("house");
   const [params] = useSearchParams();
   const [designId, setDesignId] = useState<string | undefined>(params.get("design") ?? undefined);
   const [designs, setDesigns] = useState<Design[]>([]);
   const [sources, setSources] = useState<SourceRef[]>([]);
+  const [notRead, setNotRead] = useState<string[]>([]);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [pasteName, setPasteName] = useState("");
   const [pasteText, setPasteText] = useState("");
@@ -84,8 +83,7 @@ export default function NewDeck() {
       const id = await ensureDeck();
       const r = await api.uploadSources(id, files);
       setSources((s) => [...s, ...r.added]);
-      if (r.skipped.length) toast(`Skipped ${r.skipped.length} file(s) that could not be read: ${r.skipped.slice(0, 3).join(", ")}`, true);
-      else toast(`Added ${r.added.length} source${r.added.length === 1 ? "" : "s"}`);
+      if (r.skipped.length) setNotRead((n) => [...n, ...r.skipped]);
     } catch (e) {
       toast((e as Error).message, true);
     } finally {
@@ -139,8 +137,11 @@ export default function NewDeck() {
   };
 
   const hasPictures = sources.some((s) => s.kind === "image");
-  const canNext = step === 0 ? auto || prompt.trim().length > 10 : true;
-  const briefHint = step === 0 && !canNext ? "Tick what the deck is for, or type a few words." : "";
+  const summary = sourcesSummary(sources);
+  // The Sources step waits until every file and link is read and the person has seen what came through.
+  const sourceHint = step === 1 ? sourcesBlocker(sources, notRead, uploading || linkBusy) : "";
+  const canNext = step === 0 ? auto || prompt.trim().length > 10 : step === 1 ? !sourceHint : true;
+  const briefHint = step === 0 && !canNext ? "Tick what the deck is for, or type a few words." : sourceHint;
   // Auto skips the Angle step; the Features step keeps only the design.
   const next = () => setStep((s) => (auto && s === 1 ? 3 : s + 1) as Step);
   const back = () => setStep((s) => Math.max(0, auto && s === 3 ? 1 : s - 1) as Step);
@@ -196,6 +197,7 @@ export default function NewDeck() {
       {step === 1 && (
         <div className="stack">
           <DropZone onFiles={addFiles} busy={uploading} />
+          <LinkSourceBox getDeckId={ensureDeck} onAdded={(a) => setSources((s) => [...s, ...a])} onNotRead={(x) => setNotRead((n) => [...n, ...x])} onBusy={setLinkBusy} />
           <OneDriveBox getDeckId={ensureDeck} link={link} onImported={(src, l) => { setSources(src.length ? src : sources); setLink(l); }} />
           <div className="card tight stack">
             <div className="row between"><b className="small">Paste text</b><span className="small muted">Notes, an email, a clause you copied.</span></div>
@@ -203,18 +205,9 @@ export default function NewDeck() {
             <textarea value={pasteText} onChange={(e) => setPasteText(e.target.value)} rows={4} placeholder="Paste here" />
             <div className="row"><button className="btn btn-ghost btn-sm" onClick={addPaste} disabled={!pasteText.trim()}>Add text</button></div>
           </div>
-          {sources.length > 0 && (
-            <div className="srcs">
-              {sources.map((s) => (
-                <div key={s.id} className="src">
-                  <span className="k">{s.kind}</span>
-                  <span className="n" title={s.name}>{s.name}</span>
-                  <span className="muted">{s.kind === "image" ? "picture" : fmtChars(s.chars)}</span>
-                  <button className="btn btn-quiet btn-xs" onClick={() => removeSource(s)}>Remove</button>
-                </div>
-              ))}
-            </div>
-          )}
+          <NotRead items={notRead} onDismiss={() => setNotRead([])} />
+          {summary && <div className={`srcsum t-${summary.tone}`} data-testid="source-summary">{summary.text}</div>}
+          <SourceReview sources={sources} onRemove={removeSource} />
           {sources.length === 0 && <p className="small muted">No sources yet. You can continue without any; the writer then works from the brief alone and leaves out figures it cannot stand behind.</p>}
         </div>
       )}

@@ -28,6 +28,17 @@ single HTML file. Runs on your own machine or server, with your own key.
   picture reader transcribes them and they can go on slides. A large pile of
   sources is condensed to the facts relevant to the brief before the deck is
   written.
+- **Google Drive and Sheets links.** Paste a link to a Google Sheet (every
+  tab comes through), a Doc, Slides, any file in Drive, or a shared folder
+  (its files, up to 25, 25 MB each). The file must be shared as "Anyone with
+  the link", Viewer; the server fetches only from Google's own hosts. A file
+  that is not shared is refused with the steps to share it.
+- **Every source is checked before you go on.** Each one shows what was
+  read: rows per tab for a sheet, words for a document, and the first lines
+  of the data. A source with nothing readable (an empty sheet, a scanned
+  PDF), a file that could not be opened, or a link that was refused stops
+  Continue and Regenerate until it is removed or replaced, or you choose to
+  go on without it.
 - **Pictures on the slides.** Every uploaded picture the writer did not use
   goes beside the points of the slide whose words it shares, or on a picture
   slide of its own before the close; a slide count you fixed is kept.
@@ -74,6 +85,18 @@ single HTML file. Runs on your own machine or server, with your own key.
   unticked. In the editor, **Add to this slide** puts any of them on the
   slide in one click. All of them are drawn the same in the browser, the
   web deck and native PowerPoint.
+- **House design system** (every deck). The writer, the designer pass and
+  single-slide rewrites all follow the same rules: one idea per slide,
+  statement titles on one line, diagram over bullets, one everyday analogy
+  per technical term, a plain-language line to end most slides on, layouts
+  that never repeat back to back, a dark cover and close around light
+  content, one honest caveat slide, illustrative numbers labelled as such,
+  and speaker notes written as what the presenter says. The facts rules
+  still come first. New decks use the **Teal Explainer** look by default:
+  Arial titles, Calibri body, amber eyebrows, soft cards on a white-to-tint
+  wash with a faint particle field, a teal pull-quote band in Cambria
+  italic, and a dark cover whose second title line is lit. Pick another
+  default in Settings.
 - **Themes.** Colours, fonts, radius, slide style, footer and logo per deck,
   plus series colours, capital titles, dark title slides, tiles or ring
   gauges, and a tag on every slide (e.g. For healthcare professionals only),

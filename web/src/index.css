@@ -205,3 +205,16 @@ table.edit input{padding:5px 8px;font-size:12px}
   .ed-title{width:100% !important;max-width:100%}
   .page .row.between{flex-wrap:wrap;gap:8px}
 }
+/* source read report */
+.src{flex-direction:column;align-items:stretch}
+.src .mark{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.src .m-ok{background:#E3F5EA;color:#0F5A34}
+.src .m-warn{background:#FFF1D6;color:#7A4B00}
+.src .m-fail{background:#FDECEC;color:#8C2323}
+.src.src-fail{border-color:#E8B4B4}
+.src .note{padding-left:30px;line-height:1.4}
+.src .peek{margin-left:30px;padding:8px 10px;border-radius:6px;background:var(--surface-2);font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:pre-wrap;word-break:break-word;color:var(--ink-2)}
+.srcsum{font-size:13px;font-weight:600;padding:8px 12px;border-radius:var(--radius-sm)}
+.srcsum.t-ok{background:#E3F5EA;color:#0F5A34}
+.srcsum.t-warn{background:#FFF1D6;color:#7A4B00}
+.srcsum.t-fail{background:#FDECEC;color:#8C2323}
