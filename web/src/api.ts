@@ -148,6 +148,7 @@ export const api = {
     for (const f of files) fd.append("files", f.file, encodeURIComponent(f.path));
     return req<{ added: SourceRef[]; skipped: string[] }>("POST", `/api/decks/${id}/sources`, undefined, fd);
   },
+  addLink: (id: string, url: string) => req<{ added: SourceRef[]; skipped: string[] }>("POST", `/api/decks/${id}/sources/link`, { url }),
   addText: (id: string, name: string, text: string) => req<SourceRef>("POST", `/api/decks/${id}/sources/text`, { name, text }),
   deleteSource: (sid: string) => req<{ ok: true }>("DELETE", `/api/sources/${sid}`),
   media: (id: string) => req<MediaItem[]>("GET", `/api/decks/${id}/media`),

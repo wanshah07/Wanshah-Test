@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizeSlide, sanitizeTheme, type Slide, type Deck, type SourceRef } from "@slidecraft/shared";
+import { checkSource, sanitizeSlide, sanitizeTheme, type Slide, type Deck, type SourceRef } from "@slidecraft/shared";
 import { getDb, now, uid } from "./db.js";
 import { config } from "./config.js";
 
@@ -54,11 +54,12 @@ export function saveDeck(userId: string, deck: Deck): Deck {
 }
 
 export function listSourceRefs(deckId: string): SourceRef[] {
-  return (getDb().prepare("SELECT id, name, kind, chars, rel_path FROM sources WHERE deck_id = ? ORDER BY created_at").all(deckId) as { id: string; name: string; kind: string; chars: number; rel_path: string | null }[]).map((r) => ({
+  return (getDb().prepare("SELECT id, name, kind, chars, rel_path, text FROM sources WHERE deck_id = ? ORDER BY created_at").all(deckId) as { id: string; name: string; kind: string; chars: number; rel_path: string | null; text: string }[]).map((r) => ({
     id: r.id,
     name: r.rel_path || r.name,
     kind: r.kind,
     chars: r.chars,
+    check: checkSource(r.kind, r.text ?? ""),
   }));
 }
 
@@ -88,7 +89,7 @@ export function addSource(userId: string, deckId: string, s: { name: string; rel
   getDb()
     .prepare("INSERT INTO sources (id, user_id, deck_id, name, rel_path, kind, bytes, chars, text, media_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .run(id, userId, deckId, s.name, s.relPath ?? null, s.kind, s.bytes, s.text.length, s.text, s.mediaId ?? null, now());
-  return { id, name: s.relPath ?? s.name, kind: s.kind, chars: s.text.length };
+  return { id, name: s.relPath ?? s.name, kind: s.kind, chars: s.text.length, check: checkSource(s.kind, s.text) };
 }
 
 export interface MediaRow {

@@ -258,6 +258,8 @@ export interface SourceRef {
   name: string;
   kind: string;
   chars: number;
+  /** What was read from it, worked out by the server. */
+  check?: import("./sources.js").SourceCheck;
 }
 
 export interface Deck {

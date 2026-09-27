@@ -13,6 +13,7 @@ import { LayoutPicker } from "../components/LayoutPicker";
 import { FeatureChoices } from "../components/FeatureChoices";
 import { DropZone } from "../components/DropZone";
 import { OneDriveBox } from "../components/OneDriveBox";
+import { LinkSourceBox, NotRead, SourceReview, sourcesBlocker, sourcesSummary } from "../components/SourceReview";
 import type { PathedFile } from "../lib/files";
 import { explainFailure } from "../lib/errors";
 
@@ -354,6 +355,8 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
   const [link, setLink] = useState(deck.onedrive);
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notRead, setNotRead] = useState<string[]>([]);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [auto, setAuto] = useState(!!stored?.auto);
   // Auto's own ticks: every device on unless the last Auto run had it off.
   const [autoFeatures, setAutoFeatures] = useState<Features>(() => {
@@ -366,8 +369,7 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
     setBusy(true);
     try {
       const r = await api.uploadSources(deck.id, files);
-      if (r.skipped.length) toast(`Added ${r.added.length}, skipped ${r.skipped.length} that could not be read`, true);
-      else toast(`Added ${r.added.length}`);
+      if (r.skipped.length) setNotRead((n) => [...n, ...r.skipped]);
       reload();
     } catch (e) {
       toast((e as Error).message, true);
@@ -406,20 +408,18 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
     }
   };
   const running = job && (job.status === "queued" || job.status === "running");
+  const summary = sourcesSummary(sources);
+  const blocker = sourcesBlocker(sources, notRead, busy || linkBusy);
   return (
     <div className="stack">
       <h4>Sources</h4>
       <DropZone onFiles={add} busy={busy} compact />
       <OneDriveBox getDeckId={async () => deck.id} link={link} onImported={(src, l) => { if (src.length) setSources(src); setLink(l); }} />
-      <div className="srcs">
-        {sources.map((s) => (
-          <div key={s.id} className="src">
-            <span className="k">{s.kind}</span><span className="n" title={s.name}>{s.name}</span>
-            <button className="btn btn-quiet btn-xs" onClick={() => api.deleteSource(s.id).then(reload)}>✕</button>
-          </div>
-        ))}
-        {sources.length === 0 && <p className="small muted">No sources attached.</p>}
-      </div>
+      <LinkSourceBox compact getDeckId={async () => deck.id} onAdded={() => reload()} onNotRead={(x) => setNotRead((n) => [...n, ...x])} onBusy={setLinkBusy} />
+      <NotRead items={notRead} onDismiss={() => setNotRead([])} />
+      {summary && <div className={`srcsum t-${summary.tone}`}>{summary.text}</div>}
+      <SourceReview compact sources={sources} onRemove={(s) => api.deleteSource(s.id).then(reload)} />
+      {sources.length === 0 && <p className="small muted">No sources attached.</p>}
       <hr />
       <h4>Regenerate</h4>
       {stored && <p className="small muted">Your last choices are ticked. Change anything, then regenerate.</p>}
@@ -444,12 +444,13 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       )}
       </>}
       {deck.slides.length > 0 ? (
-        <ConfirmButton className="btn btn-primary" confirm={`Click again: replace all ${deck.slides.length} slides`} onConfirm={() => run()} disabled={!!running}>
+        <ConfirmButton className="btn btn-primary" confirm={`Click again: replace all ${deck.slides.length} slides`} onConfirm={() => run()} disabled={!!running || !!blocker}>
           {running ? <span className="spin" /> : "Regenerate deck"}
         </ConfirmButton>
       ) : (
-        <button className="btn btn-primary" onClick={() => run()} disabled={!!running}>{running ? <span className="spin" /> : "Generate deck"}</button>
+        <button className="btn btn-primary" onClick={() => run()} disabled={!!running || !!blocker}>{running ? <span className="spin" /> : "Generate deck"}</button>
       )}
+      {blocker && !running && <span className="small muted" data-testid="regen-blocker">{blocker}</span>}
       {job?.status === "failed" && (() => {
         const why = explainFailure(job.error || "");
         return (

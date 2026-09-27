@@ -40,7 +40,7 @@ function pictureMime(b: Buffer): string | null {
 }
 
 /** A lookup that refuses private addresses, used by the socket itself. */
-const guardedLookup: net.LookupFunction = (host, opts, cb) => {
+export const guardedLookup: net.LookupFunction = (host, opts, cb) => {
   dns.lookup(host, { ...opts, all: true }, (err, addrs) => {
     if (err) return cb(err, "", 4);
     const list = addrs as dns.LookupAddress[];
