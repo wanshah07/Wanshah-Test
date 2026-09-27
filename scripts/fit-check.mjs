@@ -36,6 +36,10 @@ const heavy = [
   { id: "mpx", _theme: "audit-report", layout: "map", title: long(15), map: { region: "world", areas: ["MY", "SG", "ID", "TH", "VN", "PH", "EU", "UK", "US", "CN", "JP", "KR", "IN", "AU", "GCC", "BR", "ZA", "CA"].map((code, i) => ({ code, status: ["ALLOWED", "RESTRICTED 2%", "BANNED", "PENDING"][i % 4], note: long(12) })), legend: long(12), source: long(10) }, citations: cites },
   { id: "hbx", _theme: "rose-aesthetic", layout: "diagram", title: long(15), diagram: { kind: "hub", center: long(6), nodes: Array.from({ length: 8 }, () => ({ label: long(5), detail: long(16) })), pills: Array.from({ length: 5 }, () => long(3)) } },
   { id: "fnx", _theme: "audit-report", layout: "diagram", title: long(15), diagram: { kind: "funnel", stages: Array.from({ length: 7 }, (_, i) => ({ value: String(3000 - i * 400), label: long(10) })) }, body: long(20), callout: long(20) },
+  // The house design system: dark cover with a two-line title, content with a pull-quote band, closing chips.
+  { id: "hcov", _theme: "house", layout: "title", kicker: "WORKSHOP", title: `${long(8)}\n${long(8)}`, subtitle: long(30), kpi: Array.from({ length: 4 }, () => ({ value: "1,250", label: long(8) })) },
+  { id: "hcard", _theme: "house", layout: "cards", kicker: "HOW IT WORKS", title: long(18), cards: Array.from({ length: 6 }, () => ({ heading: long(8), detail: long(30), tag: "HIGH" })), callout: long(30), citations: cites },
+  { id: "hclose", _theme: "house", layout: "closing", title: `${long(8)}\n${long(8)}`, subtitle: long(25), bullets: Array.from({ length: 4 }, () => long(6)) },
   { id: "eqx", _theme: "booth-bright", layout: "diagram", title: long(15), diagram: { kind: "equation", terms: Array.from({ length: 5 }, () => ({ value: "1,250", label: long(12) })), result: { value: "40/40", label: long(12) } }, callout: long(25) },
 ];
 const normal = [
@@ -51,6 +55,9 @@ const normal = [
   { id: "nmp", _theme: "audit-report", layout: "map", kicker: "STATUS", title: "Salicylic acid is allowed in 2 of 4 markets", map: { region: "asean", areas: [{ code: "MY", status: "ALLOWED", note: "ACD Annex III" }, { code: "SG", status: "ALLOWED", note: "HSA" }, { code: "TH", status: "RESTRICTED", note: "FDA Thailand" }, { code: "ID", status: "PENDING", note: "BPOM draft" }], legend: "Leave-on products", source: "ASEAN Cosmetic Directive" } },
   { id: "nhb", _theme: "rose-aesthetic", layout: "diagram", kicker: "MECHANISM", title: "What niacinamide does in the skin", diagram: { kind: "hub", center: "Niacinamide", nodes: [{ label: "Repairs", detail: "Barrier lipids up" }, { label: "Hydrates", detail: "TEWL down" }, { label: "Calms", detail: "Less redness" }, { label: "Firms", detail: "Collagen up" }], pills: ["+45% hydration", "1.25x elasticity"] } },
   { id: "nfn", _theme: "audit-report", layout: "diagram", kicker: "DROP-OFF", title: "One in thirteen visits became a sale", diagram: { kind: "funnel", stages: [{ value: "400", label: "Visited" }, { value: "120", label: "Engaged" }, { value: "36", label: "Leads" }, { value: "30", label: "Sales" }] } },
+  { id: "nhcov", _theme: "house", layout: "title", kicker: "WORKSHOP", title: "How a label becomes\ncompliant in five steps", subtitle: "Regulatory training for the product team", kpi: [] },
+  { id: "nhcard", _theme: "house", layout: "cards", kicker: "THE PATHWAY", title: "A notification is a form, not a licence", cards: [{ heading: "Screen the formula", detail: "Like checking a recipe before cooking." }, { heading: "Build the PIF", detail: "The product's passport, kept on file." }, { heading: "Notify NPRA", detail: "One product, one notification." }], callout: "A notification tells NPRA; it is not an approval." },
+  { id: "nhclose", _theme: "house", layout: "closing", title: "Notify first,\nsell second", subtitle: "Every product on the shelf has a number behind it.", bullets: ["Screen the formula", "Keep the PIF", "Notify before sale", "Label as notified"] },
   { id: "neq", _theme: "booth-bright", layout: "diagram", kicker: "THE CLAIM", title: "What the claim rests on", diagram: { kind: "equation", terms: [{ value: "3", label: "actives" }, { value: "28", label: "days" }, { value: "40", label: "users" }], result: { value: "40/40", label: "improved" } }, callout: "Every user improved by day 28." },
 ];
 
@@ -66,7 +73,7 @@ const render = async (s) => {
     const r = window.fitSlide(slide);
     const sb = slide.getBoundingClientRect();
     const bad = [];
-    for (const el of slide.querySelectorAll(".sc-body, .sc-content, .sc-hub .disc, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table, .sc-row, .sc-main, .sc-asides, .sc-aside, .sc-rings, .sc-facts, .sc-gallery, .sc-mapwrap, .sc-mapkey, .sc-hub .node, .sc-hub .side, .sc-hub .core, .sc-eq .term, .sc-funnel .stage, .sc-callout, .sc-hero .hs")) {
+    for (const el of slide.querySelectorAll(".sc-body, .sc-content, .sc-hub .disc, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table, .sc-row, .sc-main, .sc-asides, .sc-aside, .sc-rings, .sc-facts, .sc-gallery, .sc-mapwrap, .sc-mapkey, .sc-hub .node, .sc-hub .side, .sc-hub .core, .sc-eq .term, .sc-funnel .stage, .sc-callout, .sc-hero .hs, .sc-chips")) {
       if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) bad.push(`${el.className} spills (${el.scrollWidth}x${el.scrollHeight} in ${el.clientWidth}x${el.clientHeight})`);
     }
     // Every piece of visible text must sit on the slide.

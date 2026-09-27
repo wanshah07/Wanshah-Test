@@ -2,6 +2,7 @@ import { newId, type Features, type Slide } from "@slidecraft/shared";
 import { chatJson, type LlmAuth } from "./client.js";
 import { SLIDE_SCHEMA } from "./schema.js";
 import { VISUAL } from "./visualise.js";
+import { houseDesign } from "./house.js";
 
 // Two passes after the deck is written, for writers that answer in bullets:
 // the writer itself is asked to redesign its text slides as charts, tables,
@@ -39,6 +40,7 @@ export function designSystem(f: Features, lang: "en" | "ms", designNotes?: strin
     "Keep the slide's title and its facts. Use only figures, names and wording that appear in the slide or in the sources below; never invent a number, a category, a date or a study. If no visual fits a slide honestly, leave that slide out of your answer.",
     "Put what a presenter would say, but the slide cannot show, in notes. Keep citations.",
     [f.badges && "badge: a verdict pill where the slide judges", f.callouts && "callout: the one sentence to keep, on a few slides", f.asides && "aside: Reading and Watch-outs panels beside a chart, table or map"].filter(Boolean).join("; ") || "Leave badge, callout and aside empty.",
+    houseDesign(),
     ...(designNotes?.trim() ? [`The deck's design, follow its devices: ${designNotes.trim()}`] : []),
     `Write in ${lang === "ms" ? "Bahasa Malaysia (Malaysia), never Bahasa Indonesia" : "English"}. No dashes as punctuation, no emoji.`,
     "Answer with JSON: {\"slides\": [{\"index\": <the slide's index as given>, \"slide\": <the redesigned slide in the schema>}]}.",

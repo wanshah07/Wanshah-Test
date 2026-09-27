@@ -1,4 +1,5 @@
 import { angleById, slopBanList, type Features, type Lang } from "@slidecraft/shared";
+import { houseDesign } from "./house.js";
 
 export interface GenerateParams {
   prompt: string;
@@ -54,7 +55,7 @@ export function systemPrompt(p: GenerateParams): string {
   if (f.gallery && f.images && p.imageMode !== "none") allowed.push("gallery");
 
   const lines: string[] = [];
-  lines.push("You write slide decks for a regulatory and scientific professional. The reader is expert. Every slide must earn its place with a fact, a number, a decision or a step.");
+  lines.push("You write and design slide decks for a regulatory and scientific professional. Every slide must earn its place with a fact, a number, a decision or a step.");
   lines.push("");
   lines.push(`ANGLE: ${angle.name} (${angle.hat}). ${angle.brief}`);
   if (angle.skeleton.length) lines.push(`Suggested structure, adapt to the material: ${angle.skeleton.join(" → ")}.`);
@@ -77,6 +78,8 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("- Do not open with a scene-setter or close with a summary of the summary. Do not congratulate the reader or the presenter.");
   lines.push("- Use **bold** only for the single figure or term on a slide that matters most, at most once per slide.");
   lines.push("");
+  lines.push(houseDesign());
+  lines.push("");
   lines.push("DECK CRAFT (how a strong professional deck is built; follow all of it):");
   lines.push("- `kicker` on every content slide: a short uppercase label of 1 to 4 words naming the part of the argument, e.g. AT A GLANCE, THE EVIDENCE, COSTING, YEAR 1, NEXT STEPS. Null on title, section and closing slides.");
   lines.push("- Titles are action titles: the conclusion of the slide in under 12 words, carrying its number where there is one ('3 of 5 claims need a clinical study', not 'Claims review').");
@@ -94,7 +97,7 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("");
   lines.push("SLIDE LAYOUTS you may use: " + allowed.join(", ") + ". Any other layout is forbidden.");
   lines.push("- title: first slide only. subtitle carries the occasion, audience or date if known.");
-  lines.push("- closing: last slide. If a summary is requested, put it on a bullets slide before the closing slide.");
+  lines.push("- closing: last slide: a 2-line statement as the title, a message as the subtitle, 4 short takeaways as bullets. If a summary is requested, put it on a slide before the closing slide.");
   if (f.sections) lines.push("- section: a divider before each part. Title is the part name, subtitle one line on what it decides.");
   lines.push("- bullets: 3 to 5 bullets. body is optional, one sentence of context above the bullets.");
   lines.push("- cards: 2 to 6 numbered cards. Each has a heading under 10 words, a detail of one sentence under 20 words, and a tag (a verdict, an owner, a date or a priority) or null. body is optional, one line under the cards.");
@@ -116,7 +119,7 @@ export function systemPrompt(p: GenerateParams): string {
     if (p.imageMode === "uploaded") lines.push("- image: use for an uploaded picture. Set image.sourceName to the file name from the source list that fits, caption what it shows. bullets may hold 2 or 3 points beside it.");
     else lines.push("- image: at most 3 slides in the deck. image.prompt describes a photograph or clean illustration to generate (no text in the picture, no logos, no people's faces), caption what it shows.");
   }
-  if (f.notes) lines.push("- notes: 40 to 120 words of what the presenter says on this slide, in the same language, plain prose, no bullets. Include the caveats that do not fit on the slide.");
+  if (f.notes) lines.push("- notes: what the presenter SAYS on this slide, 3 to 5 conversational sentences in the same language, plain prose, no bullets, never a copy of the slide. Include the caveats that do not fit on the slide.");
   else lines.push("- notes: leave null.");
   if (f.summary) lines.push("- Include one bullets slide titled with the decision or takeaways, immediately before the closing slide.");
   if (f.qa) lines.push("- The closing slide invites questions; its notes list three questions the audience is likely to ask, each with a one-line answer.");
@@ -167,6 +170,7 @@ export function rewriteSystem(p: { lang: Lang; angle: string; house?: GeneratePa
   const angle = angleById(p.angle);
   return [
     ...houseLines(p.house, p.designNotes).filter(Boolean),
+    houseDesign(),
     "You revise one slide of a deck. Keep the slide's layout unless the instruction asks for a change. Keep every fact and citation unless the instruction changes it. Keep the schema shape.",
     "Layouts you may switch to when asked: bullets, two-column, cards, chart (chart.highlight marks our category), table, diagram (flow, timeline, matrix, hub = mechanism map with center, nodes and pills, funnel = stages of value and label, equation = terms adding to a result), kpi (kpiStyle 'rings' for ring gauges), facts (label and value rows, highlight the key row), map (region asean, asia or world; areas with a country code and a status), gallery, image, quote. Extras on any content slide: badge (a verdict pill), callout (one dark banner sentence), aside (up to 2 side panels, e.g. Reading and Watch-outs).",
     `ANGLE: ${angle.name}. ${angle.brief}`,

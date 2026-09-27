@@ -28,7 +28,7 @@ export default function NewDeck() {
   const [autoFeatures, setAutoFeatures] = useState<Features>(() => allVisuals(DEFAULT_FEATURES));
   const [slides, setSlides] = useState(10);
   const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
-  const [themeId, setThemeId] = useState("facerinna");
+  const [themeId, setThemeId] = useState("house");
   const [params] = useSearchParams();
   const [designId, setDesignId] = useState<string | undefined>(params.get("design") ?? undefined);
   const [designs, setDesigns] = useState<Design[]>([]);

@@ -85,6 +85,18 @@ single HTML file. Runs on your own machine or server, with your own key.
   unticked. In the editor, **Add to this slide** puts any of them on the
   slide in one click. All of them are drawn the same in the browser, the
   web deck and native PowerPoint.
+- **House design system** (every deck). The writer, the designer pass and
+  single-slide rewrites all follow the same rules: one idea per slide,
+  statement titles on one line, diagram over bullets, one everyday analogy
+  per technical term, a plain-language line to end most slides on, layouts
+  that never repeat back to back, a dark cover and close around light
+  content, one honest caveat slide, illustrative numbers labelled as such,
+  and speaker notes written as what the presenter says. The facts rules
+  still come first. New decks use the **Teal Explainer** look by default:
+  Arial titles, Calibri body, amber eyebrows, soft cards on a white-to-tint
+  wash with a faint particle field, a teal pull-quote band in Cambria
+  italic, and a dark cover whose second title line is lit. Pick another
+  default in Settings.
 - **Themes.** Colours, fonts, radius, slide style, footer and logo per deck,
   plus series colours, capital titles, dark title slides, tiles or ring
   gauges, and a tag on every slide (e.g. For healthcare professionals only),

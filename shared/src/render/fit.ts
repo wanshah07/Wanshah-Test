@@ -25,7 +25,7 @@ export function fitSlide(slide: HTMLElement, min = 0.25): FitResult {
     slide.style.visibility = "hidden";
   }
   const q = (sel: string) => Array.prototype.slice.call(slide.querySelectorAll(sel)) as HTMLElement[];
-  const boxes = q(".sc-body, .sc-content, .sc-hub .disc, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table, .sc-row, .sc-main, .sc-asides, .sc-aside, .sc-rings, .sc-facts, .sc-gallery, .sc-mapwrap, .sc-mapkey, .sc-hub .node, .sc-hub .side, .sc-hub .core, .sc-eq .term, .sc-funnel .stage, .sc-callout, .sc-hero .hs");
+  const boxes = q(".sc-body, .sc-content, .sc-hub .disc, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table, .sc-row, .sc-main, .sc-asides, .sc-aside, .sc-rings, .sc-facts, .sc-gallery, .sc-mapwrap, .sc-mapkey, .sc-hub .node, .sc-hub .side, .sc-hub .core, .sc-eq .term, .sc-funnel .stage, .sc-callout, .sc-hero .hs, .sc-chips");
   const spills = (el: HTMLElement) => el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2;
   // The body is a fixed-height column: its own overflow catches a heading too tall to leave room.
   const body = slide.querySelector(".sc-body") as HTMLElement | null;

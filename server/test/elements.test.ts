@@ -142,3 +142,40 @@ describe("a design read back from a PowerPoint file", () => {
     expect(d.analysis.warnings.join(" ")).toMatch(/Read from the file and applied: titles in capitals, dark title slides, figures as ring gauges/);
   });
 });
+
+describe("the house design system", () => {
+  it("is in every writer's instructions: the deck writer, the designer and a single-slide rewrite", async () => {
+    const { houseDesign } = await import("../src/llm/house.js");
+    const { designSystem } = await import("../src/llm/design.js");
+    const house = houseDesign();
+    const sys = prompts.systemPrompt({ prompt: "x", lang: "en", angle: "custom", slides: 8, features: S.DEFAULT_FEATURES, imageMode: "none" });
+    expect(sys).toContain(house);
+    expect(designSystem(S.DEFAULT_FEATURES, "en")).toContain(house);
+    expect(prompts.rewriteSystem({ lang: "ms", angle: "custom" })).toContain(house);
+    for (const rule of ["One idea per slide", "Titles are statements, not labels", "Diagram over bullets", "ONE everyday analogy", "set `callout` to the one sentence the audience repeats", "never the same layout on two slides in a row", "'Illustrative figure, not from the sources'", "3 to 5 conversational sentences", "No emoji"]) expect(sys).toContain(rule);
+    // The facts rules still come first and still forbid inventing a figure.
+    expect(sys.indexOf("FACTS AND SOURCES")).toBeLessThan(sys.indexOf("HOUSE DESIGN SYSTEM"));
+    expect(sys).toMatch(/Do not invent a fee, a date, a clause number, a statistic or a study/);
+    // A writer that answers in JSON is never told to stop and wait for approval.
+    expect(sys).not.toMatch(/wait for approval/i);
+  });
+
+  it("exports the house look to PowerPoint: wash and glow backgrounds, the italic band, closing chips", async () => {
+    const deck = deckOf("house", [
+      { layout: "title", title: "How a label becomes\ncompliant", subtitle: "Training" },
+      { layout: "cards", kicker: "THE PATHWAY", title: "A notification is a form", cards: [{ heading: "A" }, { heading: "B" }], callout: "It is not an approval." },
+      { layout: "closing", title: "Notify first,\nsell second", bullets: ["Screen", "Keep the PIF", "Notify", "Label"] },
+    ]);
+    const zip = await JSZip.loadAsync(await deckToPptx(deck, "u_test"));
+    const xml = (n: number) => zip.file(`ppt/slides/slide${n}.xml`)!.async("string");
+    const cover = await xml(1);
+    expect(cover).toContain('<a:srgbClr val="5EEAD4"/>');
+    expect(cover).toMatch(/<p:bg><p:bgPr><a:blipFill/);
+    const content = await xml(2);
+    expect(content).toMatch(/lIns="304800" tIns="50800" rIns="304800" bIns="50800"[^>]*anchor="ctr"/);
+    expect(content).toMatch(/i="1"[^>]*>[\s\S]*?<a:latin typeface="Cambria"[\s\S]*?It is not an approval\./);
+    expect(content).toContain('<a:srgbClr val="D97706"/>');
+    const close = await xml(3);
+    for (const chip of ["Screen", "Keep the PIF", "Notify", "Label"]) expect(close).toContain(`<a:t>${chip}</a:t>`);
+  });
+});

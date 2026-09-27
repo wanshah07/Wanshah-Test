@@ -43,6 +43,8 @@ const slides = [
   { id: "hbx", layout: "diagram", title: long(15), diagram: { kind: "hub", center: long(6), nodes: Array.from({ length: 8 }, () => ({ label: long(5), detail: long(16) })), pills: Array.from({ length: 5 }, () => long(3)) } },
   { id: "fnx", layout: "diagram", title: long(15), diagram: { kind: "funnel", stages: Array.from({ length: 7 }, (_, i) => ({ value: String(3000 - i * 400), label: long(10) })) }, body: long(20), callout: long(20) },
   { id: "eqx", layout: "diagram", title: long(15), diagram: { kind: "equation", terms: Array.from({ length: 5 }, () => ({ value: "1,250", label: long(12) })), result: { value: "40/40", label: long(12) } }, callout: long(25) },
+  { id: "hcov", layout: "title", kicker: "WORKSHOP", title: `${long(8)}\n${long(8)}`, subtitle: long(30) },
+  { id: "hclose", layout: "closing", title: `${long(8)}\n${long(8)}`, subtitle: long(25), bullets: Array.from({ length: 4 }, () => long(6)) },
   { id: "n", layout: "cards", kicker: "NEXT STEPS", title: "Three decisions before the next batch", subtitle: "Each card is one owner and one date.", cards: [{ heading: "Reformulate rinse-off SKUs to 2%", detail: "R&D, before the next batch.", tag: "HIGH" }, { heading: "Update the labels", detail: "Regulatory and packaging.", tag: "MEDIUM" }, { heading: "Confirm the effective date", detail: "With NPRA this month." }], citations: ["EC 1223/2009 Annex III entry 98"] },
 ];
 // ONLY=tb keeps one slide, and with an outDir also writes it as a picture.

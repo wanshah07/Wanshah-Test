@@ -1,5 +1,5 @@
 import type { Deck, Slide, Theme } from "../deck.js";
-import { fontStack, sanitizeTheme } from "../theme.js";
+import { fontStack, glowOf, sanitizeTheme } from "../theme.js";
 import { esc, inline } from "./escape.js";
 import { chartSvg, seriesPalette } from "./charts.js";
 import { mapGrid, mapTiles, tileName } from "../map.js";
@@ -30,6 +30,8 @@ export function themeVars(raw: Theme): string {
     `--radius:${t.radius}px`,
     `--font-display:${fontStack(t.fontDisplay)}`,
     `--font-body:${fontStack(t.fontBody)}`,
+    `--font-quote:${fontStack(t.fontQuote ?? t.fontDisplay)}`,
+    `--glow:${glowOf(c.brand)}`,
   ].join(";");
 }
 
@@ -91,6 +93,30 @@ function chrome(s: Slide, t: Theme, ctx: RenderCtx): string {
   if (foot.length) out += `<div class="sc-foot">${foot.join("")}</div>`;
   if (t.tag) out += `<div class="sc-tag">${esc(t.tag)}</div>`;
   return out;
+}
+
+/** A deterministic number from a string, so a slide's particle field is the same on every render. */
+function seedOf(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+/** About forty faint dots behind a bloom slide: 3 to 9 px, the brand colour at 5 to 15%. */
+export function particles(seed: string, n = 40): { x: number; y: number; r: number; o: number }[] {
+  let x = seedOf(seed) || 1;
+  const rnd = () => ((x = Math.imul(x ^ (x >>> 15), 2246822507) ^ Math.imul(x ^ (x >>> 13), 3266489909)), ((x ^= x >>> 16) >>> 0) / 4294967296);
+  return Array.from({ length: n }, () => ({ x: Math.round(rnd() * 1920), y: Math.round(rnd() * 1080), r: Math.round((1.5 + rnd() * 3) * 1.5 * 10) / 10, o: Math.round((0.05 + rnd() * 0.1) * 100) / 100 }));
+}
+
+function particlesSvg(seed: string): string {
+  return `<svg class="sc-dots" viewBox="0 0 1920 1080" aria-hidden="true">${particles(seed).map((p) => `<circle cx="${p.x}" cy="${p.y}" r="${p.r}" style="fill:var(--brand)" fill-opacity="${p.o}"/>`).join("")}</svg>`;
+}
+
+/** A title on two lines: the second one lit on a dark cover. */
+function titleLines(s: Slide): string {
+  const [a, ...rest] = s.title.split(/\n+/);
+  return rest.length ? `${inline(a)}<br><span class="l2">${inline(rest.join(" "))}</span>` : inline(s.title);
 }
 
 /** A number drawn as a ring: the percentage in the figure, or null when it carries none. */
@@ -191,7 +217,9 @@ export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): stri
     case "title":
     case "closing": {
       const hero = s.layout === "title" && s.kpi?.length ? `<div class="sc-hero">${s.kpi.slice(0, 4).map((k) => `<div class="hs"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div></div>`).join("")}</div>` : "";
-      body = `${heading(s)}<div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}${s.body ? `<p class="sc-sub">${inline(s.body)}</p>` : ""}${hero}`;
+      const chips = s.layout === "closing" && s.bullets?.length ? `<div class="sc-chips">${s.bullets.slice(0, 4).map((b) => `<span>${inline(b)}</span>`).join("")}</div>` : "";
+      const k = s.kicker;
+      body = `<h2 class="sc-h">${k ? `<span class="sc-kicker">${esc(k)}</span>` : ""}${titleLines(s)}</h2><div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}${s.body ? `<p class="sc-sub">${inline(s.body)}</p>` : ""}${hero}${chips}`;
       break;
     }
     case "section":
@@ -265,7 +293,8 @@ export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): stri
   const cls = ["sc-slide", `sc-${s.layout}`, `sc-style-${t.slideStyle}`];
   if (t.upperTitles) cls.push("sc-upper");
   if (t.darkTitle && (s.layout === "title" || s.layout === "closing")) cls.push("sc-dark");
-  return `<div class="${cls.join(" ")}" style="${themeVars(t)}" data-slide="${esc(s.id)}">${logoHtml(t, ctx)}<div class="sc-body">${body}</div>${chrome(s, t, ctx)}</div>`;
+  const dots = t.slideStyle === "bloom" && s.layout !== "section" ? particlesSvg(s.id) : "";
+  return `<div class="${cls.join(" ")}" style="${themeVars(t)}" data-slide="${esc(s.id)}">${dots}${logoHtml(t, ctx)}<div class="sc-body">${body}</div>${chrome(s, t, ctx)}</div>`;
 }
 
 function placeholder(text: string, lang: "en" | "ms"): string {

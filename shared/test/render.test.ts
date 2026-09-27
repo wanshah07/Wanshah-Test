@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { verdictTone, renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS, sanitizeSlide, sanitizeTheme, themeGuide, ringPercent, mapTiles, mapTone, stepRate } from "../src/index.js";
+import { verdictTone, renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS, sanitizeSlide, sanitizeTheme, themeGuide, ringPercent, mapTiles, mapTone, stepRate, glowOf, particles, fontsUrl, SLIDE_CSS } from "../src/index.js";
 import type { Deck, Slide } from "../src/index.js";
 
 const theme = themePreset("facerinna");
@@ -250,5 +250,48 @@ describe("the elements the reference decks use", () => {
     const html = renderSlideHtml(s, T("booth-bright"), ctx);
     expect(html).toContain(`--cc:${T("booth-bright").series![1]}`);
     expect(renderSlideHtml(s, theme, ctx)).not.toContain("--cc:");
+  });
+});
+
+describe("the house design system", () => {
+  const house = themePreset("house");
+  it("is a preset with the house palette, fonts and look", () => {
+    expect(house).toMatchObject({ id: "house", fontDisplay: "Arial", fontBody: "Calibri", fontQuote: "Cambria", radius: 22, slideStyle: "bloom", darkTitle: true });
+    expect(house.colors).toMatchObject({ ink: "#0B1B3A", brandDeep: "#16305E", brand: "#0D9488", accent: "#D97706", ink2: "#44546A" });
+    expect(glowOf("#0D9488")).toBe("#5EEAD4");
+    expect(glowOf("#E4708A")).toMatch(/^#[0-9A-F]{6}$/);
+    // The fallback preset for an unknown theme is unchanged, so saved designs do not pick up the house habits.
+    expect(themePreset("no-such-id").id).toBe("facerinna");
+    expect(sanitizeTheme({ ...house, slideStyle: "bloom" }).slideStyle).toBe("bloom");
+    expect(fontsUrl(house)).toContain("Caladea");
+  });
+
+  it("draws a dark cover with its second line lit, and the closing takeaways as chips", () => {
+    const cover = renderSlideHtml({ id: "c", layout: "title", kicker: "WORKSHOP", title: "How a label becomes\ncompliant in five steps" }, house, ctx);
+    expect(cover).toContain("sc-style-bloom");
+    expect(cover).toContain("sc-dark");
+    expect(cover).toContain('How a label becomes<br><span class="l2">compliant in five steps</span>');
+    expect(cover).toContain("sc-dots");
+    expect(cover.match(/<circle /g)?.length).toBe(40);
+    const close = renderSlideHtml({ id: "z", layout: "closing", title: "Notify first,\nsell second", bullets: ["Screen", "Keep the PIF", "Notify", "Label", "extra"] }, house, ctx);
+    expect(close.match(/<span>[^<]+<\/span>/g)?.length).toBe(4);
+  });
+
+  it("draws the same particle field for a slide every time, and a different one for another slide", () => {
+    expect(particles("s_1")).toEqual(particles("s_1"));
+    expect(particles("s_1")).not.toEqual(particles("s_2"));
+    for (const p of particles("s_1")) {
+      expect(p.o).toBeGreaterThanOrEqual(0.05);
+      expect(p.o).toBeLessThanOrEqual(0.15);
+    }
+  });
+
+  it("gives content slides amber eyebrows and the pull-quote band, in the quote font", () => {
+    const html = renderSlideHtml({ id: "k", layout: "cards", kicker: "THE PATHWAY", title: "A notification is a form", cards: [{ heading: "A" }, { heading: "B" }], callout: "It is not an approval." }, house, ctx);
+    expect(html).toContain("--font-quote:'Cambria','Caladea'");
+    expect(html).toContain("--glow:#5EEAD4");
+    expect(html).toContain('class="sc-callout">It is not an approval.<');
+    expect(SLIDE_CSS).toMatch(/\.sc-style-bloom \.sc-h \.sc-kicker\{color:var\(--accent\)/);
+    expect(SLIDE_CSS).toMatch(/\.sc-style-bloom \.sc-callout\{border-radius:999px/);
   });
 });
