@@ -12,6 +12,14 @@ interface Behaviour {
   refuseMaxCompletion?: boolean;
   fenced?: boolean;
   silent?: boolean;
+  /** Gemini: a list-shaped error, with a reason that never says "schema". */
+  gemini?: boolean;
+  geminiModels?: boolean;
+  /** A rate limit: the number of 429s still to send, and the wait they ask for. */
+  limited?: number;
+  retryIn?: number;
+  daily?: boolean;
+  badModel?: boolean;
 }
 
 let behaviour: Behaviour = {};
@@ -29,7 +37,8 @@ beforeAll(async () => {
       if (behaviour.silent) return; // accept, never answer
       if (req.url === "/v1/models") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ data: [{ id: "claude-sonnet" }, { id: "gpt-4.1" }, { id: "llama-3" }] }));
+        if (behaviour.geminiModels) res.end(JSON.stringify({ object: "list", data: ["models/gemini-2.5-flash", "models/gemini-2.5-flash-preview-image", "models/imagen-4.0-generate-001", "models/text-embedding-004", "models/gemini-2.5-flash-preview-tts", "models/gemini-2.5-pro"].map((id) => ({ id, object: "model" })) }));
+        else         res.end(JSON.stringify({ data: [{ id: "claude-sonnet" }, { id: "gpt-4.1" }, { id: "llama-3" }] }));
         return;
       }
       const body = raw ? JSON.parse(raw) : {};
@@ -38,6 +47,17 @@ beforeAll(async () => {
         res.writeHead(400, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: { message: msg, type: "invalid_request_error" } }));
       };
+      const geminiFail = (msg: string) => {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify([{ error: { code: 400, message: msg, status: "INVALID_ARGUMENT" } }]));
+      };
+      if (behaviour.limited && behaviour.limited > 0) {
+        behaviour.limited--;
+        res.writeHead(429, { "content-type": "application/json" });
+        return res.end(JSON.stringify([{ error: { code: 429, message: `You exceeded your current quota.\nPlease retry in ${behaviour.retryIn}s.`, status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: `${behaviour.retryIn}s` }, ...(behaviour.daily ? [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaMetric: "generativelanguage.googleapis.com/generate_content_free_tier_requests", quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] : [])] } }]));
+      }
+      if (behaviour.badModel) return geminiFail("* GenerateContentRequest.model: unexpected model name format");
+      if (behaviour.gemini && body.response_format?.type === "json_schema") return geminiFail('Invalid JSON payload received. Unknown name "additionalProperties" at \'generation_config.response_schema\': Cannot find field.');
       if (behaviour.refuseMaxCompletion && "max_completion_tokens" in body) return fail("Unrecognized request argument supplied: max_completion_tokens");
       if (behaviour.refuseSchema && body.response_format?.type === "json_schema") return fail("response_format json_schema is not supported by this model");
       const content = JSON.stringify({ title: "ok", n: 1 });
@@ -58,6 +78,59 @@ const auth = (): LlmAuth => ({ apiKey: "k", model: "claude-sonnet", imageModel: 
 const args = () => ({ auth: auth(), system: "sys", user: "u", schemaName: "t", schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] } });
 
 describe("gateway compatibility", () => {
+  it("waits as long as a rate limit asks, then goes on", async () => {
+    behaviour = { limited: 1, retryIn: 0.4 };
+    const t0 = Date.now();
+    expect(await chatJson(args())).toEqual({ title: "ok", n: 1 });
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1300); // 0.4 s asked, plus a second's margin
+    behaviour = {};
+  });
+
+  it("does not wait on a daily quota even when it says retry in seconds", async () => {
+    behaviour = { limited: 5, retryIn: 1, daily: true };
+    const t0 = Date.now();
+    const e = await chatJson(args()).catch((x) => x);
+    behaviour = {};
+    expect(Date.now() - t0).toBeLessThan(900);
+    expect(e.status).toBe(429);
+  });
+
+  it("does not sit out a long (daily) limit: it stops and says why", async () => {
+    behaviour = { limited: 5, retryIn: 3600 };
+    const t0 = Date.now();
+    const e = await chatJson(args()).catch((x) => x);
+    behaviour = {};
+    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(e).toBeInstanceOf(LlmError);
+    expect(e.status).toBe(429);
+    expect(e.message).toMatch(/You exceeded your current quota/);
+  });
+
+  it("lists only models that can write, with Gemini's models/ prefix removed, and picture models apart", async () => {
+    behaviour = { geminiModels: true };
+    const r = await checkKey("k", base);
+    behaviour = {};
+    expect(r.models).toEqual(["gemini-2.5-flash", "gemini-2.5-pro"]);
+    expect(r.imageModels).toEqual(["gemini-2.5-flash-preview-image", "imagen-4.0-generate-001"]);
+  });
+
+  it("falls back to plain JSON when Gemini refuses the strict schema in its own words", async () => {
+    behaviour = { gemini: true };
+    seen.length = 0;
+    expect(await chatJson(args())).toEqual({ title: "ok", n: 1 });
+    expect(seen.map((b) => (b.response_format as { type: string }).type)).toEqual(["json_schema", "json_object"]);
+    behaviour = {};
+  });
+
+  it("shows Gemini's own reason when it refuses a request", async () => {
+    behaviour = { badModel: true };
+    const e = await chatJson(args()).catch((x) => x);
+    behaviour = {};
+    expect(e).toBeInstanceOf(LlmError);
+    expect(e.message).toMatch(/answered 400: \* GenerateContentRequest\.model: unexpected model name format/);
+    expect(e.code).toBe("INVALID_ARGUMENT");
+  });
+
   it("uses strict json_schema when the endpoint accepts it", async () => {
     behaviour = {};
     seen.length = 0;

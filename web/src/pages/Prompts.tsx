@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type SavedPrompt } from "../api";
+import { BackButton } from "../components/BackButton";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { toast } from "../components/Toast";
 
@@ -45,6 +46,7 @@ export default function Prompts() {
   };
   return (
     <main className="page stack" style={{ maxWidth: 820 }}>
+      <BackButton />
       <div className="row between">
         <div>
           <h1>Prompts</h1>

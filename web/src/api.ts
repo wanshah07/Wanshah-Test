@@ -24,6 +24,10 @@ async function req<T>(method: string, url: string, body?: unknown, form?: FormDa
   } catch {
     json = { raw: text };
   }
+  // 502/503/504 with no JSON body comes from the proxy in front of Slidecraft (a codespace's port
+  // forwarder), not from Slidecraft: its server is stopped, restarting or still building.
+  if (!res.ok && res.status >= 502 && res.status <= 504 && !json.message && !json.error)
+    throw new ApiError(`Slidecraft's server did not answer (${res.status}). It is stopped, restarting or still building: check the terminal running npm start, start it again if it has stopped, then reload this page.`, res.status, "server_down");
   if (!res.ok) throw new ApiError(String(json.message || json.error || `${res.status} ${res.statusText}`), res.status, json.error ? String(json.error) : undefined);
   return json as T;
 }
@@ -35,6 +39,9 @@ export interface DeckSummary {
   angle: string;
   slides: number;
   themeId?: string;
+  /** The deck's own theme and first slide, for its card. */
+  theme?: Theme;
+  cover?: Slide;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,7 +49,6 @@ export interface DeckSummary {
 export interface DeckResponse {
   deck: Deck;
   slop: Record<string, SlopHit[]>;
-  sahkan: number;
 }
 
 export interface Job {
@@ -66,6 +72,8 @@ export interface Settings {
   defaults: { model: string; imageModel: string };
   /** Whether the writer model reads pictures, as last checked. */
   vision: "yes" | "no" | "unknown";
+  /** An optional second endpoint that only reads uploaded pictures. */
+  reader: { baseUrl: string; model: string; key: string; complete: boolean };
   appTheme: "light" | "dark" | "system";
   defaultTheme: string;
 }
@@ -181,7 +189,10 @@ export const api = {
   feedback: (deckId: string, sid: string, text: string, apply: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/feedback`, { text, apply }),
   slideOk: (deckId: string, sid: string, ok: boolean) => req<{ slide: Slide; slop: SlopHit[] }>("POST", `/api/decks/${deckId}/slides/${sid}/ok`, { ok }),
   applyAllFeedback: (deckId: string) => req<{ jobId: string }>("POST", `/api/decks/${deckId}/feedback/apply`),
-  testKey: (openaiKey?: string, baseUrl?: string, model?: string) => req<{ ok: boolean; message: string; models?: string[]; vision?: string }>("POST", "/api/settings/test-key", { openaiKey, baseUrl, model }),
+  saveReader: (b: { key?: string | null; baseUrl?: string | null; model?: string | null }) => req<{ ok: true }>("PUT", "/api/settings/reader", b),
+  clearReader: () => req<{ ok: true }>("DELETE", "/api/settings/reader"),
+  testReader: (b: { key?: string; baseUrl?: string; model?: string }) => req<{ ok: boolean; message: string; models?: string[]; vision?: string }>("POST", "/api/settings/reader/test", b),
+  testKey: (openaiKey?: string, baseUrl?: string, model?: string) => req<{ ok: boolean; message: string; models?: string[]; imageModels?: string[]; vision?: string }>("POST", "/api/settings/test-key", { openaiKey, baseUrl, model }),
 };
 
 export function mediaUrl(id: string): string {

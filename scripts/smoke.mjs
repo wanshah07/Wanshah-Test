@@ -39,6 +39,8 @@ try {
   check("decks page renders", await page.locator("h1", { hasText: "Decks" }).isVisible());
   // Library: a design from a screenshot, and a saved prompt ticked by default.
   await page.goto(`http://localhost:${PORT}/designs`);
+  await page.locator("h1", { hasText: "Designs" }).waitFor({ timeout: 10000 });
+  check("Designs has a Back button", (await page.locator("button:has-text('← Back')").count()) === 1);
   const png = path.join(tmp, "Reference slide.png");
   {
     // An opaque slide picture: navy with a blue bar.
@@ -105,6 +107,7 @@ try {
   await page.click("button:has-text('Generate')");
   await page.locator("text=The writer endpoint did not answer in time.").waitFor({ timeout: 10000 }).catch(() => {});
   check("a failure says what went wrong in plain words", (await page.locator("text=The writer endpoint did not answer in time.").count()) === 1);
+  check("a failed generation offers Back", (await page.locator("button:has-text('← Back')").count()) === 1);
   await page.click("button:has-text('Try again')");
   await page.locator("button:has-text('Write anyway')").waitFor({ timeout: 10000 }).catch(() => {});
   check("unreadable pictures stop the writer and offer a choice", (await page.locator("text=cannot read pictures").count()) >= 1 && (await page.locator("button:has-text('Write anyway')").count()) === 1);
@@ -195,6 +198,7 @@ try {
   await page.locator("text=Composio API key").waitFor({ timeout: 5000 }).catch(() => {});
   check("OneDrive can go through Composio", (await page.locator("text=Composio API key").count()) === 1 && (await page.locator("button:has-text('Find my OneDrive accounts')").count()) === 1);
   check("settings says whether the writer reads pictures", (await page.locator("text=Reads pictures:").count()) === 1);
+  check("settings offers a separate picture reader", (await page.locator("[data-testid=reader] h2", { hasText: "Picture reader" }).count()) === 1 && (await page.locator("button:has-text('Save picture reader')").count()) === 1);
   // Inside another page (VS Code's preview pane), say so and offer a real tab.
   await page.setContent(`<iframe src="http://localhost:${PORT}/" style="width:1200px;height:700px"></iframe>`);
   const inner = page.frameLocator("iframe");

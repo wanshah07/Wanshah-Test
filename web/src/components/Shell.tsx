@@ -46,7 +46,7 @@ export function Shell() {
           <span className="sp" />
           {me && (
             <span className="row small muted">
-              {me.name || me.email}
+              <span className="who">{me.name || me.email}</span>
               {mode === "local" && (
                 <button className="btn btn-quiet btn-sm" onClick={() => api.logout().then(() => nav("/login"))}>Sign out</button>
               )}

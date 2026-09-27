@@ -1,9 +1,10 @@
 import { ANGLES, angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themePreset, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
 import { config } from "../config.js";
 import { getDb, now } from "../db.js";
-import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, type SourceRow } from "../store.js";
+import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, updateDeck, updateSlide, type SourceRow } from "../store.js";
 import { NOTHING, readPicture, visionFor } from "./vision.js";
 import fs from "node:fs";
+import path from "node:path";
 import { chatJson, chatText, generateImage, LlmError, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
 import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
@@ -11,6 +12,9 @@ import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
 import { resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
 import { getDesign, promptTexts } from "../library.js";
+import { pictureAuth } from "../reader.js";
+import { visualise } from "./visualise.js";
+import { designPass, needsDesign, placePictures } from "./design.js";
 
 export interface Job {
   id: string;
@@ -40,6 +44,23 @@ export function log(jobId: string, line: string): void {
   const p = row ? (JSON.parse(row.progress) as string[]) : [];
   p.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
   setJob(jobId, { progress: p });
+}
+
+/** The first array of slide-like objects anywhere in an answer, and where it was. */
+export function findSlides(value: unknown, at = "", depth = 0): { at: string; slides: Record<string, unknown>[]; title?: string } | null {
+  if (!value || typeof value !== "object" || depth > 4) return null;
+  if (Array.isArray(value)) {
+    const objs = value.filter((v) => v && typeof v === "object" && !Array.isArray(v)) as Record<string, unknown>[];
+    const slideLike = objs.filter((o) => typeof o.title === "string" || typeof o.heading === "string" || typeof o.layout === "string");
+    return value.length >= 2 && slideLike.length >= Math.ceil(value.length / 2) ? { at: at || "(top level)", slides: objs } : null;
+  }
+  const o = value as Record<string, unknown>;
+  const keys = Object.keys(o).sort((a, b) => Number(/slide/i.test(b)) - Number(/slide/i.test(a)));
+  for (const k of keys) {
+    const hit = findSlides(o[k], at ? `${at}.${k}` : k, depth + 1);
+    if (hit) return { ...hit, title: hit.title ?? (typeof o.title === "string" ? o.title : undefined) };
+  }
+  return null;
 }
 
 export function normaliseParams(raw: Record<string, unknown>, fallbackAngle = "custom"): GenerateParams {
@@ -88,8 +109,36 @@ export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): 
   p.slides = Math.max(6, Math.min(30, Math.round(Number(plan.slides) || 12)));
   if (!p.title && plan.title?.trim()) p.title = plan.title.trim().slice(0, 140);
   const f = plan.features ?? ({} as Plan["features"]);
-  p.features = { ...p.features, charts: !!f.charts, tables: !!f.tables, diagrams: !!f.diagrams, kpis: !!f.kpis, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
+  // Charts, tables, diagrams and big numbers stay available whatever the plan says: they are how a slide carries a
+  // point without a paragraph, and the writer only uses a number tile when the sources give numbers.
+  p.features = { ...p.features, charts: true, tables: true, diagrams: true, kpis: true, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures };
   p.imageMode = hasPictures ? "uploaded" : "none";
+}
+
+/** The planner's own message: the brief and a short look at each source, and a clear instruction not to write the deck. */
+export function planUser(p: GenerateParams, sources: { name: string; kind: string; text: string }[]): string {
+  const parts = [
+    "TASK: choose the settings for a slide deck. Do NOT write the deck, its slides or any outline. Answer with the settings JSON only.",
+    `BRIEF: ${p.prompt.trim()}`,
+  ];
+  if (p.title) parts.push(`DECK TITLE: ${p.title}`);
+  if (sources.length) {
+    parts.push(`SOURCES (${sources.length}; the start of each):`);
+    for (const x of sources.slice(0, 30)) parts.push(x.kind === "image" ? `- Picture: ${x.name}` : `- ${x.name} (${x.kind}): ${x.text.slice(0, 1500).replace(/\s+/g, " ")}`);
+  } else parts.push("SOURCES: none.");
+  return parts.join("\n");
+}
+
+/** Settings used when the model will not plan: the form's angle, a length that fits the material, every visual it can fill. */
+export function fallbackPlan(p: GenerateParams, hasNumbers: boolean, sourceCount: number): Plan {
+  return {
+    title: null,
+    angle: p.angle,
+    audience: p.audience || "professional readers",
+    slides: sourceCount >= 4 ? 14 : 10,
+    features: { charts: hasNumbers, tables: true, diagrams: true, kpis: true, sections: sourceCount >= 4, summary: true, qa: false },
+    reason: "Standard settings, because the model did not return a plan.",
+  };
 }
 
 export function mockPlan(p: GenerateParams, hasNumbers: boolean): Plan {
@@ -162,9 +211,174 @@ export function demote(s: Slide): void {
   delete s.image;
 }
 
+const firstStr = (o: Record<string, unknown>, keys: string[]): string | undefined => {
+  for (const k of keys) if (typeof o[k] === "string" && (o[k] as string).trim()) return (o[k] as string).trim();
+  return undefined;
+};
+const asText = (v: unknown): string =>
+  typeof v === "string" ? v : v && typeof v === "object" ? String(firstStr(v as Record<string, unknown>, ["text", "point", "label", "title", "heading", "value"]) ?? Object.values(v as object).filter((x) => typeof x === "string").join(": ")) : String(v ?? "");
+
+/**
+ * A model that ignored the schema still wrote slides, under names of its own
+ * (heading, content, points, speakerNotes). Map those onto the schema's names,
+ * never overwriting a field the model did fill correctly.
+ */
+/** Nothing there yet: a field the model filled in any shape is left for the sanitizer to read. */
+const empty = (v: unknown): boolean => v === undefined || v === null || (typeof v === "string" && !v.trim());
+
+export function coerceSlideShape(raw: Record<string, unknown>): Record<string, unknown> {
+  const inner = raw.content && typeof raw.content === "object" && !Array.isArray(raw.content) ? (raw.content as Record<string, unknown>) : {};
+  const o: Record<string, unknown> = { ...inner, ...raw };
+  const out: Record<string, unknown> = { ...raw };
+  if (empty(out.title)) out.title = firstStr(o, ["title", "heading", "slideTitle", "slide_title", "headline", "name", "header"]) ?? "";
+  if (empty(out.kicker)) out.kicker = firstStr(o, ["eyebrow", "label", "tag", "section"]) ?? null;
+  if (empty(out.subtitle)) out.subtitle = firstStr(o, ["subheading", "sub_title", "subTitle", "tagline"]) ?? null;
+  if (empty(out.body)) out.body = firstStr(o, ["body", "text", "content", "description", "summary", "message", "paragraph", "keyMessage", "key_message"]) ?? null;
+  if (!Array.isArray(out.bullets) || !out.bullets.length) {
+    const list = ["bullets", "points", "bullet_points", "bulletPoints", "keyPoints", "key_points", "items", "content", "list"].map((k) => o[k]).find((v) => Array.isArray(v) && v.length);
+    out.bullets = list ? (list as unknown[]).map(asText).filter((x) => x.trim()) : [];
+  } else out.bullets = (out.bullets as unknown[]).map(asText).filter((x) => x.trim());
+  if (empty(out.notes)) out.notes = firstStr(o, ["speakerNotes", "speaker_notes", "presenterNotes", "narration", "script"]) ?? null;
+  addVisuals(out, o);
+  if (typeof out.layout !== "string") out.layout = firstStr(o, ["type", "slideType", "slide_type", "kind"]) ?? null;
+  return out;
+}
+
+const VALUE_KEY = /^(value|figure|number|stat|amount|percent|percentage|count)$/i;
+const LABEL_KEYS = ["label", "name", "metric", "title", "heading", "what"];
+const DETAIL_KEYS = ["detail", "description", "text", "explanation", "body", "summary", "desc"];
+const listOfObjects = (v: unknown): Record<string, unknown>[] | null =>
+  Array.isArray(v) && v.length >= 2 && v.every((x) => x && typeof x === "object" && !Array.isArray(x)) ? (v as Record<string, unknown>[]) : null;
+
+/**
+ * A model that ignored the schema still often drew the visual, in words of its own: figures as
+ * [{name, value}], a process as "stages", cards as [{title, description}]. Turn those into the
+ * slide's real visual instead of flattening them into text.
+ */
+function addVisuals(out: Record<string, unknown>, o: Record<string, unknown>): void {
+  const has = (k: string) => Array.isArray(out[k]) ? (out[k] as unknown[]).length > 0 : !!out[k] && typeof out[k] === "object";
+  const entries = Object.entries(o);
+  // Figures → number tiles.
+  if (!has("kpi")) {
+    for (const [, v] of entries) {
+      const list = listOfObjects(v);
+      if (!list || list.length > 6) continue;
+      if (!list.every((x) => Object.keys(x).some((k) => VALUE_KEY.test(k)))) continue;
+      out.kpi = list.map((x) => {
+        const vk = Object.keys(x).find((k) => VALUE_KEY.test(k))!;
+        return { label: firstStr(x, LABEL_KEYS) ?? "", value: String(x[vk] ?? ""), note: firstStr(x, ["note", ...DETAIL_KEYS]) ?? null };
+      });
+      if (out.layout !== "kpi" && !(Array.isArray(out.bullets) && out.bullets.length)) out.layout = "kpi";
+      break;
+    }
+  }
+  // A process or a timeline → a diagram.
+  const d = out.diagram && typeof out.diagram === "object" ? (out.diagram as Record<string, unknown>) : null;
+  const stepsIn = (src: Record<string, unknown>) => ["steps", "stages", "process", "flow", "phases", "procedure", "sequence"].map((k) => src[k]).find((v) => Array.isArray(v) && v.length >= 2) as unknown[] | undefined;
+  const eventsIn = (src: Record<string, unknown>) => ["events", "timeline", "milestones"].map((k) => src[k]).find((v) => Array.isArray(v) && v.length >= 2) as unknown[] | undefined;
+  const hasDiagram = d && ((Array.isArray(d.steps) && d.steps.length) || (Array.isArray(d.events) && d.events.length) || (Array.isArray(d.rows) && d.rows.length));
+  if (!hasDiagram) {
+    const events = (d && eventsIn(d)) || eventsIn(o);
+    const steps = (d && stepsIn(d)) || stepsIn(o);
+    if (events && events.every((e) => e && typeof e === "object" && firstStr(e as Record<string, unknown>, ["when", "date", "year", "time"]))) {
+      out.diagram = { kind: "timeline", events: events.map((e) => ({ when: firstStr(e as Record<string, unknown>, ["when", "date", "year", "time"]) ?? "", label: firstStr(e as Record<string, unknown>, ["label", "event", ...LABEL_KEYS, ...DETAIL_KEYS]) ?? "" })) };
+    } else if (steps) {
+      out.diagram = { kind: "flow", steps: steps.map((x) => (typeof x === "string" ? { label: x } : x && typeof x === "object" ? { label: firstStr(x as Record<string, unknown>, ["label", "step", "stage", ...LABEL_KEYS]) ?? "", detail: firstStr(x as Record<string, unknown>, DETAIL_KEYS) ?? null } : { label: String(x) })) };
+    }
+    if (out.diagram && out.layout !== "diagram" && !(Array.isArray(out.bullets) && out.bullets.length)) out.layout = "diagram";
+  }
+  // Titled points → cards.
+  if (!has("cards") && (out.layout === "cards" || !has("kpi"))) {
+    for (const [k, v] of entries) {
+      if (["kpi", "diagram", "citations", "sources", "chart", "table"].includes(k)) continue;
+      const list = listOfObjects(v);
+      if (!list || list.length > 6) continue;
+      if (!list.every((x) => firstStr(x, ["heading", "title", "name", "point"]) && firstStr(x, DETAIL_KEYS))) continue;
+      out.cards = list.map((x) => ({ heading: firstStr(x, ["heading", "title", "name", "point"])!, detail: firstStr(x, DETAIL_KEYS) ?? null, tag: firstStr(x, ["tag", "badge", "status"]) ?? null }));
+      if (!(Array.isArray(out.bullets) && out.bullets.length) || out.layout === "cards") {
+        out.layout = "cards";
+        out.bullets = [];
+      }
+      break;
+    }
+  }
+  // A table under other names.
+  const t = out.table && typeof out.table === "object" ? (out.table as Record<string, unknown>) : null;
+  if (t && !Array.isArray(t.header)) {
+    const header = ["headers", "columns", "cols", "head"].map((k) => t[k]).find(Array.isArray);
+    if (header) out.table = { ...t, header };
+  }
+}
+
+/** A slide with nothing on its face: no title, no body, no bullets, nothing drawn. */
+function isBlank(s: Slide): boolean {
+  const r = s as unknown as Record<string, unknown>;
+  return !String(s.title ?? "").trim() && !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote;
+}
+
+const NOT_FACE = new Set(["title", "heading", "slidetitle", "slide_title", "headline", "kicker", "eyebrow", "subtitle", "layout", "type", "kind", "slidetype", "notes", "speakernotes", "speaker_notes", "presenternotes", "narration", "script", "citations", "sources", "source", "references", "id", "image", "prompt", "unit", "sourcename"]);
+
+/**
+ * Every piece of text a slide carries outside the fields that name or annotate it, as bullets:
+ * what is left when the model put the content somewhere the schema has no name for, or in a
+ * visual the slide could not draw. A pair like {label, value} becomes one line.
+ */
+const LABEL_KEY = /^(label|name|heading|metric|key|term|step|stage|item|when|date|year)$/i;
+
+export function harvestText(raw: unknown, max = 6): string[] {
+  const out: string[] = [];
+  const walk = (v: unknown, depth: number): void => {
+    if (out.length >= max || depth > 4 || v == null) return;
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t.length >= 3 && !out.includes(t)) out.push(t.length > 160 ? t.slice(0, 157).trimEnd() + "…" : t);
+      return;
+    }
+    if (typeof v === "number") return;
+    if (Array.isArray(v)) return v.forEach((x) => walk(x, depth + 1));
+    if (typeof v !== "object") return;
+    const o = v as Record<string, unknown>;
+    const strEntries = Object.entries(o).filter(([k, x]) => typeof x === "string" && x.trim() && !NOT_FACE.has(k.toLowerCase()));
+    const strs = strEntries.map(([, x]) => (x as string).trim());
+    const rest = Object.entries(o).filter(([k, x]) => typeof x !== "string" && !NOT_FACE.has(k.toLowerCase()));
+    const labelled = strEntries.some(([k]) => LABEL_KEY.test(k)) || Object.values(o).some((x) => typeof x === "number");
+    if (depth > 0 && labelled && strs.length >= 1 && strs.length <= 3 && strs.join(" ").length <= 160) {
+      // A small record ({label, value, note}) reads as one line.
+      const line = strs.join(": ");
+      const num = Object.values(o).find((x) => typeof x === "number");
+      const full = num !== undefined && !line.includes(String(num)) ? `${line}: ${num}` : line;
+      if (!out.includes(full)) out.push(full);
+    } else strs.forEach((x) => walk(x, depth + 1));
+    rest.forEach(([, x]) => walk(x, depth + 1));
+  };
+  walk(raw, 0);
+  return out.slice(0, max);
+}
+
+const STRUCTURAL = new Set(["title", "section", "closing"]);
+
+/** A content slide that says nothing below its title. */
+export function hasNoFace(s: Slide): boolean {
+  if (STRUCTURAL.has(s.layout)) return false;
+  const r = s as unknown as Record<string, unknown>;
+  return !String(r.body ?? "").trim() && !(Array.isArray(r.bullets) && r.bullets.length) && !(Array.isArray(r.bulletsRight) && r.bulletsRight.length) && !r.chart && !r.table && !r.diagram && !(Array.isArray(r.kpi) && r.kpi.length) && !(Array.isArray(r.cards) && r.cards.length) && !r.quote && !r.image;
+}
+
 function toSlide(raw: Record<string, unknown>, features: Features, imageMode: string): Slide {
-  const s = normaliseSlide(raw);
-  s.diagram = coerceDiagram(raw.diagram);
+  const s = finishSlide(normaliseSlide(coerceSlideShape(raw)), raw, features, imageMode);
+  if (hasNoFace(s)) {
+    // The content is in the answer, just not where a field reads it: put it on the slide as points.
+    const got = harvestText(raw);
+    if (got.length) {
+      s.layout = "bullets";
+      (s as unknown as Record<string, unknown>).bullets = got;
+    }
+  }
+  return s;
+}
+
+function finishSlide(s: Slide, raw: Record<string, unknown>, features: Features, imageMode: string): Slide {
+  s.diagram = coerceDiagram(raw.diagram) ?? s.diagram;
   if (s.layout === "diagram" && !s.diagram) s.layout = "bullets";
   if (s.layout === "chart" && (!s.chart || !s.chart.series?.length)) s.layout = "bullets";
   if (s.layout === "table" && !s.table?.header?.length) s.layout = "bullets";
@@ -194,25 +408,38 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       try {
         const r = await importFolder(userId, deckId, deck.onedrive.folder, deck.onedrive.subfolders, (l) => log(jobId, l));
         log(jobId, summarise(r));
-        deck.onedrive.lastSync = now();
-        saveDeck(userId, deck);
+        updateDeck(userId, deckId, (d) => {
+          if (d.onedrive) d.onedrive.lastSync = now();
+        });
       } catch (e) {
         // A OneDrive outage costs the fresh pull, never the deck.
         log(jobId, `OneDrive not read (${(e as Error).message}). Using the pictures already pulled.`);
       }
     }
-    if (auth) await readUploadedPictures(jobId, userId, deckId, auth);
+    const reader = config.mockLlm ? null : pictureAuth(userId);
+    if (reader) await readUploadedPictures(jobId, userId, deckId, reader);
     const rows = listSources(deckId);
     const { sources, condensed } = await prepareSources(jobId, auth, p, rows);
     if (p.auto) {
       log(jobId, "Auto: reading the material to choose the angle, audience, length and layouts");
       const hasPictures = rows.some((r) => r.kind === "image" && r.media_id);
-      const plan: Plan = config.mockLlm || !auth
-        ? mockPlan(p, sources.some((x) => /\d{2,}/.test(x.text)))
-        : await chatJson({ auth, system: planSystem(), user: userPrompt(p, sources.map((x) => ({ ...x, text: x.text.slice(0, 12000) })), condensed), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+      const hasNumbers = sources.some((x) => /\d{2,}/.test(x.text));
+      let plan: Plan;
+      if (config.mockLlm || !auth) plan = mockPlan(p, hasNumbers);
+      else {
+        try {
+          plan = await chatJson({ auth, system: planSystem(), user: planUser(p, sources), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+        } catch (e) {
+          // The plan only picks settings; a model that will not give one still gets to write the deck.
+          if (!(e instanceof LlmError) || !["parse", "length", "unsupported"].includes(String(e.code))) throw e;
+          log(jobId, `Auto: the model did not return a plan (${e.message}), so standard settings are used`);
+          if (e.raw !== undefined) log(jobId, `Model reply (first ${RAW_KEEP} characters): ${e.raw || "(empty)"}`);
+          plan = fallbackPlan(p, hasNumbers, sources.length);
+        }
+      }
       applyPlan(p, plan, hasPictures);
       const on = (["charts", "tables", "diagrams", "kpis", "sections"] as const).filter((k) => p.features[k]);
-      log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}. ${plan.reason}`);
+      log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}.${plan.reason ? " " + plan.reason : ""}`);
       const d = loadDeck(userId, deckId);
       if (d) {
         d.brief = { ...(d.brief ?? { text: "", purposes: [], include: [], audiences: [] }), slides: p.slides, imageMode: p.imageMode, features: { ...p.features }, auto: true };
@@ -231,22 +458,81 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         { auth, system: systemPrompt(p), user: userPrompt(p, sources, condensed), schemaName: "deck", schema: DECK_SCHEMA, maxTokens: Math.min(32000, 1800 * p.slides + 2000) },
       );
     }
-    const slides = (json.slides ?? []).map((r) => toSlide(r, p.features, p.imageMode));
+    if (!Array.isArray(json.slides)) {
+      // A model that wrapped the deck in a shape of its own ({deck:{slides}}, {outline:[…]}) still wrote it.
+      const found = findSlides(json);
+      if (found) {
+        log(jobId, `The writer put the slides under "${found.at}" instead of "slides"; using them`);
+        json = { ...json, title: json.title ?? found.title ?? "", subtitle: json.subtitle ?? null, slides: found.slides };
+      }
+    }
+    const rawSlides = (Array.isArray(json.slides) ? json.slides : []).filter((r) => r && typeof r === "object") as Record<string, unknown>[];
+    const slides = rawSlides.map((r) => toSlide(r, p.features, p.imageMode));
+    // Keep the writer's answer for this deck, so a deck that comes out wrong can be looked into.
+    try {
+      const dir = path.join(config.dataDir, "writer-replies");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${deckId}.json`), JSON.stringify(json, null, 2));
+    } catch {
+      /* diagnostics only */
+    }
+    const content = slides.filter((x) => !STRUCTURAL.has(x.layout));
+    const faceless = content.filter(hasNoFace).length;
+    const blank = slides.filter(isBlank).length;
+    if (faceless) {
+      const sample = rawSlides.find((r, i) => hasNoFace(slides[i]));
+      log(jobId, `${faceless} slide${faceless === 1 ? "" : "s"} came back with a title and nothing under it. First one as the writer sent it: ${rawSnippet(JSON.stringify(sample ?? {}))}`);
+    }
+    if (slides.length && blank > slides.length / 2) {
+      // Better a clear failure than a deck of empty frames that reads as done.
+      const keys = [...new Set(rawSlides.flatMap((r) => Object.keys(r)))].slice(0, 20).join(", ");
+      const e = new LlmError(`The writer returned ${slides.length} slides but ${blank} have nothing on them (it used the fields: ${keys || "none"})`, 0, "no_slides");
+      e.raw = rawSnippet(JSON.stringify(json));
+      throw e;
+    }
+    if (content.length && faceless > content.length / 2) {
+      const keys = [...new Set(rawSlides.flatMap((r) => Object.keys(r)))].slice(0, 20).join(", ");
+      const e = new LlmError(`The writer returned ${content.length} content slides but ${faceless} have a title and nothing on them (it used the fields: ${keys || "none"})`, 0, "no_slides");
+      e.raw = rawSnippet(JSON.stringify(json));
+      throw e;
+    }
     if (!slides.length) {
       const e = new LlmError("The writer returned no slides", 0, "no_slides");
       e.raw = rawSnippet(JSON.stringify(json));
       throw e;
     }
+    // Design: a writer that answered in bullets is asked to redraw its text slides from the sources' own figures.
+    if (!config.mockLlm && auth && needsDesign(slides)) {
+      log(jobId, "Designing: most slides are text, so the writer is asked to redraw them as charts, tables, diagrams and figures");
+      try {
+        const n = await designPass(auth, slides, sources, p.features, p.lang, (r) => toSlide(r, p.features, p.imageMode));
+        log(jobId, n ? `Design: ${n} slide${n === 1 ? "" : "s"} redrawn as visuals` : "Design: the writer found no slide it could redraw honestly");
+      } catch (e) {
+        // The deck is already written; a design pass that fails costs the redesign, never the deck.
+        log(jobId, `Design pass skipped: ${(e as Error).message}`);
+      }
+    }
     // Pictures.
     const imageSlides = slides.filter((s) => s.layout === "image");
+    const pics = rows.filter((r) => r.kind === "image" && r.media_id);
     if (imageSlides.length && p.imageMode === "uploaded") {
-      const pics = rows.filter((r) => r.kind === "image" && r.media_id);
-      let k = 0;
-      for (const s of imageSlides) {
-        const want = String((json.slides.find((r) => r.title === s.title) as { image?: { sourceName?: string } } | undefined)?.image?.sourceName ?? "").toLowerCase();
-        const match = pics.find((r) => want && (r.name.toLowerCase() === want || (r.rel_path ?? "").toLowerCase() === want)) ?? pics[k++ % Math.max(pics.length, 1)];
-        if (match?.media_id) s.image = { ...(s.image ?? {}), mediaId: match.media_id };
+      const taken = new Set<string>();
+      for (const [i, s] of slides.entries()) {
+        if (s.layout !== "image" || s.image?.mediaId) continue;
+        // The file the writer named; slides still line up with the writer's answer here.
+        const want = String((rawSlides[i]?.image as { sourceName?: unknown } | undefined)?.sourceName ?? "").toLowerCase().trim();
+        const byName = (r: SourceRow) => !!want && (r.name.toLowerCase() === want || (r.rel_path ?? "").toLowerCase() === want);
+        // The picture the writer named; else the next one not yet on a slide; never the same picture twice while others wait.
+        const match = pics.find((r) => byName(r)) ?? pics.find((r) => !taken.has(r.media_id!)) ?? null;
+        if (match?.media_id) {
+          s.image = { ...(s.image ?? {}), mediaId: match.media_id };
+          taken.add(match.media_id);
+        }
       }
+    }
+    if (p.imageMode === "uploaded" && p.features.images && pics.length) {
+      const placed = placePictures(slides, pics.map((r) => ({ mediaId: r.media_id!, name: r.rel_path || r.name, text: r.text })), p.lang, 6, p.auto ? Infinity : p.slides);
+      if (placed) log(jobId, `${placed} uploaded picture${placed === 1 ? "" : "s"} the writer did not use put on the slides they belong to`);
     } else if (imageSlides.length && p.imageMode === "generate" && auth) {
       let n = 0;
       for (const s of imageSlides) {
@@ -264,13 +550,19 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         }
       }
     }
-    deck.title = json.title || deck.title;
-    if (json.subtitle) deck.subtitle = json.subtitle;
-    deck.lang = p.lang;
-    deck.angle = p.angle;
-    deck.audience = p.audience;
-    deck.slides = slides;
-    saveDeck(userId, deck);
+    // Whatever is still text-heavy is redrawn from its own words.
+    const redrawn = visualise(slides, p.features);
+    if (redrawn) log(jobId, `${redrawn} more text slide${redrawn === 1 ? "" : "s"} redrawn from their own words as figures, diagrams or cards`);
+    // Written into the deck as it is now: a theme, design or brief changed while the writer worked is kept.
+    const saved = updateDeck(userId, deckId, (d) => {
+      d.title = json.title || d.title;
+      if (json.subtitle) d.subtitle = json.subtitle;
+      d.lang = p.lang;
+      d.angle = p.angle;
+      d.audience = p.audience;
+      d.slides = slides;
+    });
+    if (!saved) throw new Error("The deck was deleted while it was being written.");
     log(jobId, `Done: ${slides.length} slides`);
     setJob(jobId, { status: "done", result: { deckId } });
   } catch (e) {
@@ -302,9 +594,16 @@ export async function rewriteSlide(userId: string, deck: Deck, slide: Slide, ins
   const designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : undefined;
   const out = await chatJson<Record<string, unknown>>({ auth, system: rewriteSystem({ lang: deck.lang, angle: deck.angle, house, designNotes }), user, schemaName: "slide", schema: SLIDE_SCHEMA, maxTokens: 4000 });
   const s = toSlide({ ...out, id }, DEFAULT_FEATURES, "uploaded");
+  // A reply with nothing on the slide must never replace the user's slide.
+  if (!String(s.title ?? "").trim() || hasNoFace(s)) {
+    const e = new LlmError("The writer's rewrite came back empty, so the slide was left as it was. Try again, or rewrite with a clearer instruction.", 0, "no_slides");
+    e.raw = rawSnippet(JSON.stringify(out));
+    throw e;
+  }
   // Keep a picture the rewrite could not know about.
   if (slide.image?.mediaId && s.layout === "image") s.image = { ...(s.image ?? {}), mediaId: slide.image.mediaId };
-  if (review) s.review = review;
+  // New content needs a new sign-off.
+  if (review) s.review = { ...review, ok: false };
   return s;
 }
 
@@ -328,7 +627,7 @@ export function newDeck(userId: string, title: string, lang: "en" | "ms", angle:
 
 /** The instruction the writer gets for a slide's saved feedback. */
 export function feedbackInstruction(items: string[]): string {
-  return `Apply this feedback from the presenter to the slide. Change what it asks; keep every other fact, citation and [SAHKAN] marker.\n${items.map((t) => `- ${t}`).join("\n")}`;
+  return `Apply this feedback from the presenter to the slide. Change what it asks; keep every other fact and citation.\n${items.map((t) => `- ${t}`).join("\n")}`;
 }
 
 /** Applies every slide's waiting feedback, one slide at a time, as a job. */
@@ -348,11 +647,12 @@ export async function runApplyFeedback(jobId: string, userId: string, deckId: st
       if (!slide) continue;
       log(jobId, `Slide ${i + 1}: ${slide.title.slice(0, 60)}`);
       try {
-        const s = await rewriteSlide(userId, cur, slide, feedbackInstruction(pending.map((f) => f.text)));
+        const sent = (slide.review?.feedback ?? []).filter((f) => !f.appliedAt);
+        const s = await rewriteSlide(userId, cur, slide, feedbackInstruction(sent.map((f) => f.text)));
         const at = now();
-        s.review = { ok: false, feedback: (slide.review?.feedback ?? []).map((f) => (f.appliedAt ? f : { ...f, appliedAt: at })) };
-        cur.slides = cur.slides.map((x) => (x.id === s.id ? s : x));
-        saveDeck(userId, cur);
+        // Saved against the slide as it is now: feedback added while the writer worked stays waiting.
+        const done = updateSlide(userId, deckId, s.id, (now_) => ({ ...s, review: { ok: false, feedback: (now_.review?.feedback ?? []).map((f) => (!f.appliedAt && sent.some((x) => x.at === f.at && x.text === f.text) ? { ...f, appliedAt: at } : f)) } }));
+        if (!done) log(jobId, `Slide ${i + 1} was deleted while it was being rewritten; nothing saved`);
       } catch (e) {
         failed++;
         log(jobId, `Slide ${i + 1} failed: ${(e as Error).message}`);
@@ -378,10 +678,12 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
   const pics = unreadPictures(listSources(deckId));
   if (!pics.length) return;
   const v = await visionFor(userId, auth);
-  if (v !== "yes") {
-    log(jobId, `${pics.length} picture source${pics.length === 1 ? "" : "s"} used only as slide pictures: ${v === "no" ? `${auth.model} cannot read pictures` : "could not check whether the writer model reads pictures"}, so text inside them does not reach the deck.`);
+  if (v === "no") {
+    log(jobId, `${pics.length} picture source${pics.length === 1 ? "" : "s"} used only as slide pictures: ${auth.model} cannot read pictures, so text inside them does not reach the deck.`);
     return;
   }
+  // Unconfirmed is not a no: try, and a picture the model refuses is logged and left as a slide picture.
+  if (v === "unknown") log(jobId, `Could not confirm that ${auth.model} reads pictures; trying anyway.`);
   let n = 0;
   for (const r of pics.slice(0, READ_LIMIT)) {
     const m = r.media_id ? getMedia(userId, r.media_id) : null;
@@ -391,7 +693,7 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
       continue;
     }
     n++;
-    log(jobId, `Reading picture ${n}: ${r.rel_path || r.name}`);
+    log(jobId, `Reading picture ${n} with ${auth.model}: ${r.rel_path || r.name}`);
     try {
       const text = await readPicture(auth, r.rel_path || r.name, fs.readFileSync(m.path), m.mime);
       getDb().prepare("UPDATE sources SET text = ?, chars = ? WHERE id = ?").run(text, text === NOTHING ? 0 : text.length, r.id);

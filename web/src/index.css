@@ -185,3 +185,23 @@ table.edit input{padding:5px 8px;font-size:12px}
 .pickcard.on{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .pickcard>span{font-size:12px;font-weight:600;padding:0 2px 2px}
 .pickcard .frame{pointer-events:none}
+
+/* Phones and narrow windows: nothing may run off the side of the page. */
+@media (max-width:760px){
+  .nav .in{flex-wrap:wrap;gap:8px;padding:8px 12px}
+  .nav .links{order:3;width:100%;margin-left:0;overflow-x:auto;scrollbar-width:none}
+  .nav .links a{padding:6px 10px;white-space:nowrap}
+  .nav .who{display:none}
+  .steps{flex-wrap:wrap;row-gap:6px}
+  .steps .bar{min-width:12px}
+  .steps .s .l{display:none}
+  .steps .s.on .l{display:inline}
+  .ed{grid-template-columns:minmax(0,1fr);height:auto}
+  .ed > *{min-width:0;max-width:100%}
+  .ed .tools{flex-wrap:wrap}
+  .ed .col{overflow:visible}
+  .ed .list{flex-direction:row;overflow-x:auto}
+  .ed .list > *{flex:0 0 140px}
+  .ed-title{width:100% !important;max-width:100%}
+  .page .row.between{flex-wrap:wrap;gap:8px}
+}

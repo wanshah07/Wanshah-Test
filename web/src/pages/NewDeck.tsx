@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Design, type Job } from "../api";
@@ -47,15 +47,26 @@ export default function NewDeck() {
   useEffect(() => {
     api.settings().then((s) => setThemeId(s.defaultTheme)).catch(() => {});
     api.designs().then(setDesigns).catch(() => {});
+    // A design added in the other tab shows up on coming back, and the wizard keeps its place.
+    const refresh = () => api.designs().then(setDesigns).catch(() => {});
+    window.addEventListener("focus", refresh);
     defaultPromptIds().then((prompts) => setBrief((b) => ({ ...b, prompts })));
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   // The deck row exists from step 2 so uploads have somewhere to go.
+  // One deck however many uploads start at once: they all wait on the same creation.
+  const creating = useRef<Promise<string> | null>(null);
   const ensureDeck = async (): Promise<string> => {
     if (deckId) return deckId;
-    const d = await api.createDeck({ title, lang, angle, themeId, designId });
-    setDeckId(d.id);
-    return d.id;
+    if (!creating.current) {
+      creating.current = api.createDeck({ title, lang, angle, themeId, designId }).then((d) => {
+        setDeckId(d.id);
+        return d.id;
+      });
+      creating.current.catch(() => (creating.current = null));
+    }
+    return creating.current;
   };
 
   const pickAngle = (id: string) => {
@@ -138,10 +149,10 @@ export default function NewDeck() {
       <p className="muted" style={{ marginBottom: 20 }}>Brief, sources, angle, features. The writer works only from what you give it and marks what it cannot source.</p>
       <div className="steps">
         {STEPS.map((s, i) => (
-          <>
-            <div key={s} className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span>{auto && i === 2 ? "Angle: AI" : auto && i === 3 ? "Design" : s}</div>
-            {i < STEPS.length - 1 && <div key={s + "bar"} className="bar" />}
-          </>
+          <Fragment key={s}>
+            <div className={"s" + (i === step ? " on" : i < step ? " done" : "")}><span className="n">{i < step ? "✓" : i + 1}</span><span className="l">{auto && i === 2 ? "Angle: AI" : auto && i === 3 ? "Design" : s}</span></div>
+            {i < STEPS.length - 1 && <div className="bar" />}
+          </Fragment>
         ))}
       </div>
 
@@ -202,7 +213,7 @@ export default function NewDeck() {
               ))}
             </div>
           )}
-          {sources.length === 0 && <p className="small muted">No sources yet. You can continue without any; every fact the writer is unsure of will carry a [SAHKAN] marker.</p>}
+          {sources.length === 0 && <p className="small muted">No sources yet. You can continue without any; the writer then works from the brief alone and leaves out figures it cannot stand behind.</p>}
         </div>
       )}
 
@@ -234,7 +245,7 @@ export default function NewDeck() {
           <div className="card stack">
             <div className="row between">
               <h3>Design</h3>
-              <a href="/designs" className="small">Add a reference design</a>
+              <a href="/designs" target="_blank" rel="noopener" className="small">Add a reference design (opens in a new tab)</a>
             </div>
             <ThemeCards
               width={190}
@@ -289,6 +300,7 @@ export default function NewDeck() {
             {failed && why?.anyway && <p className="small muted">Pictures pulled from OneDrive are never read; they are slide pictures. This is only about pictures you uploaded as sources.</p>}
             {failed && (
               <div className="row">
+                <button className="btn btn-quiet" onClick={() => setStep(3)}>← Back</button>
                 <button className="btn btn-primary" onClick={() => start()}>Try again</button>
                 {why?.anyway && <button className="btn btn-ghost" onClick={() => start(true)}>Write anyway (pictures as slide pictures only)</button>}
                 {why?.settings && <Link className="btn btn-ghost" to="/settings" target="_blank">Open Settings</Link>}

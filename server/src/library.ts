@@ -1,4 +1,4 @@
-import type { Theme } from "@slidecraft/shared";
+import { sanitizeTheme, type Theme } from "@slidecraft/shared";
 import { getDb, now, uid } from "./db.js";
 import { addMedia, deleteMedia } from "./store.js";
 import type { DesignAnalysis, DesignDraft } from "./design/extract.js";
@@ -31,7 +31,7 @@ interface DesignRow {
 }
 
 function toDesign(r: DesignRow): Design {
-  return { id: r.id, name: r.name, theme: JSON.parse(r.theme), notes: r.notes, analysis: JSON.parse(r.analysis || "{}"), previewMediaId: r.preview_media_id, sourceName: r.source_name, createdAt: r.created_at, updatedAt: r.updated_at };
+  return { id: r.id, name: r.name, theme: sanitizeTheme(JSON.parse(r.theme)), notes: r.notes, analysis: JSON.parse(r.analysis || "{}"), previewMediaId: r.preview_media_id, sourceName: r.source_name, createdAt: r.created_at, updatedAt: r.updated_at };
 }
 
 export function listDesigns(userId: string): Design[] {
@@ -46,7 +46,7 @@ export function getDesign(userId: string, id: string): Design | null {
 export function createDesign(userId: string, d: { name: string; theme: Theme; notes: string; analysis?: DesignAnalysis; preview?: DesignDraft["preview"]; sourceName?: string }): Design {
   const id = uid("dz");
   const preview = d.preview ? addMedia(userId, null, `${d.name} preview`, d.preview.mime, d.preview.buf, "design") : null;
-  const theme = { ...d.theme, id: `design:${id}`, name: d.name };
+  const theme = sanitizeTheme({ ...d.theme, id: `design:${id}`, name: d.name });
   getDb()
     .prepare("INSERT INTO designs (id, user_id, name, theme, notes, analysis, preview_media_id, source_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .run(id, userId, d.name, JSON.stringify(theme), d.notes, JSON.stringify(d.analysis ?? {}), preview?.id ?? null, d.sourceName ?? null, now(), now());
@@ -57,7 +57,7 @@ export function updateDesign(userId: string, id: string, patch: { name?: string;
   const cur = getDesign(userId, id);
   if (!cur) return null;
   const name = patch.name?.trim() || cur.name;
-  const theme = { ...(patch.theme ?? cur.theme), id: `design:${id}`, name };
+  const theme = sanitizeTheme({ ...(patch.theme ?? cur.theme), id: `design:${id}`, name });
   getDb().prepare("UPDATE designs SET name = ?, notes = ?, theme = ?, updated_at = ? WHERE id = ?").run(name, patch.notes ?? cur.notes, JSON.stringify(theme), now(), id);
   return getDesign(userId, id);
 }

@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
+import { MAX_PIXELS, pictureSize } from "../llm/shrink.js";
 import { FONT_CHOICES, knownFonts, type Theme } from "@slidecraft/shared";
 import { contrast, designTheme, distance, hueGap, isChromatic, parseHex, themeColors, toHex, type Picked, type RGB } from "./colour.js";
 import { chatJson, type ContentPart, type LlmAuth } from "../llm/client.js";
@@ -310,6 +311,9 @@ async function readPdf(name: string, buf: Buffer): Promise<{ picked: Picked; fon
 // ---------------------------------------------------------------- pictures
 
 function decode(name: string, buf: Buffer, mime: string): { width: number; height: number; data: Uint8Array } {
+  // Size from the header first: a small file of one colour can claim billions of pixels.
+  const size = pictureSize(buf);
+  if (size && size.width * size.height > MAX_PIXELS) throw new DesignError(`${name} is ${Math.round((size.width * size.height) / 1e6)} megapixels, too large to read. Use a screenshot of the slide.`);
   try {
     if (mime === "image/png") return PNG.sync.read(buf);
     if (mime === "image/jpeg") return jpeg.decode(buf, { useTArray: true, maxMemoryUsageInMB: 512, maxResolutionInMP: 60 });

@@ -7,5 +7,6 @@ export * from "./render/charts.js";
 export * from "./render/diagrams.js";
 export * from "./render/css.js";
 export * from "./render/html.js";
+export * from "./render/fit.js";
 export * from "./render/deckHtml.js";
 export * from "./brief.js";

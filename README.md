@@ -23,8 +23,14 @@ single HTML file. Runs on your own machine or server, with your own key.
   same standard is on the Prompts page as the "Deck standard" starter.
 - **Sources.** PDF, Word, PowerPoint, Excel and CSV, Markdown, text, HTML,
   pictures, zips and whole folders. Text is extracted on the server; pictures
-  become media the writer can place. A large pile of sources is condensed to
-  the facts relevant to the brief before the deck is written.
+  become media the writer can place. Figures inside a PDF (charts, photos,
+  posters; not logos or icons) come out as pictures of their own, so the
+  picture reader transcribes them and they can go on slides. A large pile of
+  sources is condensed to the facts relevant to the brief before the deck is
+  written.
+- **Pictures on the slides.** Every uploaded picture the writer did not use
+  goes beside the points of the slide whose words it shares, or on a picture
+  slide of its own before the close; a slide count you fixed is kept.
 - **Angles.** Regulatory briefing, client proposal, training, medical affairs,
   brand pitch, conference talk, internal update, or custom. Each sets the
   tone, a suggested structure and the default features.
@@ -38,9 +44,23 @@ single HTML file. Runs on your own machine or server, with your own key.
   must never appear in Malaysian text) and can be sent back for a rewrite of
   that slide alone. Dashes, emoji and exclamation marks are fixed
   automatically because that cannot change meaning; nothing else is.
-- **Facts.** A fact the sources do not carry comes out as
-  `[SAHKAN: the exact missing fact]`, printed in yellow on the slide and
-  counted in the editor, until you replace it with the sourced one.
+- **Facts.** The writer uses only what the sources carry. A figure, date or
+  clause it cannot stand behind is left out, never guessed and never left as a
+  placeholder on the slide.
+- **Fits the slide.** Nothing spills over or is cut off. On screen and in the
+  web deck the text shrinks just enough to fit (the editor says when it had to
+  go below half size); in PowerPoint each text box is sized from its text.
+  The writer keeps the slide face short and at least half the content slides
+  visual (chart, diagram, big numbers, picture, table); a slide with over 90
+  words on its face is flagged.
+- **Design pass.** A writer that answers in bullets anyway (some models do,
+  whatever the instructions say) is sent its text slides once more as a
+  designer: redraw them as charts, tables, flow, timeline or matrix maps and
+  number tiles from the sources' own figures. Only a real visual replaces a
+  slide, and a failed pass never costs the deck. Whatever is still text is
+  then redrawn from its own words: points that each carry a figure become
+  number tiles, numbered steps a flow, dated points a timeline, labelled
+  points cards. The run log says what was redrawn.
 - **Themes.** Colours, fonts, radius, slide style, footer and logo per deck,
   with presets. The default preset is the token set of my.facerinna.com
   (Fraunces and Inter, brand `#4898D8` on ink `#1D344E`, 20px radius); the
@@ -134,6 +154,19 @@ it sent nothing back to GitHub Actions runners on 19 Sep (three client
 shapes, all timeouts). A Codespace runs on GitHub's own cloud, so **Test**
 from inside it is the check that settles it there.
 
+**Google Gemini** is listed too
+(`https://generativelanguage.googleapis.com/v1beta/openai`), with a key from
+aistudio.google.com. Gemini models read pictures and follow the JSON schema,
+so uploaded pictures reach the deck and Auto plans reliably. For generated
+pictures the image model is an Imagen model; Google serves Imagen only on a
+billed project, so on the free tier leave "Pictures come from" on uploads.
+
+**Picture reader** (Settings, optional). A second endpoint and model that
+only reads the pictures uploaded as sources and hands their text to the
+writer, so a writer that cannot see still writes from a poster or a table
+screenshot: for example Gemini Flash reads, Mireld writes. It has its own key,
+sent only to its own endpoint. Turned off, the writer reads pictures itself.
+
 The key is sent only to the endpoint it was saved with. The server-wide
 `OPENAI_API_KEY` is only ever sent to `OPENAI_BASE_URL`, never to an endpoint
 a user picks in Settings.
@@ -225,6 +258,12 @@ time. For an always-on address for a team, use the Docker image on a host.
 
     npm test          # shared: scanner and renderers; server: the whole API in mock mode
     npm run smoke     # drives the built app in Chromium: wizard, editor, export, presenter
+    npm run check:fit       # over-full slides of every layout in Chromium: nothing spills or is clipped
+    npm run check:pptx-fit  # the same slides as .pptx, rendered by LibreOffice Impress: no text off
+                            # the slide or on top of other text (needs soffice with Impress)
+    npm run check:web       # the editor, presenter and every page in Chromium, desktop and phone:
+                            # typing in list and number fields, saving before a download, no
+                            # sideways scroll at 390px (CHROMIUM_PATH=/opt/pw-browsers/chromium)
 
 ## Settings reference
 

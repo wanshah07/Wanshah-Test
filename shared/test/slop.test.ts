@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { scanText, autoFix, scanSlide, autoFixSlide, sahkanCount } from "../src/slop.js";
-import type { Deck, Slide } from "../src/deck.js";
-import { themePreset } from "../src/theme.js";
+import { scanText, autoFix, scanSlide, autoFixSlide, faceWords, FACE_WORDS_MAX } from "../src/slop.js";
+import type { Slide } from "../src/deck.js";
 
 describe("slop scanner", () => {
   it("flags English clichés", () => {
@@ -52,17 +51,19 @@ describe("autoFix", () => {
   });
 });
 
-describe("scanSlide and sahkanCount", () => {
+describe("scanSlide", () => {
+  it("flags a slide with too much text on its face, and ignores the notes", () => {
+    const long = Array.from({ length: 20 }, (_, i) => `point ${i} with a few more words`);
+    const s: Slide = { id: "a", layout: "bullets", title: "Many", bullets: long, notes: "word ".repeat(500) };
+    expect(faceWords(s)).toBeGreaterThan(FACE_WORDS_MAX);
+    expect(scanSlide(s, "en").some((h) => h.field === "slide" && /too much text/.test(h.note))).toBe(true);
+    const short: Slide = { id: "b", layout: "bullets", title: "Few", bullets: ["one point"], notes: "word ".repeat(500) };
+    expect(scanSlide(short, "en").some((h) => h.field === "slide")).toBe(false);
+  });
+
   it("names the field", () => {
     const s: Slide = { id: "a", layout: "bullets", title: "Fine", bullets: ["ok", "we delve deep"] };
     const hits = scanSlide(s, "en");
     expect(hits[0].field).toBe("bullets[1]");
-  });
-  it("counts unresolved markers across the deck", () => {
-    const deck: Deck = {
-      id: "d", title: "t", lang: "en", angle: "custom", theme: themePreset("facerinna"), sources: [], createdAt: "", updatedAt: "",
-      slides: [{ id: "a", layout: "bullets", title: "x", bullets: ["fee [SAHKAN: NPRA fee schedule]", "[SAHKAN: date]"] }],
-    };
-    expect(sahkanCount(deck)).toBe(2);
   });
 });

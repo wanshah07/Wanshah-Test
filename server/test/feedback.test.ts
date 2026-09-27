@@ -42,21 +42,12 @@ beforeAll(async () => {
 describe("slide feedback", () => {
   it("saves feedback for later without touching the slide", async () => {
     const s = slides[2];
-    const r = J(await app.inject({ method: "POST", url: `/api/decks/${deckId}/slides/${s.id}/feedback`, payload: { text: "Add the effective date [SAHKAN: date]" } }));
+    const r = J(await app.inject({ method: "POST", url: `/api/decks/${deckId}/slides/${s.id}/feedback`, payload: { text: "Add the effective date" } }));
     expect(r.slide.title).toBe(s.title);
     expect(r.slide.notes).toBe(s.notes);
     expect(r.slide.review.feedback).toHaveLength(1);
     expect(r.slide.review.feedback[0].appliedAt).toBeUndefined();
     expect(r.slide.review.ok).toBe(false);
-  });
-
-  it("does not count a marker quoted in feedback as a slide's SAHKAN", async () => {
-    const before = (await deck()).sahkan;
-    const clean = J(await app.inject({ method: "GET", url: `/api/decks/${deckId}` }));
-    expect(clean.sahkan).toBe(before);
-    const { sahkanCount } = await import("@slidecraft/shared");
-    const d = clean.deck;
-    expect(sahkanCount({ ...d, slides: d.slides.map((x: { review?: unknown }) => ({ ...x, review: undefined })) })).toBe(before);
   });
 
   it("applies saved and new feedback together, marks both applied and reopens the slide", async () => {

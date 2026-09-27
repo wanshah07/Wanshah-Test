@@ -1,6 +1,10 @@
 import { PNG } from "pngjs";
 import { getDb, now } from "../db.js";
 import { chatText, LlmError, type ContentPart, type LlmAuth } from "./client.js";
+import { PICTURE_BUDGET, pictureSize, shrinkPicture } from "./shrink.js";
+
+/** PNG and JPEG can be re-encoded smaller; other formats are sent as they are. */
+const decodable = (mime: string, buf: Buffer) => /png|jpe?g/i.test(mime) && pictureSize(buf) !== null;
 
 // Whether the writer model can read pictures, found out once per endpoint and
 // model with a tiny test picture and remembered. A model that can is given the
@@ -29,7 +33,11 @@ export async function probeVision(auth: LlmAuth): Promise<"yes" | "no"> {
     { type: "image_url", image_url: { url: swatch([220, 30, 30]), detail: "low" } },
   ];
   try {
-    const answer = await chatText(auth, "You answer questions about pictures in one word.", user, 20, 45000);
+    // Room to answer: a model that thinks before answering (Gemini 3, o-series) spends
+    // tokens on the thinking, and a 20-token cap left it with nothing to say.
+    const answer = (await chatText(auth, "You answer questions about pictures in one word.", user, 2048, 90000)).trim();
+    // Silence is not an answer: it says nothing about pictures, so it is not a "no".
+    if (!answer) throw new LlmError("The model gave no answer to the picture check", 0, "empty");
     return /\bred\b|merah/i.test(answer) ? "yes" : "no";
   } catch (e) {
     if (e instanceof LlmError && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429 && IMAGE_REFUSED.test(e.message)) return "no";
@@ -37,8 +45,12 @@ export async function probeVision(auth: LlmAuth): Promise<"yes" | "no"> {
   }
 }
 
+// The probe's version is part of what is remembered, so answers from an older,
+// mistaken probe (a 20-token cap read a thinking model's silence as "no") are asked again.
+const PROBE = "v2";
+
 function key(auth: LlmAuth): string {
-  return `${auth.baseUrl}|${auth.model}`;
+  return `${PROBE}|${auth.baseUrl}|${auth.model}`;
 }
 
 export function knownVision(userId: string, auth: LlmAuth): Vision {
@@ -69,7 +81,8 @@ export async function visionFor(userId: string, auth: LlmAuth, fresh = false): P
 export const NOTHING = "NONE";
 
 /** What a picture says, as notes a slide writer can cite; NONE for a picture with nothing to read. */
-export async function readPicture(auth: LlmAuth, name: string, buf: Buffer, mime: string): Promise<string> {
+export async function readPicture(auth: LlmAuth, name: string, original: Buffer, originalMime: string, budget = PICTURE_BUDGET): Promise<string> {
+  const { buf, mime, shrunk } = shrinkPicture(original, originalMime, budget);
   const user: ContentPart[] = [
     {
       type: "text",
@@ -77,6 +90,17 @@ export async function readPicture(auth: LlmAuth, name: string, buf: Buffer, mime
     },
     { type: "image_url", image_url: { url: `data:${mime};base64,${buf.toString("base64")}`, detail: "high" } },
   ];
-  const out = (await chatText(auth, "You transcribe pictures exactly. You never invent content.", user, 3000, 120000)).trim();
+  let out: string;
+  try {
+    out = (await chatText(auth, "You transcribe pictures exactly. You never invent content.", user, 12000, 180000)).trim();
+  } catch (e) {
+    // A gateway with a lower body limit than ours: once more at a quarter of the size.
+    // (A picture that could not be re-encoded, a WEBP or GIF, would only be sent again unchanged.)
+    if (e instanceof LlmError && e.status === 413 && budget > 96 * 1024 && (shrunk || original.length > budget)) {
+      if (!decodable(originalMime, original)) throw new LlmError(`${e.message} This picture is a ${originalMime.replace("image/", "").toUpperCase()}, which Slidecraft cannot make smaller: upload it as PNG or JPEG.`, 413, "too_large");
+      return readPicture(auth, name, original, originalMime, Math.floor(budget / 4));
+    }
+    throw e;
+  }
   return out || NOTHING;
 }

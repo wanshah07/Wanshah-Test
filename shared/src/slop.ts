@@ -144,8 +144,19 @@ export function scanSlide(slide: Slide, lang: "en" | "ms"): SlopHit[] {
     if (k.note) hits.push(...scanText(k.note, `kpi[${i}].note`, lang));
   });
   if (slide.diagram?.kind === "flow") slide.diagram.steps.forEach((s, i) => hits.push(...scanText(s.label + " " + (s.detail ?? ""), `diagram.steps[${i}]`, lang)));
+  const words = faceWords(slide);
+  if (words > FACE_WORDS_MAX) hits.push({ field: "slide", phrase: `${words} words`, note: `too much text for one slide (over ${FACE_WORDS_MAX}): move detail to the notes, split the slide, or show it as a chart, diagram or picture` });
   return hits;
 }
+
+/** Words a reader sees on the slide itself, notes and citations aside. */
+export function faceWords(s: Slide): number {
+  const parts = [s.title, s.subtitle, s.body, s.leftHeading, s.rightHeading, s.quote?.text, ...(s.bullets ?? []), ...(s.bulletsRight ?? []), ...(s.cards ?? []).flatMap((c) => [c.heading, c.detail]), ...(s.kpi ?? []).flatMap((k) => [k.label, k.note]), ...(s.table ? [...s.table.header, ...s.table.rows.flat()] : []), ...(s.diagram?.kind === "flow" ? s.diagram.steps.flatMap((x) => [x.label, x.detail]) : []), ...(s.diagram?.kind === "timeline" ? s.diagram.events.map((e) => e.label) : [])];
+  return parts.filter(Boolean).join(" ").split(/\s+/).filter(Boolean).length;
+}
+
+/** Above this, a slide reads as a document page rather than a slide. */
+export const FACE_WORDS_MAX = 90;
 
 export function scanDeck(deck: Deck): Record<string, SlopHit[]> {
   const out: Record<string, SlopHit[]> = {};
@@ -180,15 +191,6 @@ export function autoFixSlide(slide: Slide): Slide {
   if (s.rightHeading) s.rightHeading = autoFix(s.rightHeading, true);
   if (s.kpi) s.kpi = s.kpi.map((k) => ({ ...k, label: autoFix(k.label, true), note: k.note ? autoFix(k.note) : undefined }));
   return s;
-}
-
-/** Unresolved fact markers. The writer leaves one when the sources do not carry a fact. */
-export const SAHKAN_RE = /\[SAHKAN:[^\]]*\]/g;
-
-export function sahkanCount(deck: Deck): number {
-  // Feedback the user wrote is not slide content, so a marker quoted in it does not count.
-  const text = JSON.stringify(deck.slides.map(({ review: _r, ...content }) => content));
-  return (text.match(SAHKAN_RE) ?? []).length;
 }
 
 /** The rule list as prose, for the writer prompt. */

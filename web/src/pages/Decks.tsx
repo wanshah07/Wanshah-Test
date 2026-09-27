@@ -46,8 +46,8 @@ export default function Decks() {
       )}
       <div className="grid auto">
         {decks?.map((d) => {
-          const theme = themePreset(d.themeId ?? "facerinna");
-          const cover = { ...blankSlide("title", d.lang), title: d.title, subtitle: ANGLES.find((a) => a.id === d.angle)?.name ?? "" };
+          const theme = d.theme ?? themePreset(d.themeId ?? "facerinna");
+          const cover = d.cover ?? { ...blankSlide("title", d.lang), title: d.title, subtitle: ANGLES.find((a) => a.id === d.angle)?.name ?? "" };
           return (
             <div key={d.id} className="card deckcard">
               <Link to={`/deck/${d.id}`}>

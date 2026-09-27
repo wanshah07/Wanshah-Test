@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, sahkanCount, type Deck, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, FEATURE_LABELS, LENGTH_CHOICES, newId, scanDeck, type Deck, type FitResult, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
 import { api, type Job } from "../api";
 import { SlideFrame } from "../components/SlideFrame";
 import { SlideInspector } from "../components/SlideInspector";
@@ -28,40 +28,73 @@ export default function Editor() {
   const saveTimer = useRef<number | null>(null);
   const latest = useRef<Deck | null>(null);
 
+  const [missing, setMissing] = useState<string | null>(null);
   useEffect(() => {
+    setMissing(null);
     api.deck(id).then((r) => {
       setDeck(r.deck);
       latest.current = r.deck;
       setSel(0);
-    }).catch((e) => toast(e.message, true));
+    }).catch((e) => setMissing((e as { status?: number }).status === 404 ? "This deck does not exist, or it was deleted." : (e as Error).message));
   }, [id]);
 
   const slop = useMemo(() => (deck ? scanDeck(deck) : {}), [deck]);
-  const sahkan = useMemo(() => (deck ? sahkanCount(deck) : 0), [deck]);
+  const [fit, setFit] = useState<FitResult | null>(null);
   const slopCount = Object.values(slop).reduce((a, h) => a + h.length, 0);
   const okCount = deck ? deck.slides.filter((x) => x.review?.ok).length : 0;
   const waitingCount = deck ? deck.slides.reduce((a, x) => a + pendingFeedback(x).length, 0) : 0;
   const [applyJob, setApplyJob] = useState<string | null>(null);
 
+  const inFlight = useRef(false);
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
   const flush = useCallback(async () => {
     const d = latest.current;
     if (!d) return;
     setSaving("saving");
+    inFlight.current = true;
     try {
       await api.saveDeck(d);
       setSaving("saved");
     } catch (e) {
       setSaving("error");
-      toast("Save failed: " + (e as Error).message, true);
+      toast("Save failed: " + (e as Error).message + ". Trying again in a few seconds.", true);
+      // The edit is still only on this screen: try again, and keep the leave-warning on until it lands.
+      if (!saveTimer.current)
+        saveTimer.current = window.setTimeout(() => {
+          saveTimer.current = null;
+          void flushRef.current?.();
+        }, 8000);
+    } finally {
+      inFlight.current = false;
     }
   }, []);
+  flushRef.current = flush;
 
   const update = useCallback((next: Deck) => {
     setDeck(next);
     latest.current = next;
     setSaving("dirty");
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(flush, 900);
+    saveTimer.current = window.setTimeout(() => {
+      saveTimer.current = null;
+      void flush();
+    }, 900);
+  }, [flush]);
+
+  // Leaving with an edit not yet saved: save it now, and ask the browser to hold the page if it cannot wait.
+  useEffect(() => {
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (!saveTimer.current && !inFlight.current) return;
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        void flush();
+      }
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
   }, [flush]);
 
   useEffect(() => {
@@ -76,6 +109,7 @@ export default function Editor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [flush]);
 
+  if (missing) return <main className="page"><div className="banner warn">{missing}</div><p><Link to="/" className="btn btn-primary">Back to decks</Link></p></main>;
   if (!deck) return <main className="page"><p className="muted">Loading</p></main>;
   const slide = deck.slides[sel];
 
@@ -117,28 +151,53 @@ export default function Editor() {
       await flush();
     }
   };
-  const replaceSlide = (s: Slide, _hits: SlopHit[]) => {
+  /** Put a slide the server rewrote into the deck as it is now, keeping every edit made meanwhile. */
+  const replaceSlide = (s: Slide, _hits?: SlopHit[]) => {
     const cur = latest.current ?? deck;
     const next = { ...cur, slides: cur.slides.map((x) => (x.id === s.id ? s : x)) };
-    setDeck(next);
-    latest.current = next;
-    setSaving("saved");
+    // Saved again as a whole: an autosave that left while the writer worked may have carried
+    // the old version of this slide, and the server must end up holding what the screen shows.
+    update(next);
+  };
+  /** Save what is waiting, then go: a download or the present view shows the deck as it is on screen. */
+  const openAfterSave = async (url: string, newTab = false) => {
+    const w = newTab ? window.open("about:blank", "_blank") : null;
+    await flushNow();
+    if (w) w.location.href = url;
+    else window.location.href = url;
   };
   const applyAll = async () => {
     try {
       await flushNow();
       const { jobId } = await api.applyAllFeedback(deck.id);
       setApplyJob(jobId);
+      // What each slide looked like when the job began: a slide edited meanwhile keeps the edit.
+      const before = new Map((latest.current ?? deck).slides.map((x) => [x.id, JSON.stringify(x)]));
       const tick = async () => {
-        const j = await api.job(jobId);
-        if (j.status === "done" || j.status === "failed") {
+        try {
+          const j = await api.job(jobId);
+          if (j.status === "done" || j.status === "failed") {
+            setApplyJob(null);
+            const r = await api.deck(deck.id);
+            const server = new Map(r.deck.slides.map((x) => [x.id, x]));
+            const cur = latest.current ?? deck;
+            let edited = false;
+            const slides = cur.slides.map((x) => {
+              const untouched = before.get(x.id) === JSON.stringify(x);
+              if (!untouched) edited = true;
+              return untouched && server.has(x.id) ? server.get(x.id)! : x;
+            });
+            const next = { ...cur, slides };
+            setDeck(next);
+            latest.current = next;
+            if (edited) update(next);
+            else setSaving("saved");
+            toast(j.status === "done" ? j.progress[j.progress.length - 1]?.replace(/^\S+ /, "") || "Feedback applied" : j.error || "Failed", j.status === "failed");
+          } else setTimeout(tick, 1500);
+        } catch (e) {
           setApplyJob(null);
-          const r = await api.deck(deck.id);
-          setDeck(r.deck);
-          latest.current = r.deck;
-          setSaving("saved");
-          toast(j.status === "done" ? j.progress[j.progress.length - 1]?.replace(/^\S+ /, "") || "Feedback applied" : j.error || "Failed", j.status === "failed");
-        } else setTimeout(tick, 1500);
+          toast(`Lost track of the feedback job: ${(e as Error).message}. Reload to see the result.`, true);
+        }
       };
       tick();
     } catch (e) {
@@ -152,10 +211,7 @@ export default function Editor() {
     }
     try {
       const r = await api.rewrite(deck.id, slide.id, instruction);
-      const next = { ...deck, slides: deck.slides.map((x, i) => (i === sel ? r.slide : x)) };
-      setDeck(next);
-      latest.current = next;
-      setSaving("saved");
+      replaceSlide(r.slide);
       toast(r.slop.length ? `Rewritten, ${r.slop.length} flag${r.slop.length === 1 ? "" : "s"} remain` : "Rewritten, nothing flagged");
     } catch (e) {
       toast((e as Error).message, true);
@@ -167,12 +223,11 @@ export default function Editor() {
       <div className="row between" style={{ marginBottom: 10 }}>
         <div className="row">
           <Link to="/" className="btn btn-quiet btn-sm">← Decks</Link>
-          <input type="text" value={deck.title} onChange={(e) => update({ ...deck, title: e.target.value })} style={{ width: 420, fontWeight: 600, fontFamily: "var(--font-display)", fontSize: 18 }} />
+          <input type="text" value={deck.title} onChange={(e) => update({ ...deck, title: e.target.value })} className="ed-title" style={{ width: 420, maxWidth: "100%", fontWeight: 600, fontFamily: "var(--font-display)", fontSize: 18 }} />
           <span className="pill">{deck.lang === "ms" ? "BM" : "EN"}</span>
           <span className="pill">{ANGLES.find((a) => a.id === deck.angle)?.name ?? deck.angle}</span>
         </div>
         <div className="row">
-          {sahkan > 0 && <span className="pill warn" title="Facts the writer could not source. Search for each, then edit the marker away.">{sahkan} SAHKAN</span>}
           {slopCount > 0 && <span className="pill danger" title="Wording flagged by the de-slop scan">{slopCount} flagged</span>}
           {deck.slides.length > 0 && <span className={"pill" + (okCount === deck.slides.length ? " ok" : "")} title="Slides you have marked OK">{okCount}/{deck.slides.length} OK</span>}
           {waitingCount > 0 && (
@@ -182,8 +237,8 @@ export default function Editor() {
           )}
           <span className="small muted">{saving === "saving" ? "Saving" : saving === "dirty" ? "Unsaved" : saving === "saved" ? "Saved" : saving === "error" ? "Not saved" : ""}</span>
           <button className="btn btn-ghost btn-sm" onClick={() => setTab("sources")}>Add files / regenerate</button>
-          <a className="btn btn-ghost btn-sm" href={`/deck/${deck.id}/present`} target="_blank" rel="noreferrer">Present</a>
-          <a className="btn btn-primary btn-sm" href={`/api/decks/${deck.id}/export.pptx`}>Download PPTX</a>
+          <button className="btn btn-ghost btn-sm" onClick={() => openAfterSave(`/deck/${deck.id}/present`, true)}>Present</button>
+          <button className="btn btn-primary btn-sm" onClick={() => openAfterSave(`/api/decks/${deck.id}/export.pptx`)}>Download PPTX</button>
         </div>
       </div>
 
@@ -219,9 +274,14 @@ export default function Editor() {
             <>
               <div className="canvasWrap" style={{ padding: 18 }}>
                 <div style={{ width: "100%", maxWidth: 1100 }}>
-                  <SlideFrame slide={slide} theme={deck.theme} index={sel} total={deck.slides.length} lang={deck.lang} />
+                  <SlideFrame slide={slide} theme={deck.theme} index={sel} total={deck.slides.length} lang={deck.lang} onFit={setFit} />
                 </div>
               </div>
+              {fit?.overflow || fit?.tooSmall ? (
+                <div className="banner warn" data-testid="fit-over">This slide has so much text it had to shrink below half size to fit. Shorten it, move detail to the notes, split it in two, or show it as a chart, diagram or picture.</div>
+              ) : fit && fit.scale < 0.85 ? (
+                <p className="small muted" data-testid="fit-shrunk">Text shrunk to {Math.round(fit.scale * 100)}% to fit. Shorter text reads better from the back of the room.</p>
+              ) : null}
               <ReviewBar deckId={deck.id} slide={slide} index={sel} beforeCall={flushNow} onSlide={replaceSlide} />
               {slide.notes && (
                 <div className="card tight small" style={{ whiteSpace: "pre-line" }}>
@@ -246,7 +306,7 @@ export default function Editor() {
           {tab === "slide" && slide && <SlideInspector deckId={deck.id} slide={slide} hits={slop[slide.id] ?? []} lang={deck.lang} theme={deck.theme} onChange={setSlide} onRewrite={rewrite} />}
           {tab === "slide" && !slide && <p className="muted small">No slide selected.</p>}
           {tab === "theme" && <ThemePanel deckId={deck.id} theme={deck.theme} designId={deck.designId} onChange={setTheme} onDesign={(t, designId) => update({ ...deck, theme: t, designId })} />}
-          {tab === "export" && <ExportPanel deck={deck} sahkan={sahkan} slopCount={slopCount} />}
+          {tab === "export" && <ExportPanel deck={deck} slopCount={slopCount} open={(u) => openAfterSave(u)} />}
           {tab === "sources" && <SourcesPanel deck={deck} onDeck={(d) => { setDeck(d); latest.current = d; setSel(0); setSaving("saved"); }} />}
         </aside>
       </div>
@@ -263,17 +323,16 @@ export default function Editor() {
   );
 }
 
-function ExportPanel({ deck, sahkan, slopCount }: { deck: Deck; sahkan: number; slopCount: number }) {
+function ExportPanel({ deck, slopCount, open }: { deck: Deck; slopCount: number; open: (url: string) => void }) {
   return (
     <div className="stack">
-      {sahkan > 0 && <div className="banner warn">{sahkan} unresolved [SAHKAN] marker{sahkan === 1 ? "" : "s"}. They print on the slides in yellow until you replace each with the sourced fact.</div>}
       {slopCount > 0 && <div className="banner warn">{slopCount} flagged phrase{slopCount === 1 ? "" : "s"} left. Open each slide's inspector to see them, or rewrite the slide.</div>}
-      {sahkan === 0 && slopCount === 0 && <div className="banner info">No unresolved markers and nothing flagged.</div>}
-      <a className="btn btn-primary" href={`/api/decks/${deck.id}/export.pptx`}>PowerPoint (.pptx)</a>
+      {slopCount === 0 && <div className="banner info">Nothing flagged.</div>}
+      <button className="btn btn-primary" onClick={() => open(`/api/decks/${deck.id}/export.pptx`)}>PowerPoint (.pptx)</button>
       <p className="small muted">Native text, charts, tables and shapes. Edit anything in PowerPoint or Keynote. Fonts fall back to the machine's if {deck.theme.fontDisplay} or {deck.theme.fontBody} is not installed.</p>
-      <a className="btn btn-ghost" href={`/api/decks/${deck.id}/export.html`}>Web deck (.html)</a>
+      <button className="btn btn-ghost" onClick={() => open(`/api/decks/${deck.id}/export.html`)}>Web deck (.html)</button>
       <p className="small muted">One file with the pictures inside. Opens in any browser: arrows to move, N for notes, G for the grid, F for full screen.</p>
-      <a className="btn btn-ghost" href={`/api/decks/${deck.id}/export.json`}>Deck data (.json)</a>
+      <button className="btn btn-ghost" onClick={() => open(`/api/decks/${deck.id}/export.json`)}>Deck data (.json)</button>
       <p className="small muted">The slide specification, for re-import or a script.</p>
     </div>
   );
@@ -319,14 +378,19 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       const audience = composeAudience(brief.audiences, brief.audienceText) || deck.audience;
       const { jobId } = await api.generate(deck.id, { prompt, auto, title: deck.title, lang: deck.lang, angle, audience, slides, features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
-        const j = await api.job(jobId);
-        setJob(j);
-        if (j.status === "done") {
-          const r = await api.deck(deck.id);
-          onDeck(r.deck);
-          toast("Deck regenerated");
-        } else if (j.status === "failed") toast(j.error || "Failed", true);
-        else setTimeout(tick, 1500);
+        try {
+          const j = await api.job(jobId);
+          setJob(j);
+          if (j.status === "done") {
+            const r = await api.deck(deck.id);
+            onDeck(r.deck);
+            toast("Deck regenerated");
+          } else if (j.status === "failed") toast(j.error || "Failed", true);
+          else setTimeout(tick, 1500);
+        } catch (e) {
+          // A lost connection must not leave the spinner running for ever.
+          setJob({ id: jobId, deckId: deck.id, status: "failed", progress: [], error: `Lost track of the job: ${(e as Error).message}. Reload to see whether it finished.`, result: null });
+        }
       };
       tick();
     } catch (e) {

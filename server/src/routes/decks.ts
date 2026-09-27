@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { LAYOUTS, newId, scanDeck, sahkanCount, themePreset, type Deck, type Slide } from "@slidecraft/shared";
+import { angleById, LAYOUTS, newId, sanitizeSlide, sanitizeTheme, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
 import { getDb, now } from "../db.js";
 import { loadDeck, saveDeck } from "../store.js";
 import { newDeck } from "../llm/generate.js";
@@ -23,21 +23,25 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     const rows = getDb().prepare("SELECT id, title, doc, created_at, updated_at FROM decks WHERE user_id = ? ORDER BY updated_at DESC").all(req.user.id) as { id: string; title: string; doc: string; created_at: string; updated_at: string }[];
     return rows.map((r) => {
       const d = JSON.parse(r.doc) as Deck;
-      return { id: r.id, title: r.title, lang: d.lang, angle: d.angle, slides: d.slides.length, themeId: d.theme?.id, createdAt: r.created_at, updatedAt: r.updated_at };
+      // The deck's own look and first slide, so the card shows the deck as it is.
+      const first = Array.isArray(d.slides) && d.slides[0] ? sanitizeSlide(d.slides[0]) : undefined;
+      return { id: r.id, title: r.title, lang: d.lang, angle: d.angle, slides: d.slides.length, themeId: d.theme?.id, theme: sanitizeTheme(d.theme), cover: first, createdAt: r.created_at, updatedAt: r.updated_at };
     });
   });
 
-  app.post("/api/decks", async (req) => {
-    const b = (req.body ?? {}) as { title?: string; lang?: string; angle?: string; themeId?: string; designId?: string };
+  app.post("/api/decks", async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    for (const k of ["title", "lang", "angle", "themeId", "designId"]) if (b[k] !== undefined && b[k] !== null && typeof b[k] !== "string") return reply.code(400).send({ error: "invalid", message: `${k} must be text` });
+    const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string) : undefined);
     const s = readSettings(req.user.id);
-    return newDeck(req.user.id, b.title ?? "", b.lang === "ms" ? "ms" : "en", b.angle ?? "custom", b.themeId ?? s.default_theme ?? "facerinna", b.designId);
+    return newDeck(req.user.id, (str("title") ?? "").slice(0, 300), str("lang") === "ms" ? "ms" : "en", angleById(str("angle") ?? "custom").id, str("themeId") ?? s.default_theme ?? "facerinna", str("designId"));
   });
 
   app.get("/api/decks/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const d = loadDeck(req.user.id, id);
     if (!d) return reply.code(404).send({ error: "not_found" });
-    return { deck: d, slop: scanDeck(d), sahkan: sahkanCount(d) };
+    return { deck: d, slop: scanDeck(d) };
   });
 
   app.put("/api/decks/:id", async (req, reply) => {
@@ -48,11 +52,12 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     if (!validDeck(body) || body.id !== id) return reply.code(400).send({ error: "invalid_deck" });
     // Sources, the OneDrive link and the stored brief are the server's: an editor tab opened
     // before an import must not wipe the link when it autosaves.
-    const next: Deck = { ...body, createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief };
+    // Saved in the shapes the renderer and exporter trust: a colour is a colour, a table is square.
+    const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief };
     if (!next.onedrive) delete next.onedrive;
     if (!next.brief) delete next.brief;
     saveDeck(req.user.id, next);
-    return { deck: next, slop: scanDeck(next), sahkan: sahkanCount(next) };
+    return { deck: next, slop: scanDeck(next) };
   });
 
   app.delete("/api/decks/:id", async (req, reply) => {

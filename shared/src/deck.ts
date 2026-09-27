@@ -281,7 +281,124 @@ export function normaliseSlide(raw: Record<string, unknown>): Slide {
   }
   if (typeof out.kicker === "string") out.kicker = out.kicker.trim().slice(0, 60) || undefined;
   if (!out.kicker) delete out.kicker;
-  return out as unknown as Slide;
+  return sanitizeSlide(out);
+}
+
+const CHART_KINDS = ["bar", "column", "line", "area", "pie", "doughnut"];
+
+/** Text from whatever a model put there: a string, a number, or a small record of strings. */
+// Characters XML 1.0 forbids: a PPTX carrying one will not open in PowerPoint.
+const XML_BAD = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+
+function txt(v: unknown): string | undefined {
+  if (typeof v === "string") return v.replace(XML_BAD, "").trim() || undefined;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    const parts = Object.values(v as object).filter((x) => typeof x === "string" || typeof x === "number").map(String);
+    return parts.join(", ").trim() || undefined;
+  }
+  return undefined;
+}
+function txtList(v: unknown): string[] | undefined {
+  const list = Array.isArray(v) ? v.map(txt).filter((x): x is string => !!x) : typeof v === "string" && v.trim() ? [v.trim()] : [];
+  return list.length ? list : undefined;
+}
+const obj = (v: unknown): Record<string, unknown> | undefined => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined);
+
+/**
+ * Every field in the type the renderer expects, and nothing else. A slide is drawn by code that
+ * maps arrays and prints strings, so an object where a string belongs (a model's own shape, an
+ * old deck) would take the whole page down; here it is turned into text or dropped.
+ */
+export function sanitizeSlide(raw: unknown): Slide {
+  const r = obj(raw) ?? {};
+  const s: Slide = {
+    id: typeof r.id === "string" && r.id ? r.id : newId(),
+    layout: LAYOUTS.includes(r.layout as Layout) ? (r.layout as Layout) : "bullets",
+    title: txt(r.title) ?? "",
+  };
+  for (const k of ["kicker", "subtitle", "leftHeading", "rightHeading", "body", "notes"] as const) {
+    const v = txt(r[k]);
+    if (v) s[k] = v;
+  }
+  for (const k of ["bullets", "bulletsRight", "citations"] as const) {
+    const v = txtList(r[k]);
+    if (v) s[k] = v;
+  }
+  const c = obj(r.chart);
+  if (c) {
+    const series = (Array.isArray(c.series) ? c.series : [])
+      .map((x) => obj(x))
+      .filter((x): x is Record<string, unknown> => !!x)
+      // A value that is not a number becomes 0 where it stands, so the values after it keep their categories.
+      .map((x) => ({ name: txt(x.name) ?? "", values: (Array.isArray(x.values) ? x.values : []).map((v) => (v === null || v === "" ? NaN : Number(v))).map((v) => (Number.isFinite(v) ? v : 0)) }))
+      .filter((x) => x.values.length);
+    if (series.length) {
+      // One category per value and one value per category: a chart with fewer names than numbers draws off
+      // its canvas, and with none PowerPoint will not open the file. Blank names keep their place.
+      const cats = Array.isArray(c.categories) ? c.categories.map((x) => txt(x) ?? "") : txtList(c.categories) ?? [];
+      const n = Math.max(cats.length, ...series.map((x) => x.values.length));
+      const categories = cats.slice();
+      while (categories.length < n) categories.push(String(categories.length + 1));
+      for (const x of series) while (x.values.length < n) x.values.push(0);
+      let kind = (CHART_KINDS.includes(String(c.kind)) ? c.kind : "bar") as ChartKind;
+      // A share cannot be negative: a pie of signed values is a column chart.
+      if ((kind === "pie" || kind === "doughnut") && series.some((x) => x.values.some((v) => v < 0))) kind = "column";
+      s.chart = { kind, categories, series, ...(txt(c.unit) ? { unit: txt(c.unit) } : {}), ...(txt(c.source) ? { source: txt(c.source) } : {}) };
+    }
+  }
+  const t = obj(r.table);
+  if (t) {
+    const rows = (Array.isArray(t.rows) ? t.rows : []).map((row) => (Array.isArray(row) ? row.map((x) => txt(x) ?? "") : txt(row) ? [txt(row)!] : [])).filter((row) => row.length);
+    const header = Array.isArray(t.header) ? t.header.map((x) => txt(x) ?? "") : txtList(t.header) ?? [];
+    // Every row as wide as the widest: a ragged table is a file PowerPoint has to repair.
+    const cols = Math.max(header.length, ...rows.map((r) => r.length), 0);
+    const pad = (r: string[]) => [...r, ...Array(Math.max(0, cols - r.length)).fill("")];
+    if (cols && (header.some(Boolean) || rows.length)) s.table = { header: pad(header), rows: rows.map(pad), ...(txt(t.source) ? { source: txt(t.source) } : {}) };
+  }
+  const d = obj(r.diagram);
+  if (d) {
+    if (d.kind === "timeline") {
+      const events = (Array.isArray(d.events) ? d.events : []).map((e) => obj(e)).filter((e): e is Record<string, unknown> => !!e).map((e) => ({ when: txt(e.when) ?? "", label: txt(e.label) ?? "" })).filter((e) => e.when || e.label);
+      if (events.length) s.diagram = { kind: "timeline", events };
+    } else if (d.kind === "matrix") {
+      // Blank names keep their place, so every row keeps its own cells.
+      const rows = Array.isArray(d.rows) ? d.rows.map((x) => txt(x) ?? "") : [];
+      const cols = Array.isArray(d.cols) ? d.cols.map((x) => txt(x) ?? "") : [];
+      if (rows.some(Boolean) && cols.some(Boolean)) {
+        const cells = rows.map((_, i) => {
+          const row = Array.isArray(d.cells) && Array.isArray(d.cells[i]) ? (d.cells[i] as unknown[]).map((x) => txt(x) ?? "") : [];
+          return cols.map((__, j) => row[j] ?? "");
+        });
+        s.diagram = { kind: "matrix", rows, cols, cells };
+      }
+    } else {
+      const steps = (Array.isArray(d.steps) ? d.steps : [])
+        .map((x) => (typeof x === "string" ? { label: x } : obj(x) ? { label: txt(obj(x)!.label) ?? "", ...(txt(obj(x)!.detail) ? { detail: txt(obj(x)!.detail) } : {}) } : null))
+        .filter((x): x is { label: string; detail?: string } => !!x && !!x.label);
+      if (steps.length) s.diagram = { kind: "flow", steps };
+    }
+  }
+  if (Array.isArray(r.kpi)) {
+    const kpi = r.kpi.map((x) => obj(x)).filter((x): x is Record<string, unknown> => !!x).map((x) => ({ label: txt(x.label) ?? "", value: txt(x.value) ?? "", ...(txt(x.note) ? { note: txt(x.note) } : {}) })).filter((x) => x.label || x.value);
+    if (kpi.length) s.kpi = kpi;
+  }
+  if (Array.isArray(r.cards)) {
+    const cards = r.cards
+      .map((x) => (typeof x === "string" ? { heading: x } : obj(x) ? { heading: txt(obj(x)!.heading) ?? "", ...(txt(obj(x)!.detail) ? { detail: txt(obj(x)!.detail) } : {}), ...(txt(obj(x)!.tag) ? { tag: txt(obj(x)!.tag) } : {}) } : null))
+      .filter((x): x is CardItem => !!x && !!x.heading.trim());
+    if (cards.length) s.cards = cards;
+  }
+  const im = obj(r.image);
+  if (im) {
+    const image: ImageRef = {};
+    for (const k of ["mediaId", "url", "caption", "alt", "prompt"] as const) if (typeof im[k] === "string" && (im[k] as string).trim()) image[k] = im[k] as string;
+    if (Object.keys(image).length) s.image = image;
+  }
+  const q = typeof r.quote === "string" ? { text: r.quote } : obj(r.quote);
+  if (q && txt(q.text)) s.quote = { text: txt(q.text)!, ...(txt(q.by) ? { by: txt(q.by) } : {}) };
+  if (obj(r.review)) s.review = r.review as unknown as SlideReview;
+  return s;
 }
 
 /** Default empty slide for a layout, used by the editor's "Add slide". */

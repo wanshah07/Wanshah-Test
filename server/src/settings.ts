@@ -16,6 +16,8 @@ export interface SettingsRow {
 export const PROVIDERS: { id: string; name: string; baseUrl: string }[] = [
   { id: "openai", name: "OpenAI", baseUrl: "https://api.openai.com/v1" },
   { id: "mireld", name: "Mireld", baseUrl: "https://api.mireld.my/v1" },
+  // Google's OpenAI-compatible endpoint: reads pictures, follows a JSON schema, has a free tier.
+  { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
 ];
 
 export function normaliseBase(url: string): string {
@@ -37,7 +39,14 @@ export function writeSettings(userId: string, patch: Partial<{ openaiKey: string
   if (patch.imageModel !== undefined) next.openai_image_model = patch.imageModel || null;
   if (patch.appTheme !== undefined) next.app_theme = patch.appTheme || null;
   if (patch.defaultTheme !== undefined) next.default_theme = patch.defaultTheme || null;
-  if (patch.baseUrl !== undefined) next.openai_base = patch.baseUrl ? normaliseBase(patch.baseUrl) : null;
+  if (patch.baseUrl !== undefined) {
+    next.openai_base = patch.baseUrl ? normaliseBase(patch.baseUrl) : null;
+    // A key saved against one endpoint is only ever sent to that endpoint: a new endpoint
+    // without a new key forgets the old key rather than hand it to another host.
+    const before = cur.openai_base ?? config.openaiBase;
+    const after = next.openai_base ?? config.openaiBase;
+    if (before !== after && patch.openaiKey === undefined) next.openai_key_enc = null;
+  }
   getDb()
     .prepare(
       `INSERT INTO settings (user_id, openai_key_enc, openai_model, openai_image_model, app_theme, default_theme, openai_base, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)

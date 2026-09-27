@@ -230,3 +230,38 @@ export const FONT_CHOICES = [
   "Georgia",
   "system-ui",
 ];
+
+const COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const STYLES = ["clean", "panel", "gradient"];
+
+/**
+ * A theme safe to write into a style attribute, a class and a PPTX colour:
+ * every colour a hex value, the radius a number, the style one of the three.
+ * Anything else falls back to the preset the theme names (or the first).
+ */
+export function sanitizeTheme(raw: unknown): Theme {
+  const t = (raw && typeof raw === "object" ? raw : {}) as Partial<Theme> & Record<string, unknown>;
+  const base = themePreset(typeof t.id === "string" ? t.id : "");
+  const colours = (t.colors && typeof t.colors === "object" ? t.colors : {}) as Record<string, unknown>;
+  const colors = { ...base.colors };
+  for (const k of Object.keys(colors) as (keyof Theme["colors"])[]) {
+    const v = colours[k];
+    if (typeof v === "string" && COLOUR.test(v.trim())) colors[k] = v.trim();
+  }
+  const font = (v: unknown, fallback: string) => (typeof v === "string" && v.trim() ? v.replace(/[^\p{L}\p{N} .,'-]/gu, "").trim().slice(0, 60) || fallback : fallback);
+  const radius = Number(t.radius);
+  const out: Theme = {
+    id: typeof t.id === "string" && t.id ? t.id.slice(0, 60) : base.id,
+    name: typeof t.name === "string" && t.name.trim() ? t.name.trim().slice(0, 80) : base.name,
+    fontDisplay: font(t.fontDisplay, base.fontDisplay),
+    fontBody: font(t.fontBody, base.fontBody),
+    colors,
+    radius: Number.isFinite(radius) ? Math.max(0, Math.min(80, radius)) : base.radius,
+    slideStyle: STYLES.includes(String(t.slideStyle)) ? (t.slideStyle as Theme["slideStyle"]) : base.slideStyle,
+    slideNumbers: typeof t.slideNumbers === "boolean" ? t.slideNumbers : base.slideNumbers,
+  };
+  if (typeof t.footer === "string" && t.footer.trim()) out.footer = t.footer.slice(0, 160);
+  if (typeof t.logoMediaId === "string" && /^[\w-]{1,80}$/.test(t.logoMediaId)) out.logoMediaId = t.logoMediaId;
+  if (typeof t.logoUrl === "string" && /^https?:\/\//i.test(t.logoUrl)) out.logoUrl = t.logoUrl.slice(0, 2000);
+  return out;
+}
