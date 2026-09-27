@@ -18,6 +18,8 @@ export interface GenerateParams {
   auto?: boolean;
   /** Visual devices the person unticked: Auto never turns these back on. */
   off?: string[];
+  /** The person's own instructions for every deck, from Settings; the built-in house rules when absent. */
+  houseRules?: string | null;
 }
 
 function houseLines(house: GenerateParams["house"], designNotes: string | undefined): string[] {
@@ -78,7 +80,7 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("- Do not open with a scene-setter or close with a summary of the summary. Do not congratulate the reader or the presenter.");
   lines.push("- Use **bold** only for the single figure or term on a slide that matters most, at most once per slide.");
   lines.push("");
-  lines.push(houseDesign());
+  lines.push(houseDesign(p.houseRules));
   lines.push("");
   lines.push("DECK CRAFT (how a strong professional deck is built; follow all of it):");
   lines.push("- `kicker` on every content slide: a short uppercase label of 1 to 4 words naming the part of the argument, e.g. AT A GLANCE, THE EVIDENCE, COSTING, YEAR 1, NEXT STEPS. Null on title, section and closing slides.");
@@ -166,11 +168,11 @@ export function condensePrompt(p: GenerateParams): string {
   ].join("\n");
 }
 
-export function rewriteSystem(p: { lang: Lang; angle: string; house?: GenerateParams["house"]; designNotes?: string }): string {
+export function rewriteSystem(p: { lang: Lang; angle: string; house?: GenerateParams["house"]; designNotes?: string; houseRules?: string | null }): string {
   const angle = angleById(p.angle);
   return [
     ...houseLines(p.house, p.designNotes).filter(Boolean),
-    houseDesign(),
+    houseDesign(p.houseRules),
     "You revise one slide of a deck. Keep the slide's layout unless the instruction asks for a change. Keep every fact and citation unless the instruction changes it. Keep the schema shape.",
     "Layouts you may switch to when asked: bullets, two-column, cards, chart (chart.highlight marks our category), table, diagram (flow, timeline, matrix, hub = mechanism map with center, nodes and pills, funnel = stages of value and label, equation = terms adding to a result), kpi (kpiStyle 'rings' for ring gauges), facts (label and value rows, highlight the key row), map (region asean, asia or world; areas with a country code and a status), gallery, image, quote. Extras on any content slide: badge (a verdict pill), callout (one dark banner sentence), aside (up to 2 side panels, e.g. Reading and Watch-outs).",
     `ANGLE: ${angle.name}. ${angle.brief}`,

@@ -393,7 +393,7 @@ function composioBase(): string {
   return (process.env.COMPOSIO_API_BASE || "https://backend.composio.dev/api/v3").replace(/\/+$/, "");
 }
 
-async function composioFetch(key: string, method: "GET" | "POST", path: string, body?: unknown): Promise<Record<string, unknown>> {
+export async function composioFetch(key: string, method: "GET" | "POST", path: string, body?: unknown): Promise<Record<string, unknown>> {
   const url = composioBase() + path;
   let res: Response;
   try {
@@ -417,12 +417,12 @@ async function composioFetch(key: string, method: "GET" | "POST", path: string, 
   return json;
 }
 
-/** OneDrive accounts connected in the key's Composio project. */
-export async function composioAccounts(key: string): Promise<{ id: string; label: string; status: string }[]> {
-  const j = await composioFetch(key, "GET", "/connected_accounts?toolkit_slugs=one_drive&limit=50");
+/** Accounts of one toolkit (OneDrive by default) connected in the key's Composio project. */
+export async function composioAccounts(key: string, toolkit = "one_drive"): Promise<{ id: string; label: string; status: string }[]> {
+  const j = await composioFetch(key, "GET", `/connected_accounts?toolkit_slugs=${toolkit}&limit=50`);
   const items = (j.items as Record<string, unknown>[] | undefined) ?? [];
   return items
-    .filter((a) => String((a.toolkit as { slug?: string } | undefined)?.slug ?? "one_drive").toLowerCase() === "one_drive")
+    .filter((a) => String((a.toolkit as { slug?: string } | undefined)?.slug ?? toolkit).toLowerCase() === toolkit)
     .map((a) => ({ id: String(a.id), label: String(a.alias ?? a.user_id ?? a.id), status: String(a.status ?? ""), created: String(a.created_at ?? "") }))
     // Two connections of one user share a label; tell them apart by when they were made and the end of their id.
     .map((a, _i, all) => {
@@ -433,7 +433,7 @@ export async function composioAccounts(key: string): Promise<{ id: string; label
 }
 
 /** The Composio user id a connected account belongs to: Composio refuses a tool call that names the account without it. */
-async function composioOwner(key: string, account: string): Promise<string> {
+export async function composioOwner(key: string, account: string, toolkit = "one_drive"): Promise<string> {
   const pick = (a: Record<string, unknown> | undefined) => String(a?.user_id ?? (a?.user as { id?: string } | undefined)?.id ?? "").trim();
   try {
     const one = pick(await composioFetch(key, "GET", `/connected_accounts/${encodeURIComponent(account)}`));
@@ -441,10 +441,10 @@ async function composioOwner(key: string, account: string): Promise<string> {
   } catch (e) {
     if (e instanceof OneDriveError && e.code === "composio_key") throw e;
   }
-  const list = await composioFetch(key, "GET", "/connected_accounts?toolkit_slugs=one_drive&limit=50");
+  const list = await composioFetch(key, "GET", `/connected_accounts?toolkit_slugs=${toolkit}&limit=50`);
   const found = pick(((list.items as Record<string, unknown>[] | undefined) ?? []).find((a) => a.id === account));
   if (found) return found;
-  throw new OneDriveError("Composio did not say which user owns the chosen OneDrive account. Press Find my OneDrive accounts and pick it again.", "composio_error");
+  throw new OneDriveError("Composio did not say which user owns the chosen account. Find the accounts again in Settings and pick it again.", "composio_error");
 }
 
 let composioVersion: "latest" | null = "latest";

@@ -35,7 +35,7 @@ export function LinkSourceBox({ getDeckId, onAdded, onNotRead, onBusy, compact }
         <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" onKeyDown={(e) => e.key === "Enter" && !busy && read()} />
         <button className="btn btn-ghost btn-sm" onClick={read} disabled={busy || !url.trim()}>{busy ? <><span className="spin" /> Reading</> : "Read link"}</button>
       </div>
-      {!compact && <span className="small muted">The file must be shared as "Anyone with the link" (Viewer). It is read now, and what was read is shown below before you go on.</span>}
+      {!compact && <span className="small muted">Shared as "Anyone with the link" (Viewer), or private to the Google account connected in Settings. It is read now, and what was read is shown below before you go on.</span>}
     </div>
   );
 }

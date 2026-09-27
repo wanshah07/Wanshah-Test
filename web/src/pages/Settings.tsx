@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { THEME_PRESETS } from "@slidecraft/shared";
 import { api, type OneDriveStatus, type Settings as S } from "../api";
+import { GdriveCard } from "../components/GdriveCard";
+import { HouseCard } from "../components/HouseCard";
 import { ReaderCard } from "../components/ReaderCard";
 import { toast } from "../components/Toast";
 import { ThemeCards } from "../components/ThemeCards";
@@ -221,6 +223,8 @@ export default function Settings() {
 
       <ReaderCard s={s} onSaved={load} />
 
+      <HouseCard />
+
       <section className="card stack">
         <h2>OneDrive pictures</h2>
         <p className="small">Pull pictures from a OneDrive folder into a deck. Slidecraft only reads; it never changes anything in OneDrive. Keys and sign-ins are stored encrypted.</p>
@@ -298,6 +302,8 @@ export default function Settings() {
           </>
         )}
       </section>
+
+      <GdriveCard onKeyChanged={() => loadOd().catch(() => {})} />
 
       <section className="card stack">
         <h2>Models</h2>

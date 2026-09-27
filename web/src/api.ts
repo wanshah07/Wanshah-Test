@@ -89,6 +89,22 @@ export interface OneDriveStatus {
   pending: { userCode: string; verificationUri: string; expiresAt: string; interval: number } | null;
 }
 
+export interface GdriveStatus {
+  connected: boolean;
+  account: string;
+  label: string;
+  /** A Composio key is saved (the same one OneDrive uses). */
+  hasKey: boolean;
+}
+
+export interface HouseRules {
+  text: string;
+  /** false: the built-in rules are in force. */
+  custom: boolean;
+  default: string;
+  max: number;
+}
+
 export interface OneDriveImport {
   report: { folder: string; added: number; updated: number; unchanged: number; skipped: { name: string; reason: string }[]; capped: boolean };
   summary: string;
@@ -167,6 +183,12 @@ export const api = {
   saveOneDrive: (b: { clientId?: string | null; defaultFolder?: string | null; provider?: "microsoft" | "composio"; composioKey?: string | null; composioAccount?: string | null; composioAccountLabel?: string | null }) => req<OneDriveStatus>("PUT", "/api/onedrive", b),
   disconnectOneDrive: () => req<OneDriveStatus>("DELETE", "/api/onedrive"),
   composioAccounts: (key?: string) => req<{ accounts: { id: string; label: string; status: string }[] }>("POST", "/api/onedrive/composio/accounts", { key }),
+  gdrive: () => req<GdriveStatus>("GET", "/api/gdrive"),
+  saveGdrive: (b: { composioKey?: string | null; account?: string | null; label?: string | null }) => req<GdriveStatus>("PUT", "/api/gdrive", b),
+  deleteGdrive: () => req<GdriveStatus>("DELETE", "/api/gdrive"),
+  gdriveAccounts: (key?: string) => req<{ accounts: { id: string; label: string; status: string }[] }>("POST", "/api/gdrive/accounts", { key }),
+  house: () => req<HouseRules>("GET", "/api/settings/house"),
+  saveHouse: (text: string | null) => req<HouseRules>("PUT", "/api/settings/house", { text }),
   oneDriveLogin: () => req<NonNullable<OneDriveStatus["pending"]>>("POST", "/api/onedrive/login"),
   oneDrivePoll: () => req<{ state: "waiting" | "connected" | "expired" | "declined" | "none"; account?: string; message?: string }>("POST", "/api/onedrive/login/poll"),
   oneDriveBrowse: (folder: string) => req<{ name: string; folders: string[]; pictures: number }>("GET", `/api/onedrive/browse?folder=${encodeURIComponent(folder)}`),

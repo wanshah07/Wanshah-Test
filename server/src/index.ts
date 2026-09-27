@@ -15,6 +15,7 @@ import { generateRoutes } from "./routes/generate.js";
 import { exportRoutes } from "./routes/export.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { oneDriveRoutes } from "./routes/onedrive.js";
+import { gdriveRoutes } from "./routes/gdrive.js";
 import { libraryRoutes } from "./routes/library.js";
 
 export async function buildApp(): Promise<ReturnType<typeof Fastify>> {
@@ -37,6 +38,7 @@ export async function buildApp(): Promise<ReturnType<typeof Fastify>> {
   await app.register(exportRoutes);
   await app.register(settingsRoutes);
   await app.register(oneDriveRoutes);
+  await app.register(gdriveRoutes);
   await app.register(libraryRoutes);
 
   if (fs.existsSync(path.join(config.webDist, "index.html"))) {

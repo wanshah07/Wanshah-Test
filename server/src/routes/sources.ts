@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { extractMany, type Extracted } from "../ingest/extract.js";
-import { fetchGoogleLink, GoogleLinkError } from "../ingest/google.js";
+import { fetchGoogleLink, GoogleLinkError, type GoogleLink } from "../ingest/google.js";
+import { fetchPrivateLink, gdriveStatus } from "../gdrive.js";
 import type { SourceRef } from "@slidecraft/shared";
 import { addMedia, addSource, listSourceRefs, loadDeck } from "../store.js";
 import { getDb } from "../db.js";
@@ -58,7 +59,9 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
     const url = (req.body as { url?: unknown } | undefined)?.url;
     if (typeof url !== "string" || !url.trim() || url.length > 2000) return reply.code(400).send({ error: "invalid", message: "Paste a Google Drive, Docs, Sheets or Slides link." });
     try {
-      const { files, skipped } = await fetchGoogleLink(url);
+      // Private files go through the connected Google Drive account, when there is one.
+      const reader = gdriveStatus(req.user.id).connected ? (l: GoogleLink) => fetchPrivateLink(req.user.id, l) : undefined;
+      const { files, skipped } = await fetchGoogleLink(url, reader);
       const added: SourceRef[] = [];
       for (const f of files) await keep(req.user.id, id, await extractMany(f.name, f.buf, f.relPath), f.buf.length, added, skipped);
       return { added, skipped };

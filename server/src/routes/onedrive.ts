@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { listSourceRefs, loadDeck, saveDeck, updateDeck } from "../store.js";
+import { saveGdrive } from "../gdrive.js";
 import { browse, composioAccounts, composioKey, disconnect, importFolder, normaliseFolder, OneDriveError, pollLogin, saveOneDriveSettings, startLogin, status, summarise } from "../onedrive.js";
 
 function fail(reply: FastifyReply, e: unknown) {
@@ -13,6 +14,8 @@ export async function oneDriveRoutes(app: FastifyInstance): Promise<void> {
   app.put("/api/onedrive", async (req, reply) => {
     const b = (req.body ?? {}) as { clientId?: string | null; defaultFolder?: string | null; provider?: string; composioKey?: string | null; composioAccount?: string | null; composioAccountLabel?: string | null };
     for (const [k, v] of Object.entries(b)) if (v !== undefined && v !== null && typeof v !== "string") return reply.code(400).send({ error: "invalid", message: `${k} must be text` });
+    // A new Composio key is a new project: the Google Drive account is picked again too.
+    if (b.composioKey !== undefined) saveGdrive(req.user.id, null);
     try {
       saveOneDriveSettings(req.user.id, {
         clientId: b.clientId,
@@ -29,6 +32,8 @@ export async function oneDriveRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.delete("/api/onedrive", async (req) => {
+    // Removing the Composio key also ends the Google Drive account that used it.
+    if (status(req.user.id).provider === "composio") saveGdrive(req.user.id, null);
     disconnect(req.user.id);
     return status(req.user.id);
   });
