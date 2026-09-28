@@ -21,7 +21,9 @@
     "user:add": "node server/dist/cli/user-add.js",
     "check:fit": "node scripts/fit-check.mjs",
     "check:pptx-fit": "node scripts/pptx-fit-check.mjs",
-    "check:web": "node scripts/web-check.mjs"
+    "check:web": "node scripts/web-check.mjs",
+    "check:cloud": "node scripts/cloud-check.mjs",
+    "check:sql": "bash scripts/sql-check.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

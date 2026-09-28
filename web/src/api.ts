@@ -1,12 +1,21 @@
-import type { Deck, OneDriveLink, Slide, SlopHit, SourceRef, Theme } from "@slidecraft/shared";
+import { renderDeckHtml, type Deck, type OneDriveLink, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { ApiError } from "./apiError";
+import { cloud, sb } from "./cloud/client";
+import { cloudRequest } from "./cloud/routes";
+import { mediaDataUrl, signedMediaUrl } from "./cloud/media";
 
-export class ApiError extends Error {
-  constructor(message: string, public status: number, public code?: string) {
-    super(message);
-  }
-}
+export { ApiError } from "./apiError";
+export { cloud } from "./cloud/client";
 
 async function req<T>(method: string, url: string, body?: unknown, form?: FormData): Promise<T> {
+  if (cloud) {
+    try {
+      return (await cloudRequest(method, url, body, form)) as T;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401 && !location.hash.startsWith("#/login")) location.hash = "#/login?next=" + encodeURIComponent(location.hash.slice(1) || "/");
+      throw e;
+    }
+  }
   const res = await fetch(url, {
     method,
     headers: form ? undefined : body !== undefined ? { "content-type": "application/json" } : undefined,
@@ -148,9 +157,11 @@ export interface MediaItem {
 export const api = {
   health: () => req<{ ok: boolean; authMode: string; mockLlm: boolean }>("GET", "/api/health"),
   authMode: () => req<{ mode: "off" | "local" }>("GET", "/api/auth/mode"),
-  me: () => req<{ user: Settings["user"]; mode: string }>("GET", "/api/auth/me"),
+  me: () => req<{ user: Settings["user"]; mode: string; member?: boolean }>("GET", "/api/auth/me"),
   login: (email: string, password: string) => req<{ user: Settings["user"] }>("POST", "/api/auth/login", { email, password }),
   logout: () => req<{ ok: true }>("POST", "/api/auth/logout"),
+  /** Supabase builds only: a teammate makes their own account, then the owner adds them. */
+  signUp: (email: string, password: string) => req<{ confirm: boolean }>("POST", "/api/auth/signup", { email, password }),
   decks: () => req<DeckSummary[]>("GET", "/api/decks"),
   createDeck: (b: { title?: string; lang?: string; angle?: string; themeId?: string; designId?: string }) => req<Deck>("POST", "/api/decks", b),
   deck: (id: string) => req<DeckResponse>("GET", `/api/decks/${id}`),
@@ -219,5 +230,48 @@ export const api = {
 };
 
 export function mediaUrl(id: string): string {
-  return `/api/media/${id}`;
+  return cloud ? signedMediaUrl(id) : `/api/media/${id}`;
+}
+
+function saveBlob(blob: Blob, name: string): void {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+}
+
+const fileName = (title: string) => title.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 80) || "deck";
+
+/** The whole deck as one HTML page with its pictures inside, as the server's export and presenter build it. */
+export async function deckHtml(deckId: string): Promise<string> {
+  const { deck } = await api.deck(deckId);
+  const ids = new Set<string>();
+  JSON.stringify(deck, (k, v) => ((k === "mediaId" || k === "logoMediaId") && typeof v === "string" ? (ids.add(v), v) : v));
+  const data = new Map<string, string>();
+  for (const id of ids) data.set(id, await mediaDataUrl(id));
+  return renderDeckHtml(deck, (id) => data.get(id) ?? "");
+}
+
+/**
+ * Downloads a deck as PowerPoint, HTML or JSON. On the server the browser simply
+ * opens the export address; on GitHub Pages HTML and JSON are built here and the
+ * PowerPoint is built by the worker and fetched from sc-exports.
+ */
+export async function exportDeck(deckId: string, kind: "pptx" | "html" | "json"): Promise<void> {
+  if (!cloud) {
+    window.location.href = `/api/decks/${deckId}/export.${kind}`;
+    return;
+  }
+  const { deck } = await api.deck(deckId);
+  if (kind === "json") return saveBlob(new Blob([JSON.stringify(deck, null, 2)], { type: "application/json" }), `${fileName(deck.title)}.json`);
+  if (kind === "html") return saveBlob(new Blob([await deckHtml(deckId)], { type: "text/html" }), `${fileName(deck.title)}.html`);
+  const r = await req<{ file: { bucket: string; path: string; name: string } }>("GET", `/api/decks/${deckId}/export.pptx`);
+  const { data, error } = await sb().storage.from(r.file.bucket).download(r.file.path);
+  if (error || !data) throw new ApiError(error?.message || "The PowerPoint could not be downloaded.", 500, "download");
+  saveBlob(data, r.file.name);
+  // Downloaded: the copy in sc-exports is no longer needed.
+  void sb().storage.from(r.file.bucket).remove([r.file.path]);
 }

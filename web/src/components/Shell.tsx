@@ -6,6 +6,7 @@ import { framed } from "../lib/files";
 export function Shell() {
   const [me, setMe] = useState<Settings["user"] | null>(null);
   const [mode, setMode] = useState<string>("off");
+  const [member, setMember] = useState(true);
   const nav = useNavigate();
   const [inFrame] = useState(framed);
   // A file dropped beside a drop zone would otherwise replace the whole page with the file.
@@ -24,6 +25,7 @@ export function Shell() {
     api.me().then((r) => {
       setMe(r.user);
       setMode(r.mode);
+      setMember(r.member !== false);
     }).catch(() => {});
   }, []);
   return (
@@ -54,6 +56,11 @@ export function Shell() {
           )}
         </div>
       </header>
+      {!member && me && (
+        <div className="banner warn" style={{ margin: "10px auto 0", maxWidth: 1100 }}>
+          You are signed in as <b>{me.email}</b>, but the workspace owner has not added you yet, so there is nothing to show and nothing can be saved. Ask them to add this email, then reload.
+        </div>
+      )}
       {inFrame && (
         <div className="banner warn" style={{ margin: "10px auto 0", maxWidth: 1100 }}>
           Slidecraft is open inside another window (such as VS Code's preview pane), where dragging files in and some buttons do not work.

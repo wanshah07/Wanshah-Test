@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { appHref } from "../cloud/client";
 import { ANGLES, blankSlide, themePreset } from "@slidecraft/shared";
 import { api, type DeckSummary } from "../api";
 import { SlideFrame } from "../components/SlideFrame";
@@ -61,7 +62,7 @@ export default function Decks() {
               </div>
               <div className="row" style={{ marginTop: 12 }}>
                 <Link to={`/deck/${d.id}`} className="btn btn-ghost btn-sm">Open</Link>
-                <a href={`/deck/${d.id}/present`} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">Present</a>
+                <a href={appHref(`/deck/${d.id}/present`)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">Present</a>
                 <button className="btn btn-quiet btn-sm" onClick={() => dup(d)}>Duplicate</button>
                 <ConfirmButton confirm="Click again to delete for good" onConfirm={() => del(d)}>Delete</ConfirmButton>
               </div>

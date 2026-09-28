@@ -339,6 +339,9 @@ time. For an always-on address for a team, use the Docker image on a host.
     npm run check:fit       # over-full slides of every layout in Chromium: nothing spills or is clipped
     npm run check:pptx-fit  # the same slides as .pptx, rendered by LibreOffice Impress: no text off
                             # the slide or on top of other text (needs soffice with Impress)
+    npm run check:cloud     # the GitHub Pages build against a stand-in Supabase, with the worker:
+                            # sign-up, a deck written, pictures, exports, and a teammate who sees nothing
+    npm run check:sql       # supabase/*.sql on a throwaway Postgres, row level security from four sides
     npm run check:web       # the editor, presenter and every page in Chromium, desktop and phone:
                             # typing in list and number fields, saving before a download, no
                             # sideways scroll at 390px (CHROMIUM_PATH=/opt/pw-browsers/chromium)

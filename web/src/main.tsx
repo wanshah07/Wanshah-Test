@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, HashRouter } from "react-router-dom";
+import { cloud } from "./cloud/client";
 import App from "./App";
 import "./index.css";
 import { applyAppTheme, readAppTheme, watchSystemTheme } from "./lib/theme";
@@ -18,8 +19,15 @@ watchSystemTheme();
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    {/* GitHub Pages serves one file: routes live after the # there. */}
+    {cloud ? (
+      <HashRouter>
+        <App />
+      </HashRouter>
+    ) : (
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    )}
   </React.StrictMode>,
 );
