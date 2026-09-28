@@ -1,0 +1,65 @@
+name: Worker
+
+# Runs the jobs Slidecraft's page queues in Supabase (sc_jobs): writing decks,
+# reading files, Composio, PowerPoint. Woken by the database within seconds
+# (supabase/004_dispatch.sql); the 15-minute poll is the safety net and also
+# keeps a Free project from pausing. See docs/MIGRATION.md.
+#
+# This repository is public, so this log is public: the worker prints job ids,
+# counts and timings only (server/test/worker.test.ts checks that).
+
+on:
+  repository_dispatch:
+    types: [slidecraft_job]
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# One worker at a time. A run takes every pending job, so a queued wake-up is
+# enough; nothing is cancelled half way.
+concurrency:
+  group: slidecraft-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  work:
+    if: github.repository == 'wanshah07/Wanshah-Test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Anything to do?
+        id: queue
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase secrets are not set yet (docs/MIGRATION.md, What Wan does, once); skipping."
+            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # The poll only installs and builds when a job is waiting; the query itself keeps the project awake.
+          n=$(curl -fsS "$SUPABASE_URL/rest/v1/sc_jobs?select=id&status=in.(pending,running)&limit=1" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | jq length)
+          echo "jobs waiting or running: $n"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$n" = "0" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.queue.outputs.run == 'true'
+        uses: actions/checkout@v4
+      - if: steps.queue.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.queue.outputs.run == 'true'
+        run: npm ci --no-audit --no-fund && npm run build -w shared && npm run build -w server
+      - if: steps.queue.outputs.run == 'true'
+        name: Run the jobs
+        env:
+          NODE_ENV: production
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+        run: node server/dist/worker/index.js

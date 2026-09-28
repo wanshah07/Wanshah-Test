@@ -104,9 +104,28 @@ Each phase is one pull request. The Codespace keeps working until the last one.
 
 1. **Plan and database** (this PR): this file, `supabase/001` to `004`,
    `scripts/sql-check.sh`. Nothing runs yet.
-2. **Worker**: `server/src/worker/` (load, run, write back), a Supabase
-   store adapter behind the existing store functions, `worker.yml`
-   (dispatch plus 15-minute poll), tests against a local Postgres.
+2. **Worker** (done): `server/src/worker/` and `.github/workflows/worker.yml`.
+   - `mirror.ts` loads what a job is about (its deck, that deck's sources and
+     pictures, the person's designs, prompts and settings) into an in-memory
+     SQLite database under the one local user, and afterwards writes back
+     every row and picture that changed, always filtered by the owner's id.
+   - `run.ts` claims a pending job, sends its request to the existing app with
+     `app.inject()`, waits for background work (writing a deck) while passing
+     its progress to `sc_jobs.progress`, and stores the answer in
+     `sc_jobs.result` as `{status, body}` (or `{status, file}` for a
+     PowerPoint or HTML export, put in `sc-exports`). A request the app
+     answers with 404 or 409 is still a finished job: the page reads the
+     status like a fetch response. `error` is only for the worker failing.
+   - `merge.ts`: when the person edited the deck in the browser while the job
+     ran, the two versions are merged slide by slide instead of the worker
+     overwriting the edit.
+   - It refuses sign-in routes, any path outside `/api`, and the routes that
+     test, save or sign in with a key: keys are the worker's own secrets now.
+   - The workflow skips quietly until the Supabase secrets exist, and a
+     scheduled poll only installs and builds when a job is waiting.
+   - `server/test/worker.test.ts` runs every kind of job against a stand-in
+     for Supabase, and checks that another person's deck and files are out of
+     reach and that no content reaches the log.
 3. **Page**: Supabase sign-in and the members check, `web/src/api.ts` split
    into direct calls and jobs, live job progress, Settings without key fields.
 4. **Deploy**: Pages builds `web/` into `/app/` beside the existing redirect,
@@ -128,6 +147,8 @@ Each phase is one pull request. The Codespace keeps working until the last one.
 4. In GitHub, Settings, Secrets and variables, Actions:
    - secrets `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
      and `COMPOSIO_API_KEY` if Drive or OneDrive is used;
+   - optionally variables `OPENAI_BASE_URL` and `OPENAI_MODEL` for another
+     endpoint or model (each person's model choice in Settings still wins);
    - variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 5. Sign in once on the new link, then add yourself as `owner` and each
    teammate as `member` with the insert at the top of `001_schema.sql`.

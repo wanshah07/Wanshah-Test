@@ -24,7 +24,8 @@ export async function buildApp(): Promise<ReturnType<typeof Fastify>> {
   // A job that was running when the process died is not coming back.
   db.prepare("UPDATE jobs SET status = 'failed', error = 'server restarted' WHERE status IN ('queued','running')").run();
 
-  const app = Fastify({ logger: process.env.NODE_ENV !== "test", bodyLimit: 20 * 1024 * 1024 });
+  // The worker logs nothing per request: its Actions logs are public.
+  const app = Fastify({ logger: process.env.NODE_ENV !== "test" && process.env.SC_WORKER !== "1", bodyLimit: 20 * 1024 * 1024 });
   await app.register(cookie, { secret: requireSecret() });
   await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 500 } });
   registerAuth(app);

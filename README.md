@@ -359,4 +359,5 @@ time. For an always-on address for a team, use the Docker image on a host.
 | `MOCK_LLM` | `1` to skip OpenAI and return a fixture deck. |
 | `MS_CLIENT_ID` | Microsoft app (client) ID for OneDrive pictures. Optional; a per-user one in Settings takes precedence. |
 | `COMPOSIO_API_BASE` | Composio API address for OneDrive and Google Drive, default `https://backend.composio.dev/api/v3`. |
+| `COMPOSIO_API_KEY` | Composio key used when none is saved in Settings. The worker reads it from its GitHub secret. |
 | `MS_TENANT` | Sign-in authority for OneDrive, default `common` (personal and work accounts). |

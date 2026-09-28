@@ -65,7 +65,8 @@ export function providerFor(userId: string): Provider {
 
 export function composioKey(userId: string): string {
   const enc = row(userId).cz_key_enc;
-  if (!enc) return "";
+  // The worker has no saved key: it reads the team's key from its environment.
+  if (!enc) return process.env.COMPOSIO_API_KEY ?? "";
   try {
     return decrypt(enc);
   } catch {
