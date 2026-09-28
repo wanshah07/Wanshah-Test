@@ -162,6 +162,8 @@ export const api = {
   logout: () => req<{ ok: true }>("POST", "/api/auth/logout"),
   /** Supabase builds only: a teammate makes their own account, then the owner adds them. */
   signUp: (email: string, password: string) => req<{ confirm: boolean }>("POST", "/api/auth/signup", { email, password }),
+  /** Supabase builds only: the signed-in person sets a new password. */
+  changePassword: (password: string) => req<{ ok: true }>("PUT", "/api/auth/password", { password }),
   decks: () => req<DeckSummary[]>("GET", "/api/decks"),
   createDeck: (b: { title?: string; lang?: string; angle?: string; themeId?: string; designId?: string }) => req<Deck>("POST", "/api/decks", b),
   deck: (id: string) => req<DeckResponse>("GET", `/api/decks/${id}`),

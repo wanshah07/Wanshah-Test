@@ -40,6 +40,7 @@ const b64u = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const tokenFor = (u) => `${b64u({ alg: "none", typ: "JWT" })}.${b64u({ sub: u.id, email: u.email, role: "authenticated", aud: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
 const session = (u) => ({ access_token: tokenFor(u), token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: "r-" + u.id, user: { id: u.id, email: u.email, aud: "authenticated", role: "authenticated", app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() } });
 const isMember = (uid) => db.sc_members.some((m) => m.user_id === uid);
+let signupOpen = true; // kpi-system has sign-ups switched off; the check turns them off part way
 
 function caller(req) {
   const auth = String(req.headers.authorization || "").replace(/^Bearer /, "");
@@ -140,6 +141,8 @@ const sb = http.createServer((req, res) => {
     // Auth
     if (url.pathname === "/auth/v1/signup") {
       const b = json();
+      // What Supabase answers when "Allow new users to sign up" is off.
+      if (!signupOpen) return send(422, { code: 422, error_code: "signup_disabled", msg: "Signups not allowed for this instance" });
       if (users.some((u) => u.email === b.email)) return send(422, { code: 422, msg: "User already registered" });
       const u = { id: crypto.randomUUID(), email: b.email, password: b.password };
       users.push(u);
@@ -152,6 +155,14 @@ const sb = http.createServer((req, res) => {
       return send(200, session(u));
     }
     if (url.pathname === "/auth/v1/logout") return send(204);
+    if (url.pathname === "/auth/v1/user" && req.method === "PUT") {
+      const u = users.find((x) => x.id === who.uid);
+      if (!u) return send(401, { msg: "no user" });
+      const b = json();
+      if (b.password === u.password) return send(422, { code: 422, error_code: "same_password", msg: "New password should be different from the old password." });
+      if (b.password) u.password = b.password;
+      return send(200, session(u).user);
+    }
     if (url.pathname === "/auth/v1/user") {
       const u = users.find((x) => x.id === who.uid);
       return u ? send(200, session(u).user) : send(401, { msg: "no user" });
@@ -396,7 +407,21 @@ try {
   // Settings has no key fields.
   await page.goto(`${APP}#/settings`);
   await page.getByRole("heading", { name: "AI", exact: true }).waitFor({ timeout: 15000 });
-  check("Settings says the AI is the owner's and shows no key box", (await page.locator("input[type=password]").count()) === 0 && (await page.locator("text=provided by the workspace owner").count()) === 1);
+  check("Settings says the AI is the owner's and shows no key box", (await page.locator("section:not(:has(h2:text-is('Password'))) input[type=password]").count()) === 0 && (await page.locator("text=/API key|New key/").count()) === 0 && (await page.locator("text=provided by the workspace owner").count()) === 1);
+
+  // Changing the password, then signing in with the new one.
+  await page.fill("section:has(h2:text-is('Password')) input >> nth=0", "a brand new password");
+  await page.fill("section:has(h2:text-is('Password')) input >> nth=1", "a brand new password");
+  await page.click("button:has-text('Change password')");
+  await page.locator("text=Password changed").waitFor({ timeout: 15000 }).catch(() => {});
+  check("a person can change their own password in Settings", wan.password === "a brand new password");
+  await page.click("button:has-text('Sign out')");
+  await page.waitForURL(/#\/login/, { timeout: 15000 });
+  await page.fill("input[type=email]", "wan@example.com");
+  await page.fill("input[type=password]", "a brand new password");
+  await page.click("button:has-text('Sign in')");
+  await page.locator("h1", { hasText: "Decks" }).waitFor({ timeout: 15000 }).catch(() => {});
+  check("and sign in with the new one", (await page.locator(".deckcard").count()) === 1);
 
   // A teammate sees none of it.
   const ctx2 = await browser.newContext();
@@ -421,6 +446,20 @@ try {
   const direct = await (await fetch(`${SB}/rest/v1/sc_decks?select=*`, { headers: { apikey: ANON, authorization: `Bearer ${token}` } })).json();
   check("the teammate's own token reads no other deck", Array.isArray(direct) && direct.length === 0);
   await ctx2.close();
+
+  // With sign-ups off, as in a shared project: a visitor is told who makes accounts.
+  signupOpen = false;
+  const ctx3 = await browser.newContext();
+  const visitor = await ctx3.newPage();
+  await visitor.goto(APP);
+  await visitor.waitForURL(/#\/login/, { timeout: 15000 });
+  await visitor.click("text=New here? Create an account");
+  await visitor.fill("input[type=email]", "someone@example.com");
+  await visitor.fill("input[type=password]", "a password here");
+  await visitor.click("button:has-text('Create account')");
+  await visitor.locator("text=made by the workspace owner").waitFor({ timeout: 15000 }).catch(() => {});
+  check("with sign-ups closed, a visitor is told the owner makes accounts", (await visitor.locator("text=made by the workspace owner").count()) === 1 && (await visitor.locator("text=Signups not allowed").count()) === 0);
+  await ctx3.close();
 
   check("every file of the page loads from where it is served", missing.length === 0);
   if (missing.length) console.log(missing);

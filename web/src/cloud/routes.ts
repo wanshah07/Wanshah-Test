@@ -235,8 +235,27 @@ const routes: [string, RegExp, Handler][] = [
     /^\/api\/auth\/signup$/,
     async (_p, b) => {
       const { data, error } = await sb().auth.signUp({ email: String(b?.email ?? ""), password: String(b?.password ?? ""), options: { emailRedirectTo: location.href.split("#")[0] } });
-      if (error) throw new ApiError(error.message, 400, "signup");
+      if (error) {
+        // A project that only lets its owner create accounts (as a shared project should).
+        if (error.code === "signup_disabled" || /signups? not allowed/i.test(error.message)) throw new ApiError("New accounts are made by the workspace owner here. Ask them to create yours, then sign in with the email and password they give you.", 403, "signup_closed");
+        throw new ApiError(error.message, 400, "signup");
+      }
       return { confirm: !data.session };
+    },
+  ],
+  [
+    "PUT",
+    /^\/api\/auth\/password$/,
+    async (_p, b) => {
+      const password = String(b?.password ?? "");
+      if (password.length < 8) throw new ApiError("Use at least 8 characters.", 400, "weak_password");
+      const { error } = await sb().auth.updateUser({ password });
+      if (error) {
+        if (error.code === "same_password") throw new ApiError("That is the password you already have.", 400, "same_password");
+        if (error.code === "reauthentication_needed" || /reauthenticat/i.test(error.message)) throw new ApiError("For safety, sign out and sign in again, then change the password straight away.", 401, "reauthenticate");
+        throw new ApiError(error.message, 400, "password");
+      }
+      return { ok: true };
     },
   ],
   ["POST", /^\/api\/auth\/logout$/, async () => (await sb().auth.signOut(), { ok: true })],
