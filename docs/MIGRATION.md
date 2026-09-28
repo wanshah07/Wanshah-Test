@@ -146,6 +146,9 @@ Each phase is one pull request. The Codespace keeps working until the last one.
      PowerPoint and a finished job are removed afterwards.
    - Sign-in is Supabase Auth with email and password; a new account sees
      "the workspace owner has not added you yet" until it is in `sc_members`.
+     Settings has a Password card, so a person given a first password by the
+     owner can replace it, and a project with sign-ups off tells a visitor
+     that the owner makes accounts instead of showing Supabase's own message.
    - Settings shows no key fields: the AI is the owner's.
    - Routes use `#/…` in this mode, because GitHub Pages serves one file.
    - `scripts/cloud-check.mjs` (`npm run check:cloud`) builds the page in this
@@ -191,9 +194,14 @@ Each phase is one pull request. The Codespace keeps working until the last one.
    `https://wanshah07.github.io/Wanshah-Test/app/` to **Redirect URLs**, so the
    confirmation email of a new account comes back to Slidecraft. Leave the
    Site URL alone: in a project another app uses, it belongs to that app.
-7. Open https://wanshah07.github.io/Wanshah-Test/app/, create your account,
-   then add yourself as `owner` and each teammate as `member` with the insert
-   at the top of `001_schema.sql`. If the project does not allow new sign-ups,
-   invite each person from Authentication, Users, Invite instead.
+7. Accounts. kpi-system has sign-ups switched off, and should keep them off
+   while other apps share its logins, so the owner makes each account:
+   Authentication, Users, Add user, Create new user, with a first password
+   and **Auto Confirm User** ticked. Then add the person with the insert at
+   the top of `001_schema.sql` (`owner` for Wan, `member` for everyone else)
+   and send them the link, their email and the first password. They sign in
+   and replace the password in Settings, Password. An email that already has
+   an account in the project (Wan's, from KPI) signs in with that password.
+   A visitor who tries to create an account is told the owner makes them.
 
 Steps 4 to 7 are needed before the link works; nothing breaks meanwhile.

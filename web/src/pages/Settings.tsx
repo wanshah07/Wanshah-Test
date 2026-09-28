@@ -3,6 +3,7 @@ import { THEME_PRESETS } from "@slidecraft/shared";
 import { api, cloud, type OneDriveStatus, type Settings as S } from "../api";
 import { GdriveCard } from "../components/GdriveCard";
 import { HouseCard } from "../components/HouseCard";
+import { PasswordCard } from "../components/PasswordCard";
 import { ReaderCard } from "../components/ReaderCard";
 import { toast } from "../components/Toast";
 import { ThemeCards } from "../components/ThemeCards";
@@ -233,6 +234,8 @@ export default function Settings() {
       )}
 
       <HouseCard />
+
+      {cloud && <PasswordCard />}
 
       <section className="card stack">
         <h2>OneDrive pictures</h2>

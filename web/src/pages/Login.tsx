@@ -44,7 +44,7 @@ export default function Login() {
         <h1>{creating ? "Create your account" : "Sign in"}</h1>
         {cloud ? (
           <p className="muted small">
-            {creating ? "Use your work email. Once your account exists, the workspace owner adds you, and then your decks, sources and settings are yours alone." : "Sign in with the account the workspace owner added."}
+            {creating ? "Use your work email. Once your account exists, the workspace owner adds you, and then your decks, sources and settings are yours alone." : "Sign in with the email and password from the workspace owner. You can change the password in Settings afterwards."}
           </p>
         ) : (
           <p className="muted small">Accounts are created by the administrator with <code>npm run user:add</code>.</p>
