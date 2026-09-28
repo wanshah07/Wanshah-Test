@@ -289,6 +289,13 @@ OneDrive.
 - Pasting a new Composio key here or under OneDrive replaces it for both, and
   both accounts are then picked again.
 
+### Moving off Codespaces
+
+Slidecraft is moving to GitHub Pages, GitHub Actions and Supabase so the link
+is always on and teammates can use it. The plan, the phases and the one-time
+setup are in [docs/MIGRATION.md](docs/MIGRATION.md). Until that is finished,
+the Codespace below is still how it runs.
+
 ### On GitHub, no laptop: Codespaces
 
 `.devcontainer/devcontainer.json` builds and starts the server inside a GitHub

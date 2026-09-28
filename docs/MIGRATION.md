@@ -1,0 +1,135 @@
+# Moving Slidecraft off Codespaces
+
+Wan, 28 Sep 2026: *"codespace is not for me because it's always off and my
+teammate cannot use it anytime. Prepare to migrate and function like semasa:
+can PR, merge and open the link anytime anywhere."*
+
+Slidecraft is moving to the same shape as `wanshah07/semasa`:
+
+| Part | Today | After |
+|---|---|---|
+| Site | served by the Node server in a Codespace | GitHub Pages, rebuilt on every merge to `main` |
+| Data | SQLite file and `data/` folder in the Codespace | Supabase: Postgres tables and private Storage buckets |
+| Sign-in | `AUTH_MODE`, users made with `npm run user:add` | Supabase Auth, plus a members list the owner controls |
+| Writing, reading files, Composio, PowerPoint | the Node server, on request | a worker in GitHub Actions, woken by the database within seconds |
+| Keys | saved encrypted in Settings | GitHub Actions secrets, read only by the worker |
+
+The link stays up whether or not anyone has anything open: Pages and Supabase
+are always on, and the worker starts when a job arrives.
+
+## How a click becomes work
+
+```
+ browser (GitHub Pages)                   Supabase                          GitHub Actions
+ ──────────────────────                   ────────                          ──────────────
+ read / edit own decks  ───── RLS ──────▶ sc_decks, sc_sources, …
+ "Write deck"           ── insert ──────▶ sc_jobs (pending) ── trigger ───▶ repository_dispatch
+                                                                            worker.yml:
+                                          sc_jobs, sc_decks  ◀── writes ──  load the job's rows
+ progress and result    ◀── realtime ──── (running → done)                  run the existing server code
+                                                                            write rows and files back
+```
+
+The worker keeps the server code that already works and is already tested.
+For each job it:
+
+1. loads the person's rows (settings, the deck, its sources, media, designs,
+   prompts) from Supabase into an in-memory SQLite database, and downloads
+   the files the job needs into a temporary folder;
+2. sends the job's request (`POST /api/decks/d_x/generate` and so on) to the
+   existing Fastify app with `app.inject()`, as that person;
+3. writes back every row the request changed and uploads any new file, then
+   stores the response on the job.
+
+So `server/src/llm`, `export`, `ingest`, `design`, `onedrive.ts` and
+`gdrive.ts` move without a rewrite, and `npm test` keeps testing them.
+
+## Which requests go where
+
+**Straight to Supabase from the page** (instant, protected by RLS):
+list, open, rename, save and delete decks; list and delete sources and media;
+open a picture (a signed link); designs and prompts; Settings choices (model,
+theme, default folder, the Composio account picks, the house instructions);
+sign-in and sign-out.
+
+**Through the worker** (starts in roughly 20 to 60 seconds, then runs as long
+as the work takes):
+write a deck, design pass, rewrite or feedback on a slide, upload and read a
+source file, read a Google Drive or Sheets link, OneDrive import and browse,
+find Composio accounts, analyse a design file, export PowerPoint and HTML,
+duplicate a deck.
+
+**Dropped:** "Test key" and the picture reader's key (keys are secrets now);
+Microsoft direct sign-in for OneDrive (it stores a refresh token per person;
+Composio covers OneDrive without one); `AUTH_MODE` and `npm run user:add`.
+
+The waiting is the one real cost. Writing a whole deck already takes minutes,
+so 30 seconds more is small. Rewriting one slide goes from a few seconds to
+about a minute.
+
+## What a teammate sees
+
+They open the link, sign in with their email, and see "not added yet" until
+Wan adds them (one line in the Supabase SQL editor, in `supabase/001_schema.sql`).
+After that they have their own decks, sources and settings. Nobody sees
+anybody else's decks. Every deck is written on the team's OpenAI key.
+
+## Safety
+
+- **The repository is public, and so are its Actions logs.** The worker logs
+  job ids, counts and timings only, never slide text, source text, file names
+  or a key. A test enforces this before the worker ships.
+- **The Pages site is public.** The anon key it carries can read nothing:
+  every table and bucket is owner-only and members-only
+  (`supabase/002_rls.sql`, `003_storage.sql`). `scripts/sql-check.sh` proves it
+  on a real Postgres from four sides: the owner, a teammate, a signed-in
+  stranger and the anon key.
+- **Only the job id travels to GitHub.** The dispatch body carries the id; the
+  worker reads the job itself with the service key.
+- **A stranger cannot spend the OpenAI key.** Queuing a job needs membership.
+
+## Limits worth knowing
+
+- Supabase Free: 500 MB database, 50 MB per file, two active projects, and a
+  project with no database activity for 7 days is paused. The worker's
+  15-minute poll touches the database, which keeps it awake.
+- GitHub turns off scheduled workflows in a public repository after 60 days
+  with no activity in it. If that happens only the poll stops; the dispatch
+  still starts the worker. Re-enable it from the Actions tab.
+- Actions minutes are free for a public repository.
+
+## Phases
+
+Each phase is one pull request. The Codespace keeps working until the last one.
+
+1. **Plan and database** (this PR): this file, `supabase/001` to `004`,
+   `scripts/sql-check.sh`. Nothing runs yet.
+2. **Worker**: `server/src/worker/` (load, run, write back), a Supabase
+   store adapter behind the existing store functions, `worker.yml`
+   (dispatch plus 15-minute poll), tests against a local Postgres.
+3. **Page**: Supabase sign-in and the members check, `web/src/api.ts` split
+   into direct calls and jobs, live job progress, Settings without key fields.
+4. **Deploy**: Pages builds `web/` into `/app/` beside the existing redirect,
+   so https://wanshah07.github.io/Wanshah-Test/ keeps redirecting to kkm-halal
+   and Slidecraft opens at https://wanshah07.github.io/Wanshah-Test/app/.
+5. **Move the data**: a one-off script that copies the Codespace's SQLite
+   rows and pictures into Supabase, for the decks worth keeping.
+6. **Retire Codespaces**: remove `.devcontainer/` and the Codespaces README
+   section, update `CLAUDE.md` rules 1 and 5.
+
+## What Wan does, once
+
+1. Create a Supabase project for Slidecraft (Free plan, region Singapore). A
+   separate project keeps client decks apart from KPI data. The files also
+   run in the KPI project if a second free project is not available.
+2. In the SQL editor, run `supabase/001` to `004` in order.
+3. Put the dispatch token and repo in Vault (the two lines at the top of
+   `004_dispatch.sql`).
+4. In GitHub, Settings, Secrets and variables, Actions:
+   - secrets `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
+     and `COMPOSIO_API_KEY` if Drive or OneDrive is used;
+   - variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+5. Sign in once on the new link, then add yourself as `owner` and each
+   teammate as `member` with the insert at the top of `001_schema.sql`.
+
+Steps 4 and 5 are only needed from phase 2 and phase 4 on.
