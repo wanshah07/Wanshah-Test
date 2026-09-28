@@ -22,3 +22,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run build
       - run: npm test
+      - name: Database policies (supabase/, on a throwaway Postgres)
+        run: |
+          ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1 || { sudo apt-get update -q && sudo apt-get install -y -q postgresql; }
+          bash scripts/sql-check.sh

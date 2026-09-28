@@ -19,6 +19,21 @@ https://wanshah07.github.io/kkm-halal/. `.github/workflows/deploy-pages.yml`
 publishes that folder and nothing else. Do not point it at the app: the app
 needs a server, a disk and a secret, which Pages cannot provide.
 
+### Moving to Pages, Actions and Supabase (from 28 Sep 2026)
+
+Wan: *"codespace is not for me because it's always off and my teammate cannot
+use it anytime. Prepare to migrate and function like semasa."* The plan and
+its phases are in `docs/MIGRATION.md`. Until the deploy phase lands, the
+sentence above about Pages still holds and the Codespace is the running app.
+Two rules already apply:
+
+- `supabase/*.sql` is the security boundary once the site is public. Any
+  change to a table, policy or bucket comes with a case in
+  `supabase/test/rls_check.sql`, and `scripts/sql-check.sh` (run in CI) must
+  pass. Every table is owner-only and members-only; the anon key reads nothing.
+- Actions logs in this public repository are public. The worker may log ids,
+  counts and timings, never slide text, source text, file names or a key.
+
 ## 2. One spec, three consumers
 
 `shared/src/deck.ts` is the deck. The editor edits it, the writer returns it
