@@ -155,9 +155,14 @@ Each phase is one pull request. The Codespace keeps working until the last one.
      an edit saved, a picture through a signed link, the exports, Present,
      Settings, and a teammate who sees none of it. The teammate checks fail
      when the stand-in's owner-only rule is removed.
-4. **Deploy**: Pages builds `web/` into `/app/` beside the existing redirect,
-   so https://wanshah07.github.io/Wanshah-Test/ keeps redirecting to kkm-halal
-   and Slidecraft opens at https://wanshah07.github.io/Wanshah-Test/app/.
+4. **Deploy** (done): `deploy-pages.yml` builds `web/` in Supabase mode with
+   `VITE_BASE=/Wanshah-Test/app/` and publishes it beside the existing
+   redirect, so https://wanshah07.github.io/Wanshah-Test/ keeps redirecting to
+   kkm-halal and Slidecraft opens at https://wanshah07.github.io/Wanshah-Test/app/.
+   Every merge to `main` redeploys it. Until the two repository variables
+   exist, `/app/` shows "Slidecraft is being set up" (`docs/pages-setup.html`)
+   instead of a page that cannot work. `CLOUD_BASE=/Wanshah-Test/app/ npm run
+   check:cloud` runs the end-to-end check with the page served from that path.
 5. **Move the data**: a one-off script that copies the Codespace's SQLite
    rows and pictures into Supabase, for the decks worth keeping.
 6. **Retire Codespaces**: remove `.devcontainer/` and the Codespaces README
@@ -177,7 +182,18 @@ Each phase is one pull request. The Codespace keeps working until the last one.
    - optionally variables `OPENAI_BASE_URL` and `OPENAI_MODEL` for another
      endpoint or model (each person's model choice in Settings still wins);
    - variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
-5. Sign in once on the new link, then add yourself as `owner` and each
-   teammate as `member` with the insert at the top of `001_schema.sql`.
+5. In GitHub, Settings, Secrets and variables, Actions, **Variables** tab:
+   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Supabase, Project
+   Settings, API: the Project URL and the `anon` `public` key). These are
+   public by design; never put the service role key here. Then run the
+   "Deploy to GitHub Pages" workflow once, or merge anything.
+6. In Supabase, Authentication, URL Configuration, add
+   `https://wanshah07.github.io/Wanshah-Test/app/` to **Redirect URLs**, so the
+   confirmation email of a new account comes back to Slidecraft. Leave the
+   Site URL alone: in a project another app uses, it belongs to that app.
+7. Open https://wanshah07.github.io/Wanshah-Test/app/, create your account,
+   then add yourself as `owner` and each teammate as `member` with the insert
+   at the top of `001_schema.sql`. If the project does not allow new sign-ups,
+   invite each person from Authentication, Users, Invite instead.
 
-Steps 4 and 5 are only needed from phase 2 and phase 4 on.
+Steps 4 to 7 are needed before the link works; nothing breaks meanwhile.

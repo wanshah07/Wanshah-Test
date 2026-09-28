@@ -16,16 +16,16 @@ nothing else: no social scheduling, no scraping, no cron. The one thing kept
 from before is `retired/`, which GitHub Pages still serves at
 https://wanshah07.github.io/Wanshah-Test/ as a redirect to
 https://wanshah07.github.io/kkm-halal/. `.github/workflows/deploy-pages.yml`
-publishes that folder and nothing else. Do not point it at the app: the app
-needs a server, a disk and a secret, which Pages cannot provide.
+publishes that folder at the root and, since 28 Sep 2026, Slidecraft at
+`/app/`, built in Supabase mode (below). Keep the redirect at the root.
 
 ### Moving to Pages, Actions and Supabase (from 28 Sep 2026)
 
 Wan: *"codespace is not for me because it's always off and my teammate cannot
 use it anytime. Prepare to migrate and function like semasa."* The plan and
-its phases are in `docs/MIGRATION.md`. Until the deploy phase lands, the
-sentence above about Pages still holds and the Codespace is the running app.
-Two rules already apply:
+its phases are in `docs/MIGRATION.md`. The Pages build talks to Supabase and the worker; a
+build without `VITE_SUPABASE_URL` still talks to the Node server, which is how
+the Codespace and `npm test` run. These rules apply:
 
 - `supabase/*.sql` is the security boundary once the site is public. Any
   change to a table, policy or bucket comes with a case in

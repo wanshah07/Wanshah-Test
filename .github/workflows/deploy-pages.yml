@@ -1,9 +1,18 @@
 name: Deploy to GitHub Pages
 
-# Publishes the retirement redirect in retired/ to GitHub Pages at
-# https://wanshah07.github.io/Wanshah-Test/
+# Publishes two things to https://wanshah07.github.io/Wanshah-Test/ :
 #
-# The redirect uses an absolute address, so it works from any path.
+#   /      retired/: the old landing page's redirect to
+#          https://wanshah07.github.io/kkm-halal/, served as index.html and as
+#          404.html so every old path lands there too.
+#   /app/  Slidecraft, built in Supabase mode (docs/MIGRATION.md). It reads and
+#          writes Supabase with the public anon key, which row level security
+#          makes harmless; heavy work goes to the worker (worker.yml).
+#
+# The app needs two repository VARIABLES (not secrets: both are public by
+# design): VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Until they exist,
+# /app/ says Slidecraft is being set up instead of shipping a page that
+# cannot work.
 
 on:
   push:
@@ -24,25 +33,43 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
-      # RETIRED 23 Sep 2026. This landing page was merged into
-      # wanshah07/malaysian-regulatory-affairs (site/), which publishes the
-      # one consultancy page at https://wanshah07.github.io/kkm-halal/.
-      #
-      # What is published here now is retired/ only: a redirect to that
-      # page, served as index.html and as 404.html so every old path lands
-      # there too. The React app in src/ is kept for its history and is not
-      # built. To bring it back, restore the npm ci / npm run build steps
-      # from git history and upload dist/ again.
-      #
+      - uses: actions/setup-node@v4
+        if: env.VITE_SUPABASE_URL != '' && env.VITE_SUPABASE_ANON_KEY != ''
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build Slidecraft for Pages
+        if: env.VITE_SUPABASE_URL != '' && env.VITE_SUPABASE_ANON_KEY != ''
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/app/
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build -w shared
+          npm run build -w web
+
+      - name: Put the site together
+        run: |
+          mkdir -p site/app
+          cp -r retired/. site/
+          if [ -f web/dist/index.html ]; then
+            cp -r web/dist/. site/app/
+          else
+            cp docs/pages-setup.html site/app/index.html
+          fi
+
       # No actions/configure-pages step, deliberately: Pages is already
       # switched on (Settings > Pages > Source: GitHub Actions), and the
       # built-in GITHUB_TOKEN cannot create a Pages site anyway.
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: retired
+          path: site
 
   deploy:
     needs: build
