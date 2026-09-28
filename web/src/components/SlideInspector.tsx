@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MAP_REGIONS, MAP_TILES, type AsidePanel, type CardItem, type ChartSpec, type DiagramSpec, type FactItem, type ImageRef, type Layout, type MapSpec, type Slide, type SlopHit, type TableSpec, type Theme } from "@slidecraft/shared";
 import { fillFor, LAYOUT_NAMES, LayoutPicker } from "./LayoutPicker";
-import { api, type MediaItem } from "../api";
+import { api, mediaUrl, type MediaItem } from "../api";
 import { toast } from "./Toast";
 
 interface Props {
@@ -353,14 +353,14 @@ function GalleryEditor({ deckId, items, onChange }: { deckId: string; items: Ima
       <label>Gallery<span className="help">2 to 6 pictures, each with a caption</span></label>
       {items.map((g, i) => (
         <div key={i} className="grid" style={{ gridTemplateColumns: "64px 1fr auto auto", gap: 6, alignItems: "center" }}>
-          {g.mediaId ? <img src={`/api/media/${g.mediaId}`} alt="" style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }} /> : <span className="small muted" style={{ width: 64 }}>empty</span>}
+          {g.mediaId ? <img src={mediaUrl(g.mediaId)} alt="" style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }} /> : <span className="small muted" style={{ width: 64 }}>empty</span>}
           <input type="text" value={g.caption ?? ""} placeholder="Caption" onChange={(e) => setItem(i, { caption: e.target.value || undefined })} />
           <button className="btn btn-ghost btn-xs" onClick={() => setPick(pick === i ? null : i)}>{pick === i ? "Close" : "Pick"}</button>
           <button className="btn btn-quiet btn-xs" onClick={() => onChange(items.filter((_, j) => j !== i))} disabled={items.length < 3}>✕</button>
           {pick === i && (
             <div className="row" style={{ gap: 6, gridColumn: "1 / -1" }}>
               {media.length ? media.map((m) => (
-                <img key={m.id} src={`/api/media/${m.id}`} alt={m.name} title={m.name} onClick={() => { setItem(i, { mediaId: m.id, url: undefined }); setPick(null); }}
+                <img key={m.id} src={mediaUrl(m.id)} alt={m.name} title={m.name} onClick={() => { setItem(i, { mediaId: m.id, url: undefined }); setPick(null); }}
                   style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 6, cursor: "pointer", border: g.mediaId === m.id ? "2px solid var(--brand)" : "1px solid var(--line)" }} />
               )) : <span className="small muted">No pictures in this deck yet. Upload some.</span>}
             </div>
@@ -477,7 +477,7 @@ function ImagePicker({ deckId, slide, onChange }: { deckId: string; slide: Slide
       {media.length > 0 && (
         <div className="row" style={{ gap: 6 }}>
           {media.map((m) => (
-            <img key={m.id} src={`/api/media/${m.id}`} alt={m.name} title={m.name} onClick={() => onChange({ ...slide, image: { ...img, mediaId: m.id, url: undefined } })}
+            <img key={m.id} src={mediaUrl(m.id)} alt={m.name} title={m.name} onClick={() => onChange({ ...slide, image: { ...img, mediaId: m.id, url: undefined } })}
               style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 6, cursor: "pointer", border: img.mediaId === m.id ? "2px solid var(--brand)" : "1px solid var(--line)" }} />
           ))}
         </div>

@@ -234,8 +234,9 @@ try {
   check("settings page renders", await page.locator("h1", { hasText: "Settings" }).isVisible());
   check("settings offers OneDrive", await page.locator("h2", { hasText: "OneDrive pictures" }).isVisible());
   await page.click(".chip:has-text('Composio')");
-  await page.locator("text=Composio API key").waitFor({ timeout: 5000 }).catch(() => {});
   const odCard = page.locator("section", { has: page.locator("h2", { hasText: "OneDrive pictures" }) });
+  // Waited for inside the card: the Google Drive card has a Composio key field too.
+  await odCard.locator("text=Composio API key").waitFor({ timeout: 5000 }).catch(() => {});
   check("OneDrive can go through Composio", (await odCard.locator("text=Composio API key").count()) === 1 && (await odCard.locator("button:has-text('Find my OneDrive accounts')").count()) === 1);
   const gdCard = page.locator("section", { has: page.locator("h2", { hasText: "Google Drive (private files)" }) });
   check("settings offers private Google Drive files", (await gdCard.locator("button:has-text('Find my Google Drive accounts')").count()) === 1);

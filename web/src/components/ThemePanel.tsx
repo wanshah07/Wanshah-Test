@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FONT_CHOICES, THEME_PRESETS, themePreset, type Theme, type ThemeColors } from "@slidecraft/shared";
-import { api, type Design, type MediaItem } from "../api";
+import { api, mediaUrl, type Design, type MediaItem } from "../api";
 import { toast } from "./Toast";
 import { ThemeCards } from "./ThemeCards";
 
@@ -142,7 +142,7 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
       <div className="field">
         <label>Logo</label>
         <div className="row">
-          {theme.logoMediaId && <img src={`/api/media/${theme.logoMediaId}`} alt="" style={{ height: 28, maxWidth: 140, objectFit: "contain", background: "#fff", padding: 3, borderRadius: 6, border: "1px solid var(--line)" }} />}
+          {theme.logoMediaId && <img src={mediaUrl(theme.logoMediaId)} alt="" style={{ height: 28, maxWidth: 140, objectFit: "contain", background: "#fff", padding: 3, borderRadius: 6, border: "1px solid var(--line)" }} />}
           <button className="btn btn-ghost btn-xs" onClick={() => logoRef.current?.click()}>{theme.logoMediaId ? "Replace" : "Upload"}</button>
           {theme.logoMediaId && <button className="btn btn-quiet btn-xs" onClick={() => set({ logoMediaId: undefined })}>Remove</button>}
           <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={(e) => uploadLogo(e.target.files)} />

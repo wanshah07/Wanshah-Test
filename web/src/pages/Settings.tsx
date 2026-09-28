@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { THEME_PRESETS } from "@slidecraft/shared";
-import { api, type OneDriveStatus, type Settings as S } from "../api";
+import { api, cloud, type OneDriveStatus, type Settings as S } from "../api";
 import { GdriveCard } from "../components/GdriveCard";
 import { HouseCard } from "../components/HouseCard";
 import { ReaderCard } from "../components/ReaderCard";
@@ -170,9 +170,16 @@ export default function Settings() {
     <main className="page stack" style={{ maxWidth: 820 }}>
       <div>
         <h1>Settings</h1>
-        <p className="muted">Signed in as {s.user.name || s.user.email}. Login is {s.authMode === "off" ? "off: single-user mode" : "on"}.</p>
+        <p className="muted">Signed in as {s.user.name || s.user.email}.{cloud ? "" : ` Login is ${s.authMode === "off" ? "off: single-user mode" : "on"}.`}</p>
       </div>
 
+      {cloud ? (
+        <section className="card stack">
+          <h2>AI</h2>
+          <p className="small">The AI is provided by the workspace owner. Every deck is written with the owner's key, which never reaches this page or anyone using it. Choose the model below if the owner has told you another one to use.</p>
+        </section>
+      ) : (
+        <>
       <section className="card stack">
         <h2>Writer endpoint and key</h2>
         {s.mockLlm && <div className="banner info">The server runs with MOCK_LLM=1: generation returns a fixture deck and no key is used.</div>}
@@ -222,15 +229,17 @@ export default function Settings() {
       </section>
 
       <ReaderCard s={s} onSaved={load} />
+        </>
+      )}
 
       <HouseCard />
 
       <section className="card stack">
         <h2>OneDrive pictures</h2>
-        <p className="small">Pull pictures from a OneDrive folder into a deck. Slidecraft only reads; it never changes anything in OneDrive. Keys and sign-ins are stored encrypted.</p>
+        <p className="small">Pull pictures from a OneDrive folder into a deck. Slidecraft only reads; it never changes anything in OneDrive.{cloud ? "" : " Keys and sign-ins are stored encrypted."}</p>
         {od && (
           <>
-            <div>
+            {!cloud && <div>
               <b className="small">Connect through</b>
               <div className="chips">
                 {([["composio", "Composio", "Uses the OneDrive you already connected in Composio. No Microsoft setup."], ["microsoft", "Microsoft direct", "Signs in to Microsoft yourself. Needs an Azure app registration once; no third party."]] as const).map(([v, l, h]) => (
@@ -240,22 +249,22 @@ export default function Settings() {
                   </label>
                 ))}
               </div>
-            </div>
+            </div>}
             <label className="f">
               Default folder <span className="h">Filled in for every new deck.{od.provider === "microsoft" ? " A path, or a OneDrive share link." : " A path, e.g. 40. HERMES/photos."}</span>
               <input type="text" value={odFolder} onChange={(e) => setOdFolder(e.target.value)} placeholder="e.g. 40. HERMES/photos" />
             </label>
             {od.provider === "composio" ? (
               <div className="stack">
-                <label className="f">
+                {cloud ? <p className="small muted">Uses the workspace's Composio connection. Pick your OneDrive account below.</p> : <label className="f">
                   Composio API key <span className="h">{od.composio.key ? `Saved: ${od.composio.key}. Paste a new one to replace it.` : "From a Composio project that has OneDrive connected. Safest: a project with only OneDrive in it, or a scoped key limited to reading."}</span>
                   <input type="password" value={czKey} onChange={(e) => setCzKey(e.target.value)} placeholder="Paste the key" autoComplete="off" />
-                </label>
+                </label>}
                 <div className="row">
                   <button className="btn btn-ghost" onClick={findAccounts} disabled={czBusy || (!czKey.trim() && !od.composio.key)}>{czBusy ? <span className="spin" /> : "Find my OneDrive accounts"}</button>
                   <button className="btn btn-ghost" onClick={saveOd}>Save folder</button>
                   {od.connected && <span className="pill ok">Connected: {od.account}</span>}
-                  {(od.connected || od.composio.key) && <button className="btn btn-quiet" onClick={disconnectOd}>Remove key</button>}
+                  {(od.connected || (!cloud && od.composio.key)) && <button className="btn btn-quiet" onClick={disconnectOd}>{cloud ? "Disconnect" : "Remove key"}</button>}
                 </div>
                 {czAccounts && czAccounts.length === 0 && <div className="banner warn">This key's Composio project has no OneDrive connection. Connect OneDrive in that project on composio.dev, then try again.</div>}
                 {czAccounts && czAccounts.length > 0 && (
@@ -309,11 +318,11 @@ export default function Settings() {
         <h2>Models</h2>
         <div className="grid c2">
           <label className="f">
-            Writer model <span className="h">Writes the outline, slides and notes. Default {s.defaults.model}.</span>
+            Writer model <span className="h">Writes the outline, slides and notes. {cloud ? "Leave empty for the workspace default." : `Default ${s.defaults.model}.`}</span>
             <input type="text" value={model} onChange={(e) => setModel(e.target.value)} />
           </label>
           <label className="f">
-            Image model <span className="h">Used only when Figures is on with Generate. Default {s.defaults.imageModel}.</span>
+            Image model <span className="h">Used only when Figures is on with Generate. {cloud ? "Leave empty for the workspace default." : `Default ${s.defaults.imageModel}.`}</span>
             <input type="text" value={imageModel} onChange={(e) => setImageModel(e.target.value)} />
           </label>
         </div>

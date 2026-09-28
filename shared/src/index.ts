@@ -12,3 +12,4 @@ export * from "./render/deckHtml.js";
 export * from "./brief.js";
 export * from "./map.js";
 export * from "./sources.js";
+export * from "./house.js";

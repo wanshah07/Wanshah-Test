@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, LENGTH_CHOICES, VISUAL_FEATURES, newId, scanDeck, type Deck, type FitResult, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
-import { api, type Job } from "../api";
+import { api, cloud, exportDeck, type Job } from "../api";
+import { appHref } from "../cloud/client";
 import { SlideFrame } from "../components/SlideFrame";
 import { SlideInspector } from "../components/SlideInspector";
 import { ThemePanel } from "../components/ThemePanel";
@@ -46,6 +47,7 @@ export default function Editor() {
   const okCount = deck ? deck.slides.filter((x) => x.review?.ok).length : 0;
   const waitingCount = deck ? deck.slides.reduce((a, x) => a + pendingFeedback(x).length, 0) : 0;
   const [applyJob, setApplyJob] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   const inFlight = useRef(false);
   const flushRef = useRef<(() => Promise<void>) | null>(null);
@@ -162,6 +164,17 @@ export default function Editor() {
     update(next);
   };
   /** Save what is waiting, then go: a download or the present view shows the deck as it is on screen. */
+  const download = async (kind: "pptx" | "html" | "json") => {
+    setExporting(kind);
+    try {
+      await flushNow();
+      await exportDeck(deck.id, kind);
+    } catch (e) {
+      toast(`The download did not work: ${(e as Error).message}`, true);
+    } finally {
+      setExporting(null);
+    }
+  };
   const openAfterSave = async (url: string, newTab = false) => {
     const w = newTab ? window.open("about:blank", "_blank") : null;
     await flushNow();
@@ -239,8 +252,8 @@ export default function Editor() {
           )}
           <span className="small muted">{saving === "saving" ? "Saving" : saving === "dirty" ? "Unsaved" : saving === "saved" ? "Saved" : saving === "error" ? "Not saved" : ""}</span>
           <button className="btn btn-ghost btn-sm" onClick={() => setTab("sources")}>Add files / regenerate</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => openAfterSave(`/deck/${deck.id}/present`, true)}>Present</button>
-          <button className="btn btn-primary btn-sm" onClick={() => openAfterSave(`/api/decks/${deck.id}/export.pptx`)}>Download PPTX</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => openAfterSave(appHref(`/deck/${deck.id}/present`), true)}>Present</button>
+          <button className="btn btn-primary btn-sm" onClick={() => download("pptx")} disabled={!!exporting}>{exporting === "pptx" ? <><span className="spin" /> Building PPTX</> : "Download PPTX"}</button>
         </div>
       </div>
 
@@ -308,7 +321,7 @@ export default function Editor() {
           {tab === "slide" && slide && <SlideInspector deckId={deck.id} slide={slide} hits={slop[slide.id] ?? []} lang={deck.lang} theme={deck.theme} onChange={setSlide} onRewrite={rewrite} />}
           {tab === "slide" && !slide && <p className="muted small">No slide selected.</p>}
           {tab === "theme" && <ThemePanel deckId={deck.id} theme={deck.theme} designId={deck.designId} onChange={setTheme} onDesign={(t, designId) => update({ ...deck, theme: t, designId })} />}
-          {tab === "export" && <ExportPanel deck={deck} slopCount={slopCount} open={(u) => openAfterSave(u)} />}
+          {tab === "export" && <ExportPanel deck={deck} slopCount={slopCount} open={download} busy={exporting} />}
           {tab === "sources" && <SourcesPanel deck={deck} onDeck={(d) => { setDeck(d); latest.current = d; setSel(0); setSaving("saved"); }} />}
         </aside>
       </div>
@@ -325,16 +338,17 @@ export default function Editor() {
   );
 }
 
-function ExportPanel({ deck, slopCount, open }: { deck: Deck; slopCount: number; open: (url: string) => void }) {
+function ExportPanel({ deck, slopCount, open, busy }: { deck: Deck; slopCount: number; open: (kind: "pptx" | "html" | "json") => void; busy: string | null }) {
   return (
     <div className="stack">
       {slopCount > 0 && <div className="banner warn">{slopCount} flagged phrase{slopCount === 1 ? "" : "s"} left. Open each slide's inspector to see them, or rewrite the slide.</div>}
       {slopCount === 0 && <div className="banner info">Nothing flagged.</div>}
-      <button className="btn btn-primary" onClick={() => open(`/api/decks/${deck.id}/export.pptx`)}>PowerPoint (.pptx)</button>
+      <button className="btn btn-primary" onClick={() => open("pptx")} disabled={!!busy}>{busy === "pptx" ? <><span className="spin" /> Building the PowerPoint</> : "PowerPoint (.pptx)"}</button>
+      {busy === "pptx" && cloud && <p className="small muted">The worker builds it on GitHub; this takes about a minute.</p>}
       <p className="small muted">Native text, charts, tables and shapes. Edit anything in PowerPoint or Keynote. Fonts fall back to the machine's if {deck.theme.fontDisplay} or {deck.theme.fontBody} is not installed.</p>
-      <button className="btn btn-ghost" onClick={() => open(`/api/decks/${deck.id}/export.html`)}>Web deck (.html)</button>
+      <button className="btn btn-ghost" onClick={() => open("html")} disabled={!!busy}>Web deck (.html)</button>
       <p className="small muted">One file with the pictures inside. Opens in any browser: arrows to move, N for notes, G for the grid, F for full screen.</p>
-      <button className="btn btn-ghost" onClick={() => open(`/api/decks/${deck.id}/export.json`)}>Deck data (.json)</button>
+      <button className="btn btn-ghost" onClick={() => open("json")} disabled={!!busy}>Deck data (.json)</button>
       <p className="small muted">The slide specification, for re-import or a script.</p>
     </div>
   );

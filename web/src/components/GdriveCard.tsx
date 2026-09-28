@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type GdriveStatus } from "../api";
+import { api, cloud, type GdriveStatus } from "../api";
 import { toast } from "./Toast";
 
 // Private Google Drive files: a link that is not shared publicly is read as the
@@ -47,14 +47,14 @@ export function GdriveCard({ onKeyChanged }: { onKeyChanged?: () => void }) {
     <section className="card stack">
       <h2>Google Drive (private files)</h2>
       <p className="small">
-        A Google Drive or Sheets link that is not shared publicly is read as the Google account you connected in Composio. Public links are still read directly. Slidecraft only reads; it never changes anything in Drive. The file must be one that account can open.
+        A Google Drive or Sheets link that is not shared publicly is read as the Google account {cloud ? "you pick below, through the workspace's Composio connection" : "you connected in Composio"}. Public links are still read directly. Slidecraft only reads; it never changes anything in Drive. The file must be one that account can open.
       </p>
       {gd && (
         <>
-          <label className="f">
+          {!cloud && <label className="f">
             Composio API key <span className="h">{gd.hasKey ? "Saved, shared with OneDrive. Paste a new one to replace it; both drives are then picked again." : "From a Composio project that has Google Drive connected. The same key serves OneDrive."}</span>
             <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste the key" autoComplete="off" />
-          </label>
+          </label>}
           <div className="row">
             <button className="btn btn-ghost" onClick={find} disabled={busy || (!key.trim() && !gd.hasKey)}>{busy ? <span className="spin" /> : "Find my Google Drive accounts"}</button>
             {gd.connected && <span className="pill ok">Connected: {gd.label}</span>}

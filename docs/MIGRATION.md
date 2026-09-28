@@ -126,8 +126,35 @@ Each phase is one pull request. The Codespace keeps working until the last one.
    - `server/test/worker.test.ts` runs every kind of job against a stand-in
      for Supabase, and checks that another person's deck and files are out of
      reach and that no content reaches the log.
-3. **Page**: Supabase sign-in and the members check, `web/src/api.ts` split
-   into direct calls and jobs, live job progress, Settings without key fields.
+3. **Page** (done): `web/src/cloud/`. A build with `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY` runs in Supabase mode; without them the page talks
+   to the Node server exactly as before, so the Codespace keeps working.
+   - `routes.ts` answers each `/api` request the page makes, in the shape the
+     server route answered in. Decks, sources, pictures, settings, designs,
+     prompts and the house instructions go straight to Supabase (row level
+     security keeps each person to their own rows). Anything else is queued in
+     `sc_jobs` for the worker, with uploaded files put in `sc-inbox` first,
+     and the page polls the job every 2 seconds.
+   - Writing a deck and applying feedback return once the worker has taken
+     the job, so a refusal (a deck already being written, pictures the writer
+     cannot read) still reaches the page as before; the editor then follows
+     the job's progress as it always did.
+   - Pictures are shown through signed links made in one batch whenever a
+     deck, its pictures or the designs are read (`media.ts`).
+   - Present, the HTML export and the JSON export are built in the page from
+     the shared renderer; only the PowerPoint needs the worker. A downloaded
+     PowerPoint and a finished job are removed afterwards.
+   - Sign-in is Supabase Auth with email and password; a new account sees
+     "the workspace owner has not added you yet" until it is in `sc_members`.
+   - Settings shows no key fields: the AI is the owner's.
+   - Routes use `#/…` in this mode, because GitHub Pages serves one file.
+   - `scripts/cloud-check.mjs` (`npm run check:cloud`) builds the page in this
+     mode and drives it in Chromium against a stand-in for Supabase that
+     applies the same row level security, with the real worker taking jobs:
+     sign-up, the members notice, a source read by the worker, a deck written,
+     an edit saved, a picture through a signed link, the exports, Present,
+     Settings, and a teammate who sees none of it. The teammate checks fail
+     when the stand-in's owner-only rule is removed.
 4. **Deploy**: Pages builds `web/` into `/app/` beside the existing redirect,
    so https://wanshah07.github.io/Wanshah-Test/ keeps redirecting to kkm-halal
    and Slidecraft opens at https://wanshah07.github.io/Wanshah-Test/app/.
