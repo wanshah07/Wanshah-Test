@@ -291,10 +291,11 @@ OneDrive.
 
 ### Moving off Codespaces
 
-Slidecraft is moving to GitHub Pages, GitHub Actions and Supabase so the link
-is always on and teammates can use it. The plan, the phases and the one-time
-setup are in [docs/MIGRATION.md](docs/MIGRATION.md). Until that is finished,
-the Codespace below is still how it runs.
+Slidecraft runs at https://wanshah07.github.io/Wanshah-Test/app/ on GitHub
+Pages, with its data in Supabase and heavy work done by a worker in GitHub
+Actions, so the link is always on and teammates can use it. The design and the
+one-time setup are in [docs/MIGRATION.md](docs/MIGRATION.md). The Codespace
+below still works for development.
 
 ### On GitHub, no laptop: Codespaces
 

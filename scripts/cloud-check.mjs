@@ -20,6 +20,8 @@ const WEB_PORT = 8812;
 const SB = `http://127.0.0.1:${SB_PORT}`;
 const ANON = "anon-key";
 const SERVICE = "service-key";
+// Where the page is served from: "/" by default, "/Wanshah-Test/app/" to check the GitHub Pages layout.
+const BASE = process.env.CLOUD_BASE || "/";
 
 let failed = 0;
 const check = (name, ok) => {
@@ -264,10 +266,16 @@ const sb = http.createServer((req, res) => {
 // ------------------------------------------------------------------ the page, built for Pages
 
 const out = path.join(tmp, "web");
-execFileSync("npx", ["vite", "build", "--outDir", out, "--emptyOutDir"], { cwd: path.join(root, "web"), env: { ...process.env, VITE_SUPABASE_URL: SB, VITE_SUPABASE_ANON_KEY: ANON }, stdio: "ignore" });
+execFileSync("npx", ["vite", "build", "--outDir", out, "--emptyOutDir"], { cwd: path.join(root, "web"), env: { ...process.env, VITE_SUPABASE_URL: SB, VITE_SUPABASE_ANON_KEY: ANON, VITE_BASE: BASE }, stdio: "ignore" });
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2" };
 const web = http.createServer((req, res) => {
-  const p = path.join(out, decodeURIComponent(new URL(req.url, "http://x").pathname));
+  const pathname = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  // Like Pages: only what is under BASE is the app.
+  if (!pathname.startsWith(BASE)) {
+    res.writeHead(404, { "content-type": "text/plain" });
+    return res.end("not the app");
+  }
+  const p = path.join(out, pathname.slice(BASE.length - 1));
   const f = fs.existsSync(p) && fs.statSync(p).isFile() ? p : path.join(out, "index.html");
   res.writeHead(200, { "content-type": MIME[path.extname(f)] || "application/octet-stream" });
   res.end(fs.readFileSync(f));
@@ -303,7 +311,7 @@ const workerLoop = (async () => {
 
 await new Promise((r) => sb.listen(SB_PORT, "127.0.0.1", r));
 await new Promise((r) => web.listen(WEB_PORT, "127.0.0.1", r));
-const APP = `http://127.0.0.1:${WEB_PORT}/`;
+const APP = `http://127.0.0.1:${WEB_PORT}${BASE}`;
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 try {
@@ -311,6 +319,8 @@ try {
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const missing = [];
+  page.on("response", (r) => r.url().startsWith(`http://127.0.0.1:${WEB_PORT}`) && r.status() >= 400 && missing.push(r.url()));
 
   await page.goto(APP);
   await page.waitForURL(/#\/login/, { timeout: 15000 });
@@ -412,6 +422,8 @@ try {
   check("the teammate's own token reads no other deck", Array.isArray(direct) && direct.length === 0);
   await ctx2.close();
 
+  check("every file of the page loads from where it is served", missing.length === 0);
+  if (missing.length) console.log(missing);
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);
 } finally {

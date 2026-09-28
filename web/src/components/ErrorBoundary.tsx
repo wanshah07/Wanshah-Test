@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import { appHref } from "../cloud/client";
 
 /** A page that throws while drawing shows what went wrong and a way out, never a blank screen. */
 export class ErrorBoundary extends Component<{ children: ReactNode; resetKey?: string }, { error: Error | null }> {
@@ -20,7 +21,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode; resetKey?: s
         <p>Something in it is in a shape Slidecraft did not expect. Your work is saved; nothing was lost.</p>
         <pre style={{ whiteSpace: "pre-wrap", fontSize: 13, background: "#f4f6fb", padding: 12, borderRadius: 8 }}>{String(this.state.error.message)}</pre>
         <p style={{ display: "flex", gap: 12 }}>
-          <a className="btn btn-primary" href="/">Back to decks</a>
+          <a className="btn btn-primary" href={appHref("/")}>Back to decks</a>
           <button className="btn" onClick={() => location.reload()}>Reload</button>
         </p>
       </div>

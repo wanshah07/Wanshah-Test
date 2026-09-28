@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Design, type Job } from "../api";
 import { toast } from "../components/Toast";
+import { appHref } from "../cloud/client";
 import { BriefPicker, defaultPromptIds, EMPTY_BRIEF, type BriefValue } from "../components/BriefPicker";
 import { allVisuals, FeatureChoices } from "../components/FeatureChoices";
 import { ThemeCards } from "../components/ThemeCards";
@@ -240,7 +241,7 @@ export default function NewDeck() {
           <div className="card stack">
             <div className="row between">
               <h3>Design</h3>
-              <a href="/designs" target="_blank" rel="noopener" className="small">Add a reference design (opens in a new tab)</a>
+              <a href={appHref("/designs")} target="_blank" rel="noopener" className="small">Add a reference design (opens in a new tab)</a>
             </div>
             <ThemeCards
               width={190}
