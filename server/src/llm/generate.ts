@@ -630,7 +630,8 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     // What the model actually sent, so a failure can be diagnosed from the log.
     if (e instanceof LlmError && e.raw !== undefined) {
       log(jobId, `Model reply (first ${RAW_KEEP} characters): ${e.raw || "(empty)"}`);
-      console.warn(`[slidecraft] job ${jobId}: ${msg}. Reply began: ${e.raw}`);
+      // The console is an Actions log on the team link, and that log is public: only the size goes there.
+      console.warn(`[slidecraft] job ${jobId}: ${e.code} (reply of ${e.raw.length} characters kept in the job log)`);
     }
     log(jobId, `Failed: ${msg}`);
     setJob(jobId, { status: "failed", error: msg });

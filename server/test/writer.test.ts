@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckAllText: 0, designs: 0, designFail: false, designReply: null as null | Record<string, unknown>, designUser: "", deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, cut: 0, planAndDeck: 0, deckMsgs: [] as { role: string; content: string }[], plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckAllText: 0, designs: 0, designFail: false, designReply: null as null | Record<string, unknown>, designUser: "", deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -176,6 +176,17 @@ beforeAll(async () => {
         return reply(JSON.stringify({ purpose: "p", deck: { title: d.title, content: d.slides } }));
       }
       if (gw.garbage) return reply("Sorry, I can only help with questions about cooking. " + "x".repeat(900));
+      const full = JSON.stringify(mockDeckJson({ prompt: "x", lang: "en", angle: "custom", slides: 6, features: DEFAULT_FEATURES, imageMode: "none" }, []));
+      if (gw.cut > 0) {
+        gw.cut--;
+        gw.deckMsgs = body.messages;
+        // A gateway that stops the answer part way and still says finish_reason "stop".
+        return reply(full.slice(0, Math.floor(full.length * 0.6)));
+      }
+      if (gw.planAndDeck > 0) {
+        gw.planAndDeck--;
+        return reply(`{"title":"Plan","purpose":"Secure funding","one_conclusion":"Low"}\n${full}`);
+      }
       reply(JSON.stringify(mockDeckJson({ prompt: "x", lang: "en", angle: "custom", slides: 6, features: DEFAULT_FEATURES, imageMode: "none" }, [])));
     });
   });
@@ -206,15 +217,48 @@ describe("the writer's instructions and failures", () => {
 
   it("logs what the model sent, trimmed to 500 characters, when it is not JSON", async () => {
     gw.garbage = true;
+    // The console is a public Actions log on the team link: the reply may reach the job log, never the console.
+    const said: string[] = [];
+    const warn = console.warn;
+    console.warn = (...x: unknown[]) => void said.push(x.map(String).join(" "));
     const id = await newDeck("garbage");
     const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
     const job = await waitJob(jobId);
+    console.warn = warn;
     gw.garbage = false;
+    expect(said.join("\n")).not.toMatch(/cooking/);
     expect(job.status).toBe("failed");
     const line = (job.progress as string[]).find((l) => l.includes("Model reply (first 500 characters)"))!;
     expect(line).toMatch(/Sorry, I can only help with questions about cooking/);
     const snippet = line.split("Model reply (first 500 characters): ")[1];
-    expect(snippet.length).toBe(501); // 500 characters and the ellipsis
+    // 500 characters, the ellipsis, then the reply's size and its last 160 characters.
+    expect(snippet.split("… [")[0].length).toBe(500);
+    expect(snippet).toMatch(/characters in all; it ends: ….{160}\]$/);
+  });
+});
+
+describe("replies that are almost JSON", () => {
+  it("uses the deck when the model writes a plan object before it", async () => {
+    gw.planAndDeck = 1;
+    const id = await newDeck("plan-and-deck");
+    const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } }));
+    const job = await waitJob(jobId);
+    expect(job.status, job.error ?? "").toBe("done");
+    expect(J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides.length).toBeGreaterThan(3);
+  });
+
+  it("asks for a shorter answer when one is cut off, and says so plainly when every answer is", async () => {
+    gw.cut = 1;
+    const id = await newDeck("cut-once");
+    const one = await waitJob(J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } })).jobId);
+    expect(one.status, one.error ?? "").toBe("done");
+    expect(String(gw.deckMsgs.at(-1)?.content ?? "")).not.toMatch(/stopped before/);
+    gw.cut = 3;
+    const two = await waitJob(J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "A deck about salicylic acid limits" } })).jobId);
+    expect(gw.cut).toBe(0);
+    expect(String(gw.deckMsgs.at(-1)?.content)).toMatch(/stopped before the JSON was finished[\s\S]*shorter/);
+    expect(two.status).toBe("failed");
+    expect(two.error).toMatch(/stopped part way \([\d,]+ characters\)[\s\S]*fewer slides/);
   });
 });
 
@@ -275,7 +319,7 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
   });
 
   it("still writes the deck when the model never gives a plan", async () => {
-    gw.planProse = 2;
+    gw.planProse = 3;
     const id = await newDeck("auto-noplan");
     const { jobId } = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "", auto: true, angle: "training" } }));
     const job = await waitJob(jobId);
