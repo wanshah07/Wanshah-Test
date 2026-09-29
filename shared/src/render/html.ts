@@ -64,12 +64,54 @@ function cell(v: string): string {
   return tone ? `<span class="sc-badge v-${tone}">${inline(v)}</span>` : inline(v);
 }
 
+const NEG_HEAD = /\b(don'?t|do not|cannot|can'?t|must not|never|avoid|not allowed|not permitted|jangan|tidak boleh|dilarang|elakkan)\b|✗/i;
+
+/**
+ * A two-column slide whose right heading is the negative of its left one: Say and Don't say, what the
+ * data can and cannot tell us, Do and Avoid. Drawn as a green column of ticks against a red column of
+ * crosses rather than two neutral panels.
+ */
+export function isVersusPair(left?: string, right?: string): boolean {
+  return !!left && !!right && NEG_HEAD.test(right) && !NEG_HEAD.test(left);
+}
+
+/** Closing bullets that are actions (a sentence each) rather than two-word takeaways: drawn as numbered next steps. */
+export function isStepList(items: string[] | undefined): boolean {
+  return !!items?.length && items.some((b) => b.trim().split(/\s+/).length > 5);
+}
+
+/** A pie's categories with their values and whole-number shares, in order. */
+export function pieShares(chart: NonNullable<Slide["chart"]>): { name: string; value: number; pct: number }[] {
+  const v = chart.series[0]?.values ?? [];
+  const total = v.reduce((a, b) => a + Math.max(b, 0), 0) || 1;
+  return chart.categories.map((name, i) => ({ name, value: v[i] ?? 0, pct: Math.round((Math.max(v[i] ?? 0, 0) / total) * 1000) / 10 }));
+}
+
+function num(v: number): string {
+  return Number.isInteger(v) ? v.toLocaleString("en-US") : String(Math.round(v * 10) / 10);
+}
+
+function pieHtml(ch: NonNullable<Slide["chart"]>, t: Theme, pal: string[], font: string): string {
+  const svg = chartSvg(ch, t.colors, 700, 700, font, t.series, { legend: false });
+  const rows = pieShares(ch)
+    .map((x, i) => `<div class="lg" style="--lc:${pal[i % pal.length]}"><span class="nm">${inline(x.name)}</span><span class="vl">${num(x.value)}${ch.unit && ch.unit !== "%" ? ` <small>${inline(ch.unit)}</small>` : ""}</span><span class="pc">${x.pct}%</span></div>`)
+    .join("");
+  return `<div class="sc-pie"><div class="sc-fig">${svg}</div><div class="sc-legend n${Math.min(ch.categories.length, 8)}">${rows}</div></div>`;
+}
+
+function versusHtml(s: Slide): string {
+  const col = (hd: string, items: string[] | undefined, tone: "good" | "bad") =>
+    `<div class="sc-col sc-vcol ${tone}"><h3>${inline(hd)}</h3><ul class="sc-marks">${(items ?? []).map((b) => `<li><i>${tone === "good" ? "✓" : "✗"}</i><span>${inline(b)}</span></li>`).join("")}</ul></div>`;
+  return `<div class="sc-cols sc-vs">${col(s.leftHeading ?? "", s.bullets, "good")}${col(s.rightHeading ?? "", s.bulletsRight, "bad")}</div>`;
+}
+
 function cardsHtml(s: Slide, pal: string[] | null): string {
   const items = s.cards ?? [];
   const n = items.length;
   // Wide grids for many cards, so ten or twelve still read at a useful size.
   const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : n <= 6 || n === 9 ? 3 : 4;
-  return `<div class="sc-cards" style="--cols:${cols}">${items
+  const rows = Math.ceil(n / cols);
+  return `<div class="sc-cards${rows === 1 ? " r1" : ""}" style="--cols:${cols}">${items
     .map((c, i) => {
       const tone = c.tag ? verdictTone(c.tag) : "";
       return `<div class="sc-card"${pal ? ` style="--cc:${pal[i % pal.length]}"` : ""}><div class="top"><span class="no">${i + 1}</span>${c.tag ? `<span class="sc-badge ${tone ? `v-${tone}` : "v-plain"}">${inline(c.tag)}</span>` : ""}</div><div class="hd">${inline(c.heading)}</div>${c.detail ? `<div class="dt">${inline(c.detail)}</div>` : ""}</div>`;
@@ -139,7 +181,7 @@ function kpiHtml(s: Slide, t: Theme, pal: string[]): string {
   const rings = (s.kpiStyle ?? t.kpiStyle) === "rings";
   if (rings) return `<div class="sc-rings" style="--kpi-n:${Math.min(Math.max(items.length, 1), 4)}">${items.map((k, i) => ringHtml(k, pal[i % pal.length])).join("")}</div>`;
   return `<div class="sc-kpis" style="--kpi-n:${Math.min(Math.max(items.length, 1), 4)}">${items
-    .map((k) => `<div class="sc-kpi"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div>${k.note ? `<div class="n">${inline(k.note)}</div>` : ""}</div>`)
+    .map((k, i) => `<div class="sc-kpi" style="--kc:${pal[i % pal.length]}"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div>${k.note ? `<div class="n">${inline(k.note)}</div>` : ""}</div>`)
     .join("")}</div>`;
 }
 
@@ -217,16 +259,19 @@ export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): stri
     case "title":
     case "closing": {
       const hero = s.layout === "title" && s.kpi?.length ? `<div class="sc-hero">${s.kpi.slice(0, 4).map((k) => `<div class="hs"><div class="v">${inline(k.value)}</div><div class="l">${inline(k.label)}</div></div>`).join("")}</div>` : "";
-      const chips = s.layout === "closing" && s.bullets?.length ? `<div class="sc-chips">${s.bullets.slice(0, 4).map((b) => `<span>${inline(b)}</span>`).join("")}</div>` : "";
+      const steps = s.layout === "closing" && isStepList(s.bullets);
+      const chips = steps
+        ? `<ol class="sc-next">${s.bullets!.slice(0, 6).map((b, i) => `<li><span class="no">${i + 1}</span><span>${inline(b)}</span></li>`).join("")}</ol>`
+        : s.layout === "closing" && s.bullets?.length ? `<div class="sc-chips">${s.bullets.slice(0, 4).map((b) => `<span>${inline(b)}</span>`).join("")}</div>` : "";
       const k = s.kicker;
-      body = `<h2 class="sc-h">${k ? `<span class="sc-kicker">${esc(k)}</span>` : ""}${titleLines(s)}</h2><div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}${s.body ? `<p class="sc-sub">${inline(s.body)}</p>` : ""}${hero}${chips}`;
+      body = `<h2 class="sc-h">${k ? `<span class="sc-kicker">${esc(k)}</span>` : ""}${titleLines(s)}</h2><div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}${s.body ? `<p class="sc-sub sc-lead">${inline(s.body)}</p>` : ""}${hero}${chips}`;
       break;
     }
     case "section":
       body = `${heading(s, s.subtitle ? undefined : sectionKicker(s, ctx))}<div class="sc-rule"></div>${s.subtitle ? `<p class="sc-sub">${inline(s.subtitle)}</p>` : ""}`;
       break;
     case "two-column":
-      body = `${head}<div class="sc-cols"><div class="sc-col">${s.leftHeading ? `<h3>${inline(s.leftHeading)}</h3>` : ""}${bulletsHtml(s.bullets)}</div><div class="sc-col">${s.rightHeading ? `<h3>${inline(s.rightHeading)}</h3>` : ""}${bulletsHtml(s.bulletsRight)}</div></div>`;
+      body = isVersusPair(s.leftHeading, s.rightHeading) ? `${head}${versusHtml(s)}` : `${head}<div class="sc-cols"><div class="sc-col">${s.leftHeading ? `<h3>${inline(s.leftHeading)}</h3>` : ""}${bulletsHtml(s.bullets)}</div><div class="sc-col">${s.rightHeading ? `<h3>${inline(s.rightHeading)}</h3>` : ""}${bulletsHtml(s.bulletsRight)}</div></div>`;
       break;
     case "quote":
       body = `${head}<div class="sc-quote"><p class="q">${inline(s.quote?.text ?? "")}</p>${s.quote?.by ? `<p class="by">${inline(s.quote.by)}</p>` : ""}</div>`;
@@ -235,14 +280,15 @@ export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): stri
       main = `<div class="sc-content">${s.body ? `<p class="sc-prose" style="margin-bottom:24px;font-size:calc(32px * var(--k, 1));color:var(--ink2)">${inline(s.body)}</p>` : ""}${bulletsHtml(s.bullets)}</div>`;
       break;
     case "chart": {
-      const svg = s.chart ? chartSvg(s.chart, c, 1500, 620, font, t.series) : "";
+      const pie = s.chart && (s.chart.kind === "pie" || s.chart.kind === "doughnut") && s.chart.series.length === 1;
+      const svg = !s.chart ? "" : pie ? pieHtml(s.chart, t, pal, font) : chartSvg(s.chart, c, 1500, 620, font, t.series);
       const side = s.bullets?.length ? `<div class="sc-col" style="max-width:520px">${bulletsHtml(s.bullets)}</div>` : "";
-      main = `<div class="sc-content" style="flex-direction:row;gap:40px"><div class="sc-fig">${svg || placeholder("No chart data", ctx.lang)}</div>${side}</div>${cap(s.chart?.source)}`;
+      main = `<div class="sc-content" style="flex-direction:row;gap:40px">${pie ? svg : `<div class="sc-fig">${svg || placeholder("No chart data", ctx.lang)}</div>`}${side}</div>${cap(s.chart?.source)}`;
       break;
     }
     case "table": {
       const t2 = s.table;
-      const many = (t2?.rows.length ?? 0) > 7 ? "rows-many" : "";
+      const many = (t2?.rows.length ?? 0) > 7 ? "rows-many" : (t2?.rows.length ?? 0) <= 5 ? "rows-few" : "";
       const tbl = t2
         ? `<table class="sc-table ${many}"><thead><tr>${t2.header.map((h) => `<th>${inline(h)}</th>`).join("")}</tr></thead><tbody>${t2.rows
             .map((r) => `<tr>${r.map((v) => `<td>${cell(v)}</td>`).join("")}</tr>`)

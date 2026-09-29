@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ANGLES, composeAudience, composeBrief, DEFAULT_FEATURES, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
+import { ANGLES, DEFAULT_THEME_ID, composeAudience, composeBrief, DEFAULT_FEATURES, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Design, type Job } from "../api";
 import { toast } from "../components/Toast";
 import { appHref } from "../cloud/client";
@@ -29,7 +29,7 @@ export default function NewDeck() {
   const [autoFeatures, setAutoFeatures] = useState<Features>(() => allVisuals(DEFAULT_FEATURES));
   const [slides, setSlides] = useState(10);
   const [imageMode, setImageMode] = useState<"none" | "uploaded" | "generate">("uploaded");
-  const [themeId, setThemeId] = useState("house");
+  const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
   const [params] = useSearchParams();
   const [designId, setDesignId] = useState<string | undefined>(params.get("design") ?? undefined);
   const [designs, setDesigns] = useState<Design[]>([]);

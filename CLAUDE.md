@@ -19,13 +19,15 @@ https://wanshah07.github.io/kkm-halal/. `.github/workflows/deploy-pages.yml`
 publishes that folder at the root and, since 28 Sep 2026, Slidecraft at
 `/app/`, built in Supabase mode (below). Keep the redirect at the root.
 
-### Moving to Pages, Actions and Supabase (from 28 Sep 2026)
+### Pages, Actions and Supabase (since 28 Sep 2026)
 
 Wan: *"codespace is not for me because it's always off and my teammate cannot
-use it anytime. Prepare to migrate and function like semasa."* The plan and
-its phases are in `docs/MIGRATION.md`. The Pages build talks to Supabase and the worker; a
-build without `VITE_SUPABASE_URL` still talks to the Node server, which is how
-the Codespace and `npm test` run. These rules apply:
+use it anytime. Prepare to migrate and function like semasa."* The design is
+in `docs/MIGRATION.md`. Codespaces were retired on 29 Sep 2026 and
+`.devcontainer/` is gone; do not bring it back. The Pages build talks to
+Supabase and the worker; a build without `VITE_SUPABASE_URL` talks to the
+Node server, which is how local development and `npm test` run. These rules
+apply:
 
 - `supabase/*.sql` is the security boundary once the site is public. Any
   change to a table, policy or bucket comes with a case in
@@ -33,6 +35,9 @@ the Codespace and `npm test` run. These rules apply:
   pass. Every table is owner-only and members-only; the anon key reads nothing.
 - Actions logs in this public repository are public. The worker may log ids,
   counts and timings, never slide text, source text, file names or a key.
+- A reference deck someone uploads to show the look they want is studied, not
+  committed. The `briefing` design (the default for new decks) was built from
+  one on 29 Sep 2026; its content stays out of the repo, tests and fixtures.
 
 ## 2. One spec, three consumers
 
@@ -59,11 +64,15 @@ add auto-replacements of words. Malay text is checked against Indonesian
 forms (`bisa`, `obat`, `perusahaan`, `kualitas`, `kemasan`) as errors, and UI
 copy is English.
 
-## 5. Keys never leave the server
+## 5. Keys never reach the browser
 
-An OpenAI key is stored AES-256-GCM encrypted with `APP_SECRET`, sent only to
-`OPENAI_BASE_URL`, and shown masked. The web app never sees it. Do not add a
-client-side call to OpenAI.
+On the team link the AI key is the GitHub Actions secret `OPENAI_API_KEY`
+(with `OPENAI_BASE_URL` and `OPENAI_MODEL` as repository variables), read only
+by the worker; Settings there shows no key field, and the worker refuses the
+routes that test or save a key. On a Node server an OpenAI key is stored
+AES-256-GCM encrypted with `APP_SECRET`, sent only to `OPENAI_BASE_URL`, and
+shown masked. Either way the web app never sees it. Do not add a client-side
+call to OpenAI.
 
 ## 6. Tests run in mock mode
 

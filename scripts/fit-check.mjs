@@ -41,6 +41,15 @@ const heavy = [
   { id: "hcard", _theme: "house", layout: "cards", kicker: "HOW IT WORKS", title: long(18), cards: Array.from({ length: 6 }, () => ({ heading: long(8), detail: long(30), tag: "HIGH" })), callout: long(30), citations: cites },
   { id: "hclose", _theme: "house", layout: "closing", title: `${long(8)}\n${long(8)}`, subtitle: long(25), bullets: Array.from({ length: 4 }, () => long(6)) },
   { id: "eqx", _theme: "booth-bright", layout: "diagram", title: long(15), diagram: { kind: "equation", terms: Array.from({ length: 5 }, () => ({ value: "1,250", label: long(12) })), result: { value: "40/40", label: long(12) } }, callout: long(25) },
+  // The briefing design and the devices it brought: a cover with a finding panel, shares listed beside a
+  // doughnut, say against don't say, a short table at full size, and numbered next steps.
+  { id: "bcov", _theme: "briefing", layout: "title", kicker: "DEBRIEF", title: `${long(8)}\n${long(8)}`, subtitle: long(20), body: long(30), kpi: Array.from({ length: 4 }, () => ({ value: "12,500", label: long(6) })) },
+  { id: "bpie", _theme: "briefing", layout: "chart", title: long(15), chart: { kind: "doughnut", categories: Array.from({ length: 8 }, (_, i) => `${long(4)} ${i}`), series: [{ name: "n", values: [30, 20, 15, 10, 9, 7, 5, 4] }], source: long(15) }, callout: long(20), citations: cites },
+  { id: "bvs", _theme: "briefing", layout: "two-column", title: long(15), leftHeading: "Say", rightHeading: "Don't say", bullets: Array.from({ length: 8 }, () => long(14)), bulletsRight: Array.from({ length: 8 }, () => long(14)), citations: cites },
+  { id: "btb", _theme: "briefing", layout: "table", title: long(15), table: { header: ["Brand", "Detail", "Share", "OK"], rows: Array.from({ length: 5 }, () => [long(4), long(30), "43%", "NO"]), source: long(10) }, aside: [{ heading: "How to read", items: Array.from({ length: 4 }, () => long(10)) }] },
+  { id: "bnx", _theme: "briefing", layout: "closing", title: `${long(8)}\n${long(8)}`, subtitle: long(20), bullets: Array.from({ length: 6 }, () => long(18)) },
+  { id: "bkp", _theme: "briefing", layout: "kpi", title: long(15), kpi: Array.from({ length: 8 }, () => ({ value: "RM 1,250,000", label: long(10), note: long(14) })), callout: long(20) },
+  { id: "bcd", _theme: "briefing", layout: "cards", title: long(15), cards: Array.from({ length: 3 }, () => ({ heading: long(10), detail: long(40), tag: "HIGH" })), callout: long(20) },
 ];
 const normal = [
   { id: "nb", layout: "bullets", kicker: "THE RULE", title: "Salicylic acid is capped at 2% in rinse-off", subtitle: "Read the limit first, then the exception.", bullets: ["Annex III entry 98 sets the limit", "Leave-on stays at 0.5%", "Mandatory label: not for children under 3"], citations: ["EC 1223/2009 Annex III entry 98"] },
@@ -59,6 +68,13 @@ const normal = [
   { id: "nhcard", _theme: "house", layout: "cards", kicker: "THE PATHWAY", title: "A notification is a form, not a licence", cards: [{ heading: "Screen the formula", detail: "Like checking a recipe before cooking." }, { heading: "Build the PIF", detail: "The product's passport, kept on file." }, { heading: "Notify NPRA", detail: "One product, one notification." }], callout: "A notification tells NPRA; it is not an approval." },
   { id: "nhclose", _theme: "house", layout: "closing", title: "Notify first,\nsell second", subtitle: "Every product on the shelf has a number behind it.", bullets: ["Screen the formula", "Keep the PIF", "Notify before sale", "Label as notified"] },
   { id: "neq", _theme: "booth-bright", layout: "diagram", kicker: "THE CLAIM", title: "What the claim rests on", diagram: { kind: "equation", terms: [{ value: "3", label: "actives" }, { value: "28", label: "days" }, { value: "40", label: "users" }], result: { value: "40/40", label: "improved" } }, callout: "Every user improved by day 28." },
+  { id: "nbcov", _theme: "briefing", layout: "title", kicker: "DEBRIEF", title: "Sunscreen shelf audit\nKlang Valley 2026", subtitle: "42 pharmacies, 6 to 10 August 2026", body: "Main finding: one missing line, the PA grade, explains most label gaps.", kpi: [{ value: "42", label: "pharmacies" }, { value: "318", label: "SKUs" }, { value: "6", label: "brands" }] },
+  { id: "nbpie", _theme: "briefing", layout: "chart", kicker: "CHANNELS", title: "Chains carried most of the range", chart: { kind: "doughnut", categories: ["Chain", "Independent", "Online"], series: [{ name: "SKUs", values: [52, 33, 15] }], source: "Shelf audit, Aug 2026" } },
+  { id: "nbvs", _theme: "briefing", layout: "two-column", kicker: "WORDING", title: "How to quote these numbers", leftHeading: "Say", rightHeading: "Don't say", bullets: ["SKUs audited", "42 pharmacies", "Label gaps found"], bulletsRight: ["X% of Malaysia", "All pharmacies", "Brand B fails"] },
+  { id: "nbtb", _theme: "briefing", layout: "table", kicker: "DETAIL", title: "Label gaps by brand", table: { header: ["Brand", "SKUs", "Gaps", "Share", "OK"], rows: [["Brand A", "40", "8", "20%", "YES"], ["Brand B", "28", "12", "43%", "NO"], ["Brand C", "18", "6", "33%", "NO"], ["Brand D", "10", "5", "50%", "NO"]] } },
+  { id: "nbnx", _theme: "briefing", layout: "closing", title: "Fix the PA grade\nbefore the next batch", subtitle: "One line on the label closes most gaps.", bullets: ["Share the brand ranking with sales and marketing (internal only).", "Brief R&D to print the PA grade on every sunscreen.", "Ask QA for water resistance test reports.", "Re-audit the same 42 pharmacies in Q1 2027."] },
+  { id: "nbkp", _theme: "briefing", layout: "kpi", kicker: "WHO", title: "Who we audited", kpi: [{ value: "42", label: "Pharmacies", note: "Chains 30, independents 12" }, { value: "96", label: "Sunscreens", note: "of 318 SKUs" }, { value: "31", label: "Label gaps", note: "32% of sunscreens" }] },
+  { id: "nbcd", _theme: "briefing", layout: "cards", kicker: "WHAT WE LEARNED", title: "Three things the shelf told us", cards: [{ heading: "SPF is printed, PA is not", detail: "19 of 31 gaps were a missing PA grade." }, { heading: "Batch numbers fade", detail: "Heat in the window bleaches the print." }, { heading: "Claims outrun tests", detail: "Water resistant with no test on file." }] },
 ];
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium" });
@@ -73,7 +89,7 @@ const render = async (s) => {
     const r = window.fitSlide(slide);
     const sb = slide.getBoundingClientRect();
     const bad = [];
-    for (const el of slide.querySelectorAll(".sc-body, .sc-content, .sc-hub .disc, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table, .sc-row, .sc-main, .sc-asides, .sc-aside, .sc-rings, .sc-facts, .sc-gallery, .sc-mapwrap, .sc-mapkey, .sc-hub .node, .sc-hub .side, .sc-hub .core, .sc-eq .term, .sc-funnel .stage, .sc-callout, .sc-hero .hs, .sc-chips")) {
+    for (const el of slide.querySelectorAll(".sc-body, .sc-content, .sc-hub .disc, .sc-col, .sc-card, .sc-kpi, .sc-cards, .sc-kpis, .sc-quote, .sc-fig, .sc-cols, .sc-diagram, table.sc-table, .sc-row, .sc-main, .sc-asides, .sc-aside, .sc-rings, .sc-facts, .sc-gallery, .sc-mapwrap, .sc-mapkey, .sc-hub .node, .sc-hub .side, .sc-hub .core, .sc-eq .term, .sc-funnel .stage, .sc-callout, .sc-hero .hs, .sc-chips, .sc-pie, .sc-legend, .sc-next")) {
       if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) bad.push(`${el.className} spills (${el.scrollWidth}x${el.scrollHeight} in ${el.clientWidth}x${el.clientHeight})`);
     }
     // Every piece of visible text must sit on the slide.

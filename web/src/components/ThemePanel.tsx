@@ -102,11 +102,11 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
       <div className="field">
         <label>Slide style</label>
         <div className="row">
-          {(["clean", "panel", "gradient", "bloom"] as const).map((s) => (
+          {(["clean", "panel", "gradient", "bloom", "briefing"] as const).map((s) => (
             <button key={s} className={"btn btn-ghost btn-xs" + (theme.slideStyle === s ? " active" : "")} onClick={() => set({ slideStyle: s })}>{s}</button>
           ))}
         </div>
-        <span className="help">clean: flat background. panel: content on a card. gradient: brand wash behind everything. bloom: the house look, a soft wash with a particle field, dark cover and close, soft cards and a pull-quote band.</span>
+        <span className="help">clean: flat background. panel: content on a card. gradient: brand wash behind everything. bloom: the house look, a soft wash with a particle field, dark cover and close, soft cards and a pull-quote band. briefing: navy serif titles on white, pale blue panels, each figure in its own colour, navy cover and close.</span>
       </div>
       <div className="field">
         <label>Series colours <span className="help">Charts, card headers, funnels and gauges take these in order</span></label>
