@@ -1,4 +1,4 @@
-# Moving Slidecraft off Codespaces
+# Slidecraft off Codespaces: Pages, Actions and Supabase
 
 Wan, 28 Sep 2026: *"codespace is not for me because it's always off and my
 teammate cannot use it anytime. Prepare to migrate and function like semasa:
@@ -100,7 +100,8 @@ anybody else's decks. Every deck is written on the team's OpenAI key.
 
 ## Phases
 
-Each phase is one pull request. The Codespace keeps working until the last one.
+Each phase is one pull request. Phases 1 to 4 and 6 are done; phase 5 was
+not needed.
 
 1. **Plan and database** (this PR): this file, `supabase/001` to `004`,
    `scripts/sql-check.sh`. Nothing runs yet.
@@ -166,10 +167,13 @@ Each phase is one pull request. The Codespace keeps working until the last one.
    exist, `/app/` shows "Slidecraft is being set up" (`docs/pages-setup.html`)
    instead of a page that cannot work. `CLOUD_BASE=/Wanshah-Test/app/ npm run
    check:cloud` runs the end-to-end check with the page served from that path.
-5. **Move the data**: a one-off script that copies the Codespace's SQLite
-   rows and pictures into Supabase, for the decks worth keeping.
-6. **Retire Codespaces**: remove `.devcontainer/` and the Codespaces README
-   section, update `CLAUDE.md` rules 1 and 5.
+5. **Move the data** (not done): a one-off script to copy the Codespace's
+   SQLite rows and pictures into Supabase. Nobody asked for the old decks,
+   and a Codespace unused for 30 days deletes itself.
+6. **Retire Codespaces** (done, 29 Sep 2026): `.devcontainer/` is removed,
+   the README's Codespaces section is replaced by "The team link", and
+   `CLAUDE.md` rules 1 and 5 describe Pages and the worker's key. The Node
+   server stays for development and tests.
 
 ## What Wan does, once
 

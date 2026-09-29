@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { verdictTone, renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS, sanitizeSlide, sanitizeTheme, themeGuide, ringPercent, mapTiles, mapTone, stepRate, glowOf, particles, fontsUrl, SLIDE_CSS } from "../src/index.js";
+import { verdictTone, isVersusPair, isStepList, pieShares, DEFAULT_THEME_ID, renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS, sanitizeSlide, sanitizeTheme, themeGuide, ringPercent, mapTiles, mapTone, stepRate, glowOf, particles, fontsUrl, SLIDE_CSS } from "../src/index.js";
 import type { Deck, Slide } from "../src/index.js";
 
 const theme = themePreset("facerinna");
@@ -293,5 +293,70 @@ describe("the house design system", () => {
     expect(html).toContain('class="sc-callout">It is not an approval.<');
     expect(SLIDE_CSS).toMatch(/\.sc-style-bloom \.sc-h \.sc-kicker\{color:var\(--accent\)/);
     expect(SLIDE_CSS).toMatch(/\.sc-style-bloom \.sc-callout\{border-radius:999px/);
+  });
+});
+
+describe("the briefing design", () => {
+  const b = themePreset("briefing");
+  it("is the default for a new deck, with the navy serif palette", () => {
+    expect(DEFAULT_THEME_ID).toBe("briefing");
+    expect(b).toMatchObject({ id: "briefing", fontDisplay: "Cambria", fontBody: "Calibri", slideStyle: "briefing", darkTitle: true });
+    expect(b.colors).toMatchObject({ brandDeep: "#0B2D63", surface: "#EAF1FB", accent: "#E8174B" });
+    expect(sanitizeTheme(b).slideStyle).toBe("briefing");
+    expect(sanitizeTheme({ ...themePreset("facerinna"), slideStyle: "briefing" }).slideStyle).toBe("briefing");
+    expect(themeGuide("briefing")).toMatch(/source line/);
+    expect(SLIDE_CSS).toContain(".sc-slide.sc-style-briefing");
+  });
+
+  it("tells a say and don't say pair from two ordinary columns", () => {
+    expect(isVersusPair("Say", "Don't say")).toBe(true);
+    expect(isVersusPair("What the data can tell us", "What it cannot tell us")).toBe(true);
+    expect(isVersusPair("Boleh sebut", "Jangan sebut")).toBe(true);
+    expect(isVersusPair("Do", "Avoid")).toBe(true);
+    expect(isVersusPair("Before", "After")).toBe(false);
+    expect(isVersusPair("Don't", "Don't")).toBe(false);
+    expect(isVersusPair(undefined, "Don't say")).toBe(false);
+    const html = renderSlideHtml({ id: "v", layout: "two-column", title: "Wording", leftHeading: "Say", rightHeading: "Don't say", bullets: ["SKUs audited"], bulletsRight: ["All <b>pharmacies</b>"] }, b, ctx);
+    expect(html).toContain("sc-vs");
+    expect(html).toContain("<i>✓</i><span>SKUs audited</span>");
+    expect(html).toContain("<i>✗</i><span>All &lt;b&gt;pharmacies&lt;/b&gt;</span>");
+    // Any design draws the pair the same way.
+    expect(renderSlideHtml({ id: "v", layout: "two-column", title: "W", leftHeading: "Say", rightHeading: "Don't say", bullets: ["a"], bulletsRight: ["b"] }, theme, ctx)).toContain("sc-vs");
+    expect(renderSlideHtml({ id: "v", layout: "two-column", title: "W", leftHeading: "Before", rightHeading: "After", bullets: ["a"], bulletsRight: ["b"] }, b, ctx)).not.toContain("sc-vs");
+  });
+
+  it("lists a doughnut's shares beside it instead of in the picture", () => {
+    const chart = { kind: "doughnut" as const, categories: ["Chain", "Independent", "Online"], series: [{ name: "SKUs", values: [52, 33, 15] }] };
+    expect(pieShares(chart).map((x) => x.pct)).toEqual([52, 33, 15]);
+    expect(pieShares({ ...chart, series: [{ name: "n", values: [1, 2, 0] }] }).map((x) => x.pct)).toEqual([33.3, 66.7, 0]);
+    const html = renderSlideHtml({ id: "p", layout: "chart", title: "Shares", chart }, b, ctx);
+    expect(html).toContain("sc-pie");
+    expect(html.match(/class="lg"/g)?.length).toBe(3);
+    expect(html).toContain('<span class="pc">52%</span>');
+    // The svg carries no legend text of its own.
+    expect(html).not.toMatch(/<svg[\s\S]*Independent[\s\S]*<\/svg>/);
+    // A bar chart is unchanged.
+    expect(renderSlideHtml({ id: "q", layout: "chart", title: "Bars", chart: { ...chart, kind: "bar" } }, b, ctx)).not.toContain("sc-pie");
+  });
+
+  it("draws closing actions as numbered next steps and short takeaways as chips", () => {
+    expect(isStepList(["Screen", "Keep the PIF"])).toBe(false);
+    expect(isStepList(["Brief R&D to print the PA grade on every sunscreen."])).toBe(true);
+    const steps = renderSlideHtml({ id: "z", layout: "closing", title: "Next steps", bullets: ["Brief R&D to print the PA grade on every sunscreen.", "Re-audit the same 42 pharmacies in Q1 2027."] }, b, ctx);
+    expect(steps).toContain('<ol class="sc-next">');
+    expect(steps).toContain('<span class="no">2</span>');
+    expect(steps).not.toContain("sc-chips");
+    const chips = renderSlideHtml({ id: "z", layout: "closing", title: "Close", bullets: ["Screen", "Keep the PIF"] }, b, ctx);
+    expect(chips).toContain("sc-chips");
+  });
+
+  it("colours each figure, puts the cover's finding in a panel and marks short tables and single card rows", () => {
+    const k = renderSlideHtml({ id: "k", layout: "kpi", title: "Who", kpi: [{ label: "a", value: "1" }, { label: "b", value: "2" }] }, b, ctx);
+    expect(k).toContain(`--kc:${b.series![0]}`);
+    expect(k).toContain(`--kc:${b.series![1]}`);
+    expect(renderSlideHtml({ id: "t", layout: "title", title: "T", body: "Main finding" }, b, ctx)).toContain('class="sc-sub sc-lead"');
+    expect(renderSlideHtml({ id: "t", layout: "table", title: "T", table: { header: ["a"], rows: [["1"]] } }, b, ctx)).toContain("rows-few");
+    expect(renderSlideHtml({ id: "c", layout: "cards", title: "C", cards: [{ heading: "a" }, { heading: "b" }] }, b, ctx)).toContain("sc-cards r1");
+    expect(renderSlideHtml({ id: "c", layout: "cards", title: "C", cards: Array.from({ length: 6 }, (_, i) => ({ heading: `h${i}` })) }, b, ctx)).not.toContain("sc-cards r1");
   });
 });

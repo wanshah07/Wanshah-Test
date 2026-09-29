@@ -2,6 +2,7 @@ import {
   angleById,
   checkSource,
   HOUSE_DEFAULT,
+  DEFAULT_THEME_ID,
   HOUSE_MAX,
   houseValue,
   LAYOUTS,
@@ -287,7 +288,7 @@ const routes: [string, RegExp, Handler][] = [
         title: String(b?.title ?? "").slice(0, 300) || (lang === "ms" ? "Deck baharu" : "New deck"),
         lang,
         angle: angleById(b?.angle ?? "custom").id,
-        theme: dz ? (JSON.parse(JSON.stringify(sanitizeTheme(dz.theme))) as Theme) : themePreset(b?.themeId ?? s.default_theme ?? "house"),
+        theme: dz ? (JSON.parse(JSON.stringify(sanitizeTheme(dz.theme))) as Theme) : themePreset(b?.themeId ?? s.default_theme ?? DEFAULT_THEME_ID),
         ...(dz ? { designId: dz.id } : {}),
         slides: [],
         sources: [],
@@ -340,7 +341,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/api\/decks\/([^/]+)\/theme$/,
     async (p, b) => {
       const d = await loadDeck(p[1]);
-      d.theme = { ...themePreset(b?.presetId ?? "house"), logoMediaId: d.theme.logoMediaId, footer: d.theme.footer };
+      d.theme = { ...themePreset(b?.presetId ?? DEFAULT_THEME_ID), logoMediaId: d.theme.logoMediaId, footer: d.theme.footer };
       delete d.designId;
       return saveDoc(d);
     },
@@ -453,7 +454,7 @@ const routes: [string, RegExp, Handler][] = [
         vision: s.vision_ok === "yes" || s.vision_ok === "no" ? s.vision_ok : "unknown",
         reader: { baseUrl: "", model: "", key: "", complete: false },
         appTheme: s.app_theme ?? "system",
-        defaultTheme: s.default_theme ?? "house",
+        defaultTheme: s.default_theme ?? DEFAULT_THEME_ID,
         cloud: true,
       };
     },

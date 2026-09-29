@@ -33,8 +33,8 @@ async function req<T>(method: string, url: string, body?: unknown, form?: FormDa
   } catch {
     json = { raw: text };
   }
-  // 502/503/504 with no JSON body comes from the proxy in front of Slidecraft (a codespace's port
-  // forwarder), not from Slidecraft: its server is stopped, restarting or still building.
+  // 502/503/504 with no JSON body comes from a proxy in front of Slidecraft (a
+  // reverse proxy or port forwarder), not from Slidecraft: its server is stopped, restarting or still building.
   if (!res.ok && res.status >= 502 && res.status <= 504 && !json.message && !json.error)
     throw new ApiError(`Slidecraft's server did not answer (${res.status}). It is stopped, restarting or still building: check the terminal running npm start, start it again if it has stopped, then reload this page.`, res.status, "server_down");
   if (!res.ok) throw new ApiError(String(json.message || json.error || `${res.status} ${res.statusText}`), res.status, json.error ? String(json.error) : undefined);

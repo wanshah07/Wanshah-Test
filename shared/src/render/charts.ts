@@ -30,11 +30,11 @@ function fmt(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-export function chartSvg(chart: ChartSpec, colors: ThemeColors, W = 1400, H = 640, fontName = "Inter", series?: string[]): string {
+export function chartSvg(chart: ChartSpec, colors: ThemeColors, W = 1400, H = 640, fontName = "Inter", series?: string[], opts: { legend?: boolean } = {}): string {
   const pal = seriesPalette(colors, series);
   const font = `${fontName}, system-ui, sans-serif`;
   const kind = chart.kind;
-  if (kind === "pie" || kind === "doughnut") return pieSvg(chart, colors, pal, W, H, font);
+  if (kind === "pie" || kind === "doughnut") return pieSvg(chart, colors, pal, W, H, font, opts.legend !== false);
   if (kind === "bar") return barSvgHorizontal(chart, colors, pal, W, H, font);
   return columnLineSvg(chart, colors, pal, W, H, font);
 }
@@ -138,10 +138,11 @@ function barSvgHorizontal(chart: ChartSpec, colors: ThemeColors, pal: string[], 
   return g + "</svg>";
 }
 
-function pieSvg(chart: ChartSpec, colors: ThemeColors, pal: string[], W: number, H: number, font: string): string {
+function pieSvg(chart: ChartSpec, colors: ThemeColors, pal: string[], W: number, H: number, font: string, withLegend = true): string {
   const s = chart.series[0] ?? { name: "", values: [] };
   const total = s.values.reduce((a, b) => a + Math.max(b, 0), 0) || 1;
-  const cx = H / 2 + 40, cy = H / 2, r = H / 2 - 50;
+  // Without its own legend (the slide lists the shares beside it) the pie is centred and as large as the box.
+  const cx = withLegend ? H / 2 + 40 : W / 2, cy = H / 2, r = withLegend ? H / 2 - 50 : Math.min(W, H) / 2 - 12;
   const inner = chart.kind === "doughnut" ? r * 0.55 : 0;
   let a0 = -Math.PI / 2;
   let g = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" role="img">`;
@@ -164,13 +165,13 @@ function pieSvg(chart: ChartSpec, colors: ThemeColors, pal: string[], W: number,
   });
   // legend on the right
   const lx = cx + r + 80;
-  chart.categories.forEach((c, i) => {
+  if (withLegend) chart.categories.forEach((c, i) => {
     const y = cy - (chart.categories.length * 44) / 2 + i * 44 + 16;
     const v = s.values[i] ?? 0;
     g += `<rect x="${lx}" y="${y - 16}" width="22" height="22" rx="5" fill="${pal[i % pal.length]}"/>`;
     g += `<text x="${lx + 34}" y="${y + 2}" font-family="${font}" font-size="30" fill="${colors.ink}">${esc(truncate(c, 30))} <tspan fill="${colors.muted}">${Math.round((v / total) * 100)}%</tspan></text>`;
   });
-  if (inner) g += `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-family="${font}" font-size="44" font-weight="600" fill="${colors.ink}">${fmt(total)}</text>`;
+  if (inner) g += `<text x="${cx}" y="${cy + (withLegend ? 12 : 22)}" text-anchor="middle" font-family="${font}" font-size="${withLegend ? 44 : 72}" font-weight="700" fill="${colors.ink}">${fmt(total)}</text>`;
   return g + "</svg>";
 }
 

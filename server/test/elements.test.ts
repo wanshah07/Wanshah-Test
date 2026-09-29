@@ -178,4 +178,40 @@ describe("the house design system", () => {
     const close = await xml(3);
     for (const chip of ["Screen", "Keep the PIF", "Notify", "Label"]) expect(close).toContain(`<a:t>${chip}</a:t>`);
   });
+  it("exports the briefing look to PowerPoint: navy cover and table header, say against don't say, shares beside the doughnut, numbered next steps", async () => {
+    const deck = deckOf("briefing", [
+      { layout: "title", title: "Shelf audit\nKlang Valley", subtitle: "42 pharmacies", body: "Main finding: the PA grade is missing.", kpi: [{ label: "pharmacies", value: "42" }, { label: "SKUs", value: "318" }] },
+      { layout: "kpi", title: "Who we audited", kpi: [{ label: "Pharmacies", value: "42" }, { label: "Sunscreens", value: "96" }] },
+      { layout: "chart", title: "Chains carried most", chart: { kind: "doughnut", categories: ["Chain", "Independent", "Online"], series: [{ name: "SKUs", values: [52, 33, 15] }] } },
+      { layout: "table", title: "Gaps by brand", table: { header: ["Brand", "Gaps", "OK"], rows: [["Brand A", "8", "YES"], ["Brand B", "12", "NO"]] } },
+      { layout: "two-column", title: "How to quote these numbers", leftHeading: "Say", rightHeading: "Don't say", bullets: ["SKUs audited"], bulletsRight: ["All pharmacies"] },
+      { layout: "closing", title: "Fix the PA grade\nbefore the next batch", bullets: ["Brief R&D to print the PA grade on every sunscreen.", "Re-audit the same 42 pharmacies in Q1 2027."] },
+    ]);
+    const zip = await JSZip.loadAsync(await deckToPptx(deck, "u_test"));
+    const xml = (n: number) => zip.file(`ppt/slides/slide${n}.xml`)!.async("string");
+    const cover = await xml(1);
+    expect(cover).toContain('<p:bg><p:bgPr><a:solidFill><a:srgbClr val="0B2D63"/>');
+    expect(cover).toContain("Main finding: the PA grade is missing.");
+    expect(cover).toMatch(/<a:latin typeface="Cambria"/);
+    // Each figure in its own series colour.
+    const kpi = await xml(2);
+    expect(kpi).toMatch(/srgbClr val="2A6FDB"[\s\S]*?<a:t>42<\/a:t>/);
+    expect(kpi).toMatch(/srgbClr val="0B2D63"[\s\S]*?<a:t>96<\/a:t>/);
+    // The doughnut draws no legend of its own; each share is listed beside it with its per cent.
+    const pie = await xml(3);
+    for (const x of ["Chain", "Independent", "Online", "52%", "33%", "15%"]) expect(pie).toContain(`<a:t>${x}</a:t>`);
+    const charts = await Promise.all(Object.keys(zip.files).filter((n) => /^ppt\/charts\/chart\d+\.xml$/.test(n)).map((n) => zip.file(n)!.async("string")));
+    expect(charts.some((c) => c.includes("<c:doughnutChart>") && !c.includes("<c:legend>"))).toBe(true);
+    const table = await xml(4);
+    expect(table).toMatch(/<a:solidFill><a:srgbClr val="0B2D63"\/><\/a:solidFill>[\s\S]*?Brand</);
+    const vs = await xml(5);
+    expect(vs).toContain("<a:t>✓  SKUs audited</a:t>");
+    expect(vs).toContain("<a:t>✗  All pharmacies</a:t>");
+    expect(vs).toContain('<a:srgbClr val="2E9E6A"/>');
+    expect(vs).toContain('<a:srgbClr val="E8174B"/>');
+    const close = await xml(6);
+    expect(close).toContain("<a:t>Brief R&amp;D to print the PA grade on every sunscreen.</a:t>");
+    expect(close).toContain("<a:t>1</a:t>");
+    expect(close).toContain("<a:t>2</a:t>");
+  });
 });

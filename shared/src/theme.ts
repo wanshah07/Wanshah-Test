@@ -240,6 +240,34 @@ export const THEME_PRESETS: Theme[] = [
     darkTitle: true,
     kpiStyle: "tiles",
   },
+  {
+    // The briefing look: a navy serif title on white, content on pale blue panels with no border, big
+    // figures each in its own colour, navy table headers, green and red for say and don't, a navy
+    // cover and a navy next-steps close. Built from a data debrief deck Wan held up as the standard.
+    id: "briefing",
+    name: "Navy Briefing",
+    fontDisplay: "Cambria",
+    fontBody: "Calibri",
+    fontQuote: "Cambria",
+    radius: 14,
+    slideNumbers: false,
+    colors: {
+      bg: "#FFFFFF",
+      surface: "#EAF1FB",
+      ink: "#1B2533",
+      ink2: "#3D4A5C",
+      muted: "#5B6B80",
+      line: "#C9D6EA",
+      brand: "#2A6FDB",
+      brandDeep: "#0B2D63",
+      accent: "#E8174B",
+      gold: "#D4A017",
+    },
+    series: ["#2A6FDB", "#0B2D63", "#2E9E6A", "#D9822B", "#7A4FD0", "#0E9F8E", "#B8336A", "#E8174B"],
+    slideStyle: "briefing",
+    darkTitle: true,
+    kpiStyle: "tiles",
+  },
 ];
 
 /**
@@ -248,6 +276,8 @@ export const THEME_PRESETS: Theme[] = [
  * ring gauges) is applied by the renderer, so those never depend on the writer.
  */
 export const THEME_GUIDES: Record<string, string> = {
+  briefing:
+    "Data briefing for an internal team or a client. Navy cover with the headline figures as a hero row (kpi on the title slide). Every content slide's title states the finding and carries its number ('Two ingredients took 91% of the segment'). Fill the slide with one dominant visual: a funnel for how the numbers were reduced, number tiles for who took part, a doughnut for shares, a highlighted bar chart for a ranking, a table with verdict cells for the detail, numbered cards for what was learned. Pair a chart or table with one aside that tells the reader how to read it, and a navy callout for the line to repeat. Every slide that shows a number carries its source line. Include a two-column slide of what the data can and cannot tell us, and a Say / Don't say two-column when the figures will be quoted. Close on navy with 3 to 5 numbered next steps.",
   house:
     "The house design system: dark cover and closing slides around light content slides. Every content slide carries an amber UPPERCASE eyebrow (kicker) and a one-line statement title. Vary the layout slide to slide: icon rows of 3 to 5 cards, flows, timelines, equations, before and after as two columns, number tiles, fact sheets, tables with side panels. Most content slides end on the plain-language callout the audience will repeat. The closing slide is a 2-line statement, an italic message as its subtitle, and 4 short takeaways as its bullets.",
   "clinical-evidence":
@@ -263,6 +293,9 @@ export const THEME_GUIDES: Record<string, string> = {
 export function themeGuide(id: string | undefined): string | undefined {
   return id ? THEME_GUIDES[id] : undefined;
 }
+
+/** The design a new deck starts in when the person has not chosen a default. */
+export const DEFAULT_THEME_ID = "briefing";
 
 export function themePreset(id: string): Theme {
   const t = THEME_PRESETS.find((p) => p.id === id) ?? THEME_PRESETS[0];
@@ -401,7 +434,7 @@ export const FONT_CHOICES = [
 ];
 
 const COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const STYLES = ["clean", "panel", "gradient", "bloom"];
+const STYLES = ["clean", "panel", "gradient", "bloom", "briefing"];
 
 /**
  * A theme safe to write into a style attribute, a class and a PPTX colour:

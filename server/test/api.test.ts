@@ -62,8 +62,8 @@ describe("api", () => {
     const r = await app.inject({ method: "POST", url: "/api/decks", payload: { title: "T", lang: "ms", angle: "training" } });
     expect(r.statusCode).toBe(200);
     deckId = r.json().id;
-    // New decks use the house design system unless the user chose another default.
-    expect(r.json().theme.id).toBe("house");
+    // New decks use the briefing design unless the user chose another default.
+    expect(r.json().theme.id).toBe("briefing");
     expect(r.json().angle).toBe("training");
   });
 

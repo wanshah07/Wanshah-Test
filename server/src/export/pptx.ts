@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import PptxGenJSImport from "pptxgenjs";
-import { glowOf, mapGrid, mapTiles, mapTone, particles, ringPercent, sanitizeSlide, sanitizeTheme, seriesPalette, stepRate, tileName, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type ImageRef, type Slide, type Theme } from "@slidecraft/shared";
+import { glowOf, isStepList, isVersusPair, mapGrid, pieShares, mapTiles, mapTone, particles, ringPercent, sanitizeSlide, sanitizeTheme, seriesPalette, stepRate, tileName, verdictTone, type ChartSpec, type Deck, type DiagramSpec, type ImageRef, type Slide, type Theme } from "@slidecraft/shared";
 import { fetchPicture } from "./fetchPicture.js";
 import { bloomBackgrounds } from "./bloom.js";
 import { getMedia } from "../store.js";
@@ -97,17 +97,20 @@ function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: num
   const rows = Math.ceil(n / cols);
   const gap = 0.25;
   const cw = (w - gap * (cols - 1)) / cols;
-  const ch = Math.min((h - gap * (rows - 1)) / rows, 2.6);
+  // Two or more rows share the whole height, as on screen; one row stops at a readable height.
+  const ch = rows > 1 ? (h - gap * (rows - 1)) / rows : Math.min(h, 3.2);
   const tw = cw - 0.4;
   // The number row takes a share of short cards rather than a fixed strip, and the heading and
   // detail are sized together (one scale for every card) so both always fit what is left.
   const top = Math.max(0.36, Math.min(0.72, ch * 0.28));
   const dot = Math.max(0.24, Math.min(0.4, top - 0.3));
   const room = ch - top - 0.1;
-  let hs = 15, ds = 11, headH = 0.3;
+  // A single row of cards is drawn larger, as on screen.
+  const H0 = rows === 1 ? 20 : 15, D0 = rows === 1 ? 14 : 11;
+  let hs = H0, ds = D0, headH = 0.3;
   for (let f = 1; f >= 0.3; f -= 0.02) {
-    hs = Math.max(5, Math.round(15 * f * 2) / 2);
-    ds = Math.max(4, Math.round(11 * f * 2) / 2);
+    hs = Math.max(5, Math.round(H0 * f * 2) / 2);
+    ds = Math.max(4, Math.round(D0 * f * 2) / 2);
     headH = Math.max(...items.map((it) => textHeightIn([plain(it.heading)], tw, hs, { bold: true })));
     const detNeed = Math.max(0, ...items.map((it) => (it.detail ? textHeightIn([plain(it.detail)], tw, ds) : 0)));
     if (headH + 0.04 + detNeed <= room) break;
@@ -122,7 +125,7 @@ function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: num
     else panel(ps, cx, cy, cw, ch, c);
     // A design with its own series colours gives each card its own header colour.
     const cc = c.theme.series?.length ? hex(c.theme.series[i % c.theme.series.length]) : hex(col.brand);
-    if (!bloom) ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: cc }, line: { color: cc } });
+    if (!bloom && c.theme.slideStyle !== "briefing") ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: cc }, line: { color: cc } });
     ps.addShape(c.pres.ShapeType.ellipse, { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fill: { color: cc }, line: { color: cc } });
     ps.addText(String(i + 1), { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fontSize: Math.round(13 * (dot / 0.4)), bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody) });
     if (it.tag) {
@@ -155,7 +158,7 @@ function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; 
   let yy = y;
   const kicker = s.kicker || opts.kicker;
   if (kicker) {
-    ps.addText(kicker.toUpperCase(), { x: px(120), y: yy, w, h: px(36), fontSize: fitFont(kicker.toUpperCase(), w, px(36), 12, 8, { bold: true, maxLines: 1 }), bold: true, charSpacing: 3, color: opts.color ?? hex(t.slideStyle === "bloom" ? t.colors.accent : t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
+    ps.addText(kicker.toUpperCase(), { x: px(120), y: yy, w, h: px(36), fontSize: fitFont(kicker.toUpperCase(), w, px(36), 12, 8, { bold: true, maxLines: 1 }), bold: true, charSpacing: 3, color: opts.color ?? hex(t.slideStyle === "bloom" ? t.colors.accent : t.slideStyle === "briefing" ? t.colors.brand : t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
     yy += px(44);
   }
   // The title takes at most three lines and a quarter of the slide; its box is as tall as its text.
@@ -163,7 +166,7 @@ function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; 
   const tt = titleText(s, t);
   const size = fitFont(tt, w, 3 * max * 1.2 / 72 + 0.1, max, 14, { bold: true, maxLines: 3 });
   const h = Math.min(textHeightIn([tt], w, size, { bold: true }), H * 0.28);
-  ps.addText(tt, { x: px(120), y: yy, w, h, fontSize: size, bold: true, color: opts.color ?? hex(t.colors.ink), fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
+  ps.addText(tt, { x: px(120), y: yy, w, h, fontSize: size, bold: true, color: opts.color ?? hex(t.slideStyle === "briefing" ? t.colors.brandDeep : t.colors.ink), fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
   let end = yy + h + px(10);
   // The reading line under a content slide's title: at most two lines.
   w = W - px(240);
@@ -193,6 +196,11 @@ function fitText(ps: PSlide, text: string, box: { x: number; y: number; w: numbe
 }
 
 function panel(ps: PSlide, x: number, y: number, w: number, h: number, c: Ctx): void {
+  // The briefing style's panel: pale blue, no border, no shadow.
+  if (c.theme.slideStyle === "briefing") {
+    ps.addShape(c.pres.ShapeType.roundRect, { x, y, w, h, fill: { color: hex(c.theme.colors.surface) }, line: { color: hex(c.theme.colors.surface), width: 0.5 }, rectRadius: Math.min(0.15, px(c.theme.radius)) });
+    return;
+  }
   // The bloom style's card: white, no border, a soft wide shadow.
   if (c.theme.slideStyle === "bloom") {
     ps.addShape(c.pres.ShapeType.roundRect, { x, y, w, h, fill: { color: hex(c.theme.colors.surface) }, line: { color: hex(c.theme.colors.surface), width: 0.5 }, rectRadius: Math.min(0.23, px(c.theme.radius)), shadow: { type: "outer", blur: 20, offset: 6, angle: 90, color: "0B1B3A", opacity: 0.1 } });
@@ -295,17 +303,28 @@ function fitTable(rows: string[][], colW: number[], h: number, max: number, min 
 function table(ps: PSlide, t: NonNullable<Slide["table"]>, x: number, y: number, w: number, h: number, c: Ctx): void {
   const colW = Array(t.header.length).fill(w / Math.max(t.header.length, 1));
   const text = [t.header.map(plain), ...t.rows.map((r) => r.map(plain))];
-  const { size, heights } = fitTable(text, colW, h, 13);
+  // A short table is drawn large, as on screen, rather than as a strip at the top of the slide.
+  const few = t.rows.length <= 5;
+  const fit = fitTable(text, colW, h, few ? 16 : 13);
+  const size = fit.size;
+  // A short table's rows are opened up to fill most of the space, as the screen pads them.
+  const used = fit.heights.reduce((a, b) => a + b, 0);
+  const want = few ? Math.min(h, (t.rows.length + 1) * 0.75) : used;
+  const heights = want > used ? fit.heights.map((x) => x + (want - used) / fit.heights.length) : fit.heights;
+  const col = c.theme.colors;
+  // The briefing style: a navy header row, zebra rows, the first column bold in navy.
+  const brief = c.theme.slideStyle === "briefing";
   const rows: TableRows = [
-    t.header.map((hd) => ({ text: plain(hd), options: { bold: true, color: hex(c.theme.colors.brandDeep), fill: { color: hex(c.theme.colors.surface) }, fontSize: size } })),
-    ...t.rows.map((r) =>
-      r.map((v) => {
+    t.header.map((hd) => ({ text: plain(hd), options: { bold: true, color: brief ? "FFFFFF" : hex(col.brandDeep), fill: { color: brief ? hex(col.brandDeep) : hex(col.surface) }, fontSize: size } })),
+    ...t.rows.map((r, ri) =>
+      r.map((v, ci) => {
         const tone = verdictTone(plain(v));
-        return { text: plain(v), options: tone ? { color: TONE[tone].ink, fill: { color: TONE[tone].bg }, bold: true, fontSize: size } : { color: hex(c.theme.colors.ink), fontSize: size } };
+        const zebra = brief && ri % 2 ? "F5F8FD" : "FFFFFF";
+        return { text: plain(v), options: tone ? { color: TONE[tone].ink, fill: { color: TONE[tone].bg }, bold: true, fontSize: size } : { color: brief && ci === 0 ? hex(col.brandDeep) : hex(col.ink), bold: brief && ci === 0, fill: { color: zebra }, fontSize: size } };
       }),
     ),
   ];
-  ps.addTable(rows, { x, y, w, colW, border: { type: "solid", color: hex(c.theme.colors.line), pt: 0.75 }, fontFace: fontOk(c.theme.fontBody), valign: "top", autoPage: false, rowH: heights });
+  ps.addTable(rows, { x, y, w, colW, border: { type: "solid", color: hex(c.theme.colors.line), pt: 0.75 }, fontFace: fontOk(c.theme.fontBody), valign: "middle", autoPage: false, rowH: heights });
 }
 
 const YES_RE = /^(yes|ya|✓|true|wajib|required|mandatory)$/i;
@@ -438,9 +457,9 @@ function funnel(ps: PSlide, d: Funnel, x: number, y: number, w: number, h: numbe
   const pal = seriesPalette(col, c.theme.series).map(hex);
   const n = d.stages.length;
   const sw = w / n;
-  const ch = Math.min(1.3, h * 0.45);
+  const ch = Math.min(1.6, h * 0.45);
   const top = y + (h - ch - 1.2) / 2;
-  const vs = Math.min(...d.stages.map((st) => fitFont(st.value, sw - 0.7, ch - 0.2, 36, 10, { bold: true, maxLines: 1 })));
+  const vs = Math.min(...d.stages.map((st) => fitFont(st.value, sw - 0.7, ch - 0.2, 44, 10, { bold: true, maxLines: 1 })));
   const ls = Math.min(...d.stages.map((st) => fitFont(plain(st.label), sw - 0.2, 0.7, 13, 7)));
   d.stages.forEach((st, i) => {
     const sx = x + i * sw;
@@ -648,6 +667,63 @@ function asides(ps: PSlide, list: NonNullable<Slide["aside"]>, x: number, y: num
   });
 }
 
+/** Say against don't say: a green column of ticks and a red column of crosses, one tinted row per line. */
+function versus(ps: PSlide, s: Slide, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const gap = 0.35;
+  const cw = (w - gap) / 2;
+  const sides = [
+    { hd: s.leftHeading ?? "", items: s.bullets ?? [], mark: "✓", bar: "2E9E6A", bg: "EAF7F0", ink: "1E6B47" },
+    { hd: s.rightHeading ?? "", items: s.bulletsRight ?? [], mark: "✗", bar: "E8174B", bg: "FFF1F4", ink: "B0123A" },
+  ];
+  const headH = 0.5;
+  const n = Math.max(1, ...sides.map((x) => x.items.length));
+  const rowGap = 0.1;
+  const rowH = Math.min(1.05, (h - headH - 0.15 - rowGap * (n - 1)) / n);
+  // One size for every row on both sides, so the two columns read as a pair.
+  const size = Math.min(15, ...sides.flatMap((x) => x.items.map((it) => fitFont(`${x.mark}  ${plain(it)}`, cw - 0.4, rowH - 0.08, 15, 6, { bold: true }))));
+  sides.forEach((sd, j) => {
+    const cx = x + j * (cw + gap);
+    ps.addText(plain(sd.hd), { x: cx, y, w: cw, h: headH, fontSize: fitFont(plain(sd.hd), cw - 0.3, headH - 0.06, 16, 8, { bold: true, maxLines: 1 }), bold: true, color: "FFFFFF", align: "center", valign: "middle", fill: { color: sd.bar }, line: { color: sd.bar }, shape: c.pres.ShapeType.roundRect, rectRadius: 0.08, fontFace: fontOk(c.theme.fontBody) });
+    sd.items.forEach((it, i) => {
+      ps.addText(`${sd.mark}  ${plain(it)}`, { x: cx, y: y + headH + 0.15 + i * (rowH + rowGap), w: cw, h: rowH, fontSize: size, bold: true, color: sd.ink, valign: "middle", fill: { color: sd.bg }, line: { color: sd.bg }, shape: c.pres.ShapeType.roundRect, rectRadius: 0.08, margin: [12, 12, 4, 4], fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    });
+  });
+}
+
+/** A pie or doughnut on the left, each share on the right as a card: colour bar, name, value, per cent. */
+function pieWithShares(ps: PSlide, ch: ChartSpec, x: number, y: number, w: number, h: number, c: Ctx): void {
+  const col = c.theme.colors;
+  const pal = seriesPalette(col, c.theme.series).map(hex);
+  const d = Math.min(h, w * 0.45);
+  ps.addChart((ch.kind === "pie" ? c.pres.ChartType.pie : c.pres.ChartType.doughnut) as ChartName, [{ name: ch.series[0].name, labels: ch.categories, values: ch.series[0].values }], {
+    x, y: y + (h - d) / 2, w: d, h: d,
+    holeSize: ch.kind === "doughnut" ? 55 : undefined,
+    chartColors: pal,
+    showLegend: false,
+    showValue: false,
+    showPercent: false,
+    showLabel: false,
+    showTitle: false,
+    dataBorder: { pt: 1.5, color: "FFFFFF" },
+  });
+  const rows = pieShares(ch);
+  const lx = x + d + 0.5, lw = w - d - 0.5;
+  const gap = 0.12;
+  const rh = Math.min(0.85, (h - gap * (rows.length - 1)) / rows.length);
+  const top = y + (h - (rh * rows.length + gap * (rows.length - 1))) / 2;
+  const ns = Math.min(...rows.map((r) => fitFont(plain(r.name), lw * 0.55, rh - 0.1, 15, 6, { bold: true })));
+  rows.forEach((r, i) => {
+    const ry = top + i * (rh + gap);
+    const cc = pal[i % pal.length];
+    ps.addShape(c.pres.ShapeType.rect, { x: lx, y: ry, w: lw, h: rh, fill: { color: tint(cc, col.surface, 0.08) }, line: { color: tint(cc, col.surface, 0.08) } });
+    ps.addShape(c.pres.ShapeType.rect, { x: lx, y: ry, w: 0.08, h: rh, fill: { color: cc }, line: { color: cc } });
+    ps.addText(plain(r.name), { x: lx + 0.2, y: ry, w: lw * 0.55, h: rh, fontSize: ns, bold: true, color: hex(col.ink), valign: "middle", fontFace: fontOk(c.theme.fontBody), fit: "shrink" });
+    const v = r.value.toLocaleString("en-US");
+    ps.addText(v, { x: lx + lw * 0.55 + 0.2, y: ry, w: lw * 0.25, h: rh, fontSize: fitFont(v, lw * 0.25, rh - 0.1, 24, 8, { bold: true, maxLines: 1 }), bold: true, color: cc, align: "right", valign: "middle", fontFace: fontOk(c.theme.fontDisplay) });
+    ps.addText(`${r.pct}%`, { x: lx + lw * 0.8 + 0.2, y: ry, w: lw * 0.2 - 0.3, h: rh, fontSize: Math.min(13, fitFont(`${r.pct}%`, lw * 0.2 - 0.3, rh - 0.1, 13, 6, { maxLines: 1 })), color: hex(col.muted), align: "right", valign: "middle", fontFace: fontOk(c.theme.fontBody) });
+  });
+}
+
 /** The bloom style's faint particle field, the same dots as the editor draws, as native shapes. */
 function bloomDots(ps: PSlide, s: Slide, c: Ctx): void {
   for (const p of particles(s.id)) {
@@ -679,33 +755,58 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     case "closing": {
       const dark = !!t.darkTitle;
       const bloom = t.slideStyle === "bloom";
+      const brief = t.slideStyle === "briefing";
+      // The briefing cover and close are flat navy: no glow, no rule under the title.
+      const plainCover = bloom || brief;
       const ink = dark ? "FFFFFF" : hex(col.ink);
       background(ps, s, c, dark, dark ? hex(col.brandDeep) : hex(col.bg));
-      if (!bloom) ps.addShape(c.pres.ShapeType.ellipse, { x: W - 3.2, y: -2.2, w: 5, h: 5, fill: { color: hex(col.brand), transparency: dark ? 70 : 82 }, line: { color: hex(col.brand), transparency: 100 } });
+      if (!plainCover) ps.addShape(c.pres.ShapeType.ellipse, { x: W - 3.2, y: -2.2, w: 5, h: 5, fill: { color: hex(col.brand), transparency: dark ? 70 : 82 }, line: { color: hex(col.brand), transparency: 100 } });
       // A hero row of figures moves the title up to make room.
       const hero = s.layout === "title" ? (s.kpi ?? []).slice(0, 4) : [];
-      const up = hero.length ? 0.85 : 0;
+      const steps = s.layout === "closing" && isStepList(s.bullets);
+      const up = hero.length || steps ? 0.85 : 0;
       const tt = titleText(s, t);
       // A two-line title keeps its break, the second line lit on a dark cover.
       const [l1, ...l2] = tt.split(/\n+/);
-      const runs = l2.length ? [{ text: l1, options: { color: ink, breakLine: true } }, { text: l2.join(" "), options: { color: dark ? hex(glowOf(col.brand)) : hex(col.brand) } }] : tt;
-      if (s.kicker) ps.addText(plain(s.kicker).toUpperCase(), { x: px(160), y: 1.5 - up, w: W - px(320), h: 0.35, fontSize: 12, bold: true, charSpacing: 3, color: dark ? hex(glowOf(col.accent)) : hex(bloom ? col.accent : col.brandDeep), fontFace: fontOk(t.fontBody) });
+      const runs = l2.length ? [{ text: l1, options: { color: ink, breakLine: true } }, { text: l2.join(" "), options: { color: dark ? (brief ? "CFE0FA" : hex(glowOf(col.brand))) : hex(col.brand) } }] : tt;
+      if (s.kicker) ps.addText(plain(s.kicker).toUpperCase(), { x: px(160), y: 1.5 - up, w: W - px(320), h: 0.35, fontSize: 12, bold: true, charSpacing: 3, color: dark ? (brief ? "8FB6F2" : hex(glowOf(col.accent))) : hex(bloom ? col.accent : col.brandDeep), fontFace: fontOk(t.fontBody) });
       ps.addText(runs, { x: px(160), y: 1.9 - up, w: W - px(320), h: 2.2, fontSize: fitFont(tt.replace(/\n+/g, "\n"), W - px(320), 2.2, 44, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: ink, fontFace: fontOk(t.fontDisplay), valign: "bottom", fit: "shrink" });
-      if (!bloom) ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.25 - up, w: 0.85, h: 0.06, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
-      const sub = [s.subtitle, s.body].filter(Boolean).map((x) => plain(x!)).join("\n");
-      const subH = hero.length ? 1.0 : 1.4;
+      if (!plainCover) ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.25 - up, w: 0.85, h: 0.06, fill: { color: hex(col.brand) }, line: { color: hex(col.brand) } });
+      // The briefing cover puts its body (the main finding) in a panel of its own under the subtitle.
+      const lead = brief && dark && s.layout === "title" && s.body ? plain(s.body) : "";
+      const sub = [s.subtitle, lead ? undefined : s.body].filter(Boolean).map((x) => plain(x!)).join("\n");
+      const subH = steps ? 0.6 : lead ? 0.5 : hero.length ? 1.0 : 1.4;
       if (sub) ps.addText(sub, { x: px(160), y: 4.45 - up, w: W - px(320), h: subH, fontSize: fitFont(sub, W - px(320), subH, 18, 8), color: dark ? "E6ECF3" : hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
+      if (lead) {
+        const ly = 4.45 - up + subH + 0.05, lh = hero.length ? 0.55 : 0.9;
+        ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: ly, w: 0.07, h: lh, fill: { color: "8FB6F2" }, line: { color: "8FB6F2" } });
+        ps.addText(lead, { x: px(160) + 0.07, y: ly, w: 8.8, h: lh, fontSize: fitFont(lead, 8.5, lh - 0.1, 16, 7), color: "FFFFFF", fill: { color: "FFFFFF", transparency: 90 }, valign: "middle", margin: [14, 14, 4, 4], fontFace: fontOk(t.fontBody), fit: "shrink" });
+      }
       if (hero.length) {
         const hw = (W - px(320) - 0.3 * (hero.length - 1)) / hero.length;
         hero.forEach((k, j) => {
           const hx = px(160) + j * (hw + 0.3);
-          ps.addShape(c.pres.ShapeType.roundRect, { x: hx, y: 4.75, w: hw, h: 1.25, fill: { color: dark ? "FFFFFF" : hex(col.surface), transparency: dark ? 90 : 0 }, line: { color: dark ? "FFFFFF" : hex(col.line), transparency: dark ? 75 : 0, width: 1 }, rectRadius: Math.min(0.15, px(t.radius)) });
+          if (!brief) ps.addShape(c.pres.ShapeType.roundRect, { x: hx, y: 4.75, w: hw, h: 1.25, fill: { color: dark ? "FFFFFF" : hex(col.surface), transparency: dark ? 90 : 0 }, line: { color: dark ? "FFFFFF" : hex(col.line), transparency: dark ? 75 : 0, width: 1 }, rectRadius: Math.min(0.15, px(t.radius)) });
           ps.addText(plain(k.value), { x: hx + 0.15, y: 4.82, w: hw - 0.3, h: 0.6, fontSize: fitFont(plain(k.value), hw - 0.3, 0.6, 28, 10, { bold: true, maxLines: 1 }), bold: true, color: dark ? "FFFFFF" : hex(col.brandDeep), fontFace: fontOk(t.fontDisplay), valign: "middle" });
           ps.addText(plain(k.label), { x: hx + 0.15, y: 5.42, w: hw - 0.3, h: 0.5, fontSize: fitFont(plain(k.label), hw - 0.3, 0.5, 11, 6), color: dark ? "E6ECF3" : hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
         });
       }
+      // Next steps as a numbered list when they are sentences, as on screen.
+      if (steps) {
+        const items = s.bullets!.slice(0, 6).map(plain);
+        const top = 5.1 - up, room = H - px(120) - top, gap = 0.1;
+        const rh = Math.min(0.55, (room - gap * (items.length - 1)) / items.length);
+        const size = Math.min(...items.map((x) => fitFont(x, W - px(320) - 0.7, rh, 16, 7)));
+        const dot = Math.min(0.4, rh - 0.05);
+        items.forEach((x, j) => {
+          const ry = top + j * (rh + gap);
+          ps.addShape(c.pres.ShapeType.ellipse, { x: px(160), y: ry + (rh - dot) / 2, w: dot, h: dot, fill: { color: hex(col.accent) }, line: { color: hex(col.accent) } });
+          ps.addText(String(j + 1), { x: px(160), y: ry + (rh - dot) / 2, w: dot, h: dot, fontSize: Math.round(14 * dot / 0.4), bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(t.fontBody) });
+          ps.addText(x, { x: px(160) + dot + 0.2, y: ry, w: W - px(320) - dot - 0.2, h: rh, fontSize: size, color: ink, valign: "middle", fontFace: fontOk(t.fontBody), fit: "shrink" });
+        });
+      }
       // Takeaways on the closing slide, as a row of chips.
-      const chips = s.layout === "closing" ? (s.bullets ?? []).slice(0, 4).map(plain) : [];
+      const chips = s.layout === "closing" && !steps ? (s.bullets ?? []).slice(0, 4).map(plain) : [];
       if (chips.length) {
         const cw = (W - px(320) - 0.25 * (chips.length - 1)) / chips.length;
         const cs = Math.min(...chips.map((x) => fitFont(x, cw - 0.3, 0.55, 13, 7, { bold: true })));
@@ -759,6 +860,10 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
       break;
     }
     case "two-column": {
+      if (isVersusPair(s.leftHeading, s.rightHeading)) {
+        versus(ps, s, contentX, y0, contentW, availH, c);
+        break;
+      }
       const gap = 0.35;
       const cw = (contentW - gap) / 2;
       [[s.leftHeading, s.bullets, contentX], [s.rightHeading, s.bulletsRight, contentX + cw + gap]].forEach(([hd, items, x]) => {
@@ -775,7 +880,8 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     case "chart": {
       if (s.chart) {
         const side = s.bullets?.length ? 3.4 : 0;
-        chart(ps, s.chart, contentX, y0, contentW - side - (side ? 0.3 : 0), availH - (s.chart.source ? 0.4 : 0), c);
+        const pie = (s.chart.kind === "pie" || s.chart.kind === "doughnut") && s.chart.series.length === 1;
+        (pie ? pieWithShares : chart)(ps, s.chart, contentX, y0, contentW - side - (side ? 0.3 : 0), availH - (s.chart.source ? 0.4 : 0), c);
         if (side) bullets(ps, s.bullets!, contentX + contentW - side, y0 + 0.3, side, availH - 0.6, c, 14);
         if (s.chart.source) fitText(ps, s.chart.source, { x: contentX, y: bodyBottom - 0.35, w: contentW, h: 0.3 }, 10, { color: hex(col.muted), fontFace: fontOk(t.fontBody), valign: "top" });
       }
@@ -827,7 +933,10 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
       const gap = 0.3;
       const tw = (contentW - gap * (perRow - 1)) / perRow;
       const room = availH - (s.body ? 0.5 : 0);
-      const th = Math.min(2.6, (room - gap * (rowsN - 1)) / rowsN);
+      const th = Math.min(3.2, (room - gap * (rowsN - 1)) / rowsN);
+      // The briefing style centres each figure and draws it in its own series colour.
+      const brief = t.slideStyle === "briefing";
+      const kpal = seriesPalette(col, t.series).map(hex);
       const top = y0 + (room - (th * rowsN + gap * (rowsN - 1))) / 2;
       items.forEach((k, idx) => {
         const j = idx % 4;
@@ -835,10 +944,11 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
         const x = contentX + j * (tw + gap);
         panel(ps, x, ty, tw, th, c);
         const vh = Math.min(1.1, th * 0.42);
-        ps.addText(plain(k.value), { x: x + 0.2, y: ty + th * 0.1, w: tw - 0.4, h: vh, fontSize: fitFont(plain(k.value), tw - 0.4, vh, 40, 10, { bold: true, maxLines: 1 }), bold: true, color: hex(col.brandDeep), fontFace: fontOk(t.fontDisplay), valign: "middle", fit: "shrink" });
+        const al = brief ? "center" : "left";
+        ps.addText(plain(k.value), { x: x + 0.2, y: ty + th * 0.1, w: tw - 0.4, h: vh, fontSize: fitFont(plain(k.value), tw - 0.4, vh, brief ? 54 : 40, 10, { bold: true, maxLines: 1 }), bold: true, color: brief ? kpal[idx % kpal.length] : hex(col.brandDeep), fontFace: fontOk(t.fontDisplay), align: al, valign: "middle", fit: "shrink" });
         const lh = Math.min(0.6, th * 0.25);
-        ps.addText(plain(k.label), { x: x + 0.2, y: ty + th * 0.1 + vh + 0.05, w: tw - 0.4, h: lh, fontSize: fitFont(plain(k.label), tw - 0.4, lh, 13, 6, { bold: true }), bold: true, color: hex(col.ink), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
-        if (k.note) fitText(ps, k.note, { x: x + 0.2, y: ty + th * 0.1 + vh + lh + 0.1, w: tw - 0.4, h: Math.max(0.2, th - (th * 0.1 + vh + lh + 0.2)) }, 10, { color: hex(col.muted), fontFace: fontOk(t.fontBody), valign: "top" });
+        ps.addText(plain(k.label), { x: x + 0.2, y: ty + th * 0.1 + vh + 0.05, w: tw - 0.4, h: lh, fontSize: fitFont(plain(k.label), tw - 0.4, lh, 13, 6, { bold: true }), bold: true, color: hex(col.ink), fontFace: fontOk(t.fontBody), align: al, valign: "top", fit: "shrink" });
+        if (k.note) fitText(ps, k.note, { x: x + 0.2, y: ty + th * 0.1 + vh + lh + 0.1, w: tw - 0.4, h: Math.max(0.2, th - (th * 0.1 + vh + lh + 0.2)) }, 10, { color: hex(col.muted), fontFace: fontOk(t.fontBody), align: al, valign: "top" });
       });
       if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
       break;

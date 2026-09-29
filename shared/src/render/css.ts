@@ -208,7 +208,7 @@ const RAW_CSS = `
 /* funnel */
 .sc-slide .sc-funnel{display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:0;align-items:start}
 .sc-slide .sc-funnel .stage{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;min-width:0}
-.sc-slide .sc-funnel .chev{width:100%;height:calc(170px * var(--k, 1));display:grid;place-items:center;padding:0 60px;
+.sc-slide .sc-funnel .chev{width:100%;height:calc(220px * var(--k, 1));display:grid;place-items:center;padding:0 60px;
   background:color-mix(in srgb,var(--brand-deep) calc(100% - var(--i) * 16%),var(--brand));color:#fff;
   clip-path:polygon(0 0,calc(100% - 48px) 0,100% 50%,calc(100% - 48px) 100%,0 100%,48px 50%)}
 .sc-slide .sc-pal .sc-funnel .stage:nth-child(8n+1) .chev{background:var(--p0)}
@@ -219,8 +219,8 @@ const RAW_CSS = `
 .sc-slide .sc-pal .sc-funnel .stage:nth-child(8n+6) .chev{background:var(--p5)}
 .sc-slide .sc-pal .sc-funnel .stage:nth-child(8n+7) .chev{background:var(--p6)}
 .sc-slide .sc-funnel .stage.first .chev{clip-path:polygon(0 0,calc(100% - 48px) 0,100% 50%,calc(100% - 48px) 100%,0 100%)}
-.sc-slide .sc-funnel .v{font-family:var(--font-display);font-size:64px;font-weight:700;line-height:1}
-.sc-slide .sc-funnel .lb{font-size:26px;font-weight:600;color:var(--ink);padding:0 16px;line-height:1.25}
+.sc-slide .sc-funnel .v{font-family:var(--font-display);font-size:84px;font-weight:700;line-height:1}
+.sc-slide .sc-funnel .lb{font-size:30px;font-weight:600;color:var(--ink);padding:0 16px;line-height:1.25}
 .sc-slide .sc-funnel .rate{font-size:22px;color:var(--muted)}
 /* equation */
 .sc-slide .sc-eq{display:flex;align-items:stretch;justify-content:center;gap:20px}
@@ -263,6 +263,89 @@ const RAW_CSS = `
 .sc-slide .sc-chips{display:flex;flex-wrap:wrap;gap:20px;max-width:1600px}
 .sc-slide .sc-chips span{padding:16px 30px;border-radius:999px;font-size:26px;font-weight:600;background:color-mix(in srgb,var(--brand) 10%,var(--surface));color:var(--ink);border:2px solid var(--line)}
 .sc-slide.sc-dark .sc-chips span{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);color:#fff}
+/* fill the frame: cards in two or more rows share the whole height; a single row sits at a readable height */
+.sc-slide .sc-cards:not(.r1){grid-auto-rows:minmax(0,1fr);align-content:stretch}
+.sc-slide .sc-cards.r1{grid-auto-rows:minmax(calc(400px * var(--k, 1)),auto);align-content:center}
+.sc-slide .sc-cards.r1 .sc-card{justify-content:center;gap:calc(18px * var(--k, 1))}
+.sc-slide .sc-cards.r1 .sc-card .hd{font-size:40px}
+.sc-slide .sc-cards.r1 .sc-card .dt{font-size:30px}
+.sc-slide .sc-kpis{grid-auto-rows:minmax(calc(400px * var(--k, 1)),auto)}
+.sc-slide .sc-kpi{display:flex;flex-direction:column;justify-content:center}
+.sc-slide table.sc-table.rows-few{font-size:34px}
+.sc-slide table.sc-table.rows-few td{padding:30px 32px}
+.sc-slide table.sc-table.rows-few th{padding:26px 32px;font-size:30px}
+.sc-slide .sc-col ul.sc-bullets.n-few{font-size:34px}
+/* say and don't say: a column of ticks against a column of crosses */
+.sc-slide .sc-vs .sc-vcol{padding:0;gap:0;background:transparent;border:0;box-shadow:none;display:flex;flex-direction:column}
+.sc-slide .sc-vs ul.sc-marks{flex:1}
+.sc-slide .sc-vs ul.sc-marks li{flex:1 1 0;max-height:calc(150px * var(--k, 1));align-items:center}
+.sc-slide .sc-vs .sc-vcol h3{color:#fff;font-family:var(--font-body),system-ui,sans-serif;font-weight:700;font-size:32px;text-align:center;padding:16px 24px;border-radius:calc(var(--radius) * .6);margin-bottom:18px}
+.sc-slide .sc-vs .good h3{background:#2E9E6A}
+.sc-slide .sc-vs .bad h3{background:#E8174B}
+.sc-slide ul.sc-marks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;font-size:30px;line-height:1.3;min-height:0}
+.sc-slide ul.sc-marks li{display:flex;gap:16px;align-items:baseline;padding:16px 24px;border-radius:calc(var(--radius) * .6);font-weight:600}
+.sc-slide .sc-vs .good li{background:#EAF7F0;color:#1E6B47}
+.sc-slide .sc-vs .bad li{background:#FFF1F4;color:#B0123A}
+.sc-slide ul.sc-marks i{font-style:normal;font-weight:700;flex:none}
+/* a pie with its shares listed beside it */
+.sc-slide .sc-pie{flex:1;min-height:0;min-width:0;display:flex;gap:56px;align-items:center}
+.sc-slide .sc-pie .sc-fig{flex:none;height:100%;aspect-ratio:1/1;max-width:46%}
+.sc-slide .sc-legend{flex:1;min-width:0;min-height:0;max-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:center;overflow:hidden}
+.sc-slide .sc-legend .lg{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:20px;padding:20px 28px;border-radius:calc(var(--radius) * .6);
+  background:color-mix(in srgb,var(--lc) 8%,var(--surface));border-left:10px solid var(--lc)}
+.sc-slide .sc-legend .nm{font-size:30px;font-weight:700;color:var(--ink);min-width:0}
+.sc-slide .sc-legend .vl{font-family:var(--font-display);font-size:48px;font-weight:700;color:var(--lc);line-height:1}
+.sc-slide .sc-legend .vl small{font-size:24px}
+.sc-slide .sc-legend .pc{font-size:26px;color:var(--muted);min-width:3.5em;text-align:right}
+.sc-slide .sc-legend.n6 .lg,.sc-slide .sc-legend.n7 .lg,.sc-slide .sc-legend.n8 .lg{padding:12px 24px}
+/* numbered next steps on the closing slide */
+.sc-slide ol.sc-next{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px;max-width:1500px}
+.sc-slide ol.sc-next li{display:flex;gap:26px;align-items:center;font-size:32px;line-height:1.3;color:var(--ink)}
+.sc-slide ol.sc-next .no{flex:none;width:calc(56px * var(--k, 1));height:calc(56px * var(--k, 1));border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:28px;display:grid;place-items:center}
+.sc-slide.sc-dark ol.sc-next li{color:#fff}
+/* briefing: the data debrief look. Navy serif titles on white, pale blue panels with no border, each figure in its
+   own colour, navy table headers, navy cover and close with the headline figures as plain numbers. */
+.sc-slide.sc-style-briefing .sc-body{inset:72px 96px 104px 96px;gap:26px}
+.sc-slide.sc-style-briefing .sc-cite,.sc-slide.sc-style-briefing .sc-logo{left:96px}
+.sc-slide.sc-style-briefing .sc-foot,.sc-slide.sc-style-briefing .sc-tag{right:96px}
+.sc-slide.sc-style-briefing .sc-h{color:var(--brand-deep);font-weight:700;font-size:62px;letter-spacing:0}
+.sc-slide.sc-style-briefing .sc-h .sc-kicker{color:var(--brand);font-weight:700;letter-spacing:.14em;font-size:22px}
+.sc-slide.sc-style-briefing .sc-rule{display:none}
+.sc-slide.sc-style-briefing .sc-dek{color:var(--muted)}
+.sc-slide.sc-style-briefing .sc-card,.sc-slide.sc-style-briefing .sc-kpi,.sc-slide.sc-style-briefing .sc-step,.sc-slide.sc-style-briefing .sc-col:not(.sc-vcol),
+.sc-slide.sc-style-briefing .sc-eq .term:not(.res),.sc-slide.sc-style-briefing .sc-hub .node,.sc-slide.sc-style-briefing .sc-aside{
+  background:var(--surface);border:0;box-shadow:none;border-radius:var(--radius)}
+.sc-slide.sc-style-briefing .sc-card{border-top:0;padding:calc(34px * var(--k, 1)) calc(36px * var(--k, 1))}
+.sc-slide.sc-style-briefing .sc-card .hd{font-family:var(--font-body),system-ui,sans-serif;font-weight:700;color:var(--ink)}
+.sc-slide.sc-style-briefing .sc-col h3{font-family:var(--font-body),system-ui,sans-serif;font-weight:700}
+.sc-slide.sc-style-briefing .sc-kpi{text-align:center;align-items:center;padding:40px 32px}
+.sc-slide.sc-style-briefing .sc-kpi .v{color:var(--kc,var(--brand-deep));font-size:124px;font-weight:700}
+.sc-slide.sc-style-briefing .sc-kpi .l{font-size:32px;font-weight:700}
+.sc-slide.sc-style-briefing .sc-kpi .n{font-size:24px}
+.sc-slide.sc-style-briefing table.sc-table{border:0;border-radius:calc(var(--radius) * .6);background:#fff}
+.sc-slide.sc-style-briefing table.sc-table th{background:var(--brand-deep);color:#fff;font-weight:700}
+.sc-slide.sc-style-briefing table.sc-table td{border-top:1px solid var(--line)}
+.sc-slide.sc-style-briefing table.sc-table tbody tr:nth-child(even) td{background:#F5F8FD}
+.sc-slide.sc-style-briefing table.sc-table td:first-child{font-weight:700;color:var(--brand-deep)}
+.sc-slide.sc-style-briefing table.sc-matrix th.rh{background:var(--surface);color:var(--brand-deep)}
+.sc-slide.sc-style-briefing .sc-facts{border:0;background:#fff}
+.sc-slide.sc-style-briefing .sc-facts .fl{background:var(--brand-deep);color:#fff}
+.sc-slide.sc-style-briefing .sc-aside{border-left:0}
+.sc-slide.sc-style-briefing .sc-aside h4{color:var(--brand-deep)}
+.sc-slide.sc-style-briefing .sc-callout{background:var(--brand-deep);border-radius:var(--radius);font-weight:600}
+.sc-slide.sc-style-briefing .sc-cap{font-size:20px}
+.sc-slide.sc-style-briefing.sc-dark,.sc-slide.sc-style-briefing.sc-section{background:var(--brand-deep)}
+.sc-slide.sc-style-briefing.sc-title::after,.sc-slide.sc-style-briefing.sc-closing::after{display:none}
+.sc-slide.sc-style-briefing.sc-dark .sc-h,.sc-slide.sc-style-briefing.sc-section .sc-h{color:#fff}
+.sc-slide.sc-style-briefing.sc-dark .sc-h .sc-kicker,.sc-slide.sc-style-briefing.sc-section .sc-h .sc-kicker{color:#8FB6F2}
+.sc-slide.sc-style-briefing.sc-dark .sc-h .l2{color:#CFE0FA}
+.sc-slide.sc-style-briefing.sc-title .sc-body,.sc-slide.sc-style-briefing.sc-closing .sc-body{padding:120px 140px;gap:32px}
+.sc-slide.sc-style-briefing.sc-title .sc-h,.sc-slide.sc-style-briefing.sc-closing .sc-h{font-size:96px}
+.sc-slide.sc-style-briefing.sc-dark .sc-lead{background:rgba(255,255,255,.1);border-left:8px solid #8FB6F2;border-radius:var(--radius);padding:24px 32px;font-size:32px;max-width:1300px}
+.sc-slide.sc-style-briefing.sc-dark .sc-hero{gap:64px;max-width:none;grid-template-columns:repeat(auto-fit,minmax(0,max-content))}
+.sc-slide.sc-style-briefing.sc-dark .sc-hero .hs{background:transparent;border:0;padding:0}
+.sc-slide.sc-style-briefing.sc-dark .sc-hero .v{font-size:88px}
+.sc-slide.sc-style-briefing.sc-dark .sc-hero .l{font-size:26px}
 `;
 
 // Every font size is a multiple of --k (and the source lines of --kc), which

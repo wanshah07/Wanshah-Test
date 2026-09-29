@@ -3,7 +3,9 @@
 A slide deck builder for briefs and files. You give it a brief, the documents
 it should read, an angle and the features you want; it writes the deck with
 OpenAI, you edit it in the browser, and you take it out as PowerPoint or as a
-single HTML file. Runs on your own machine or server, with your own key.
+single HTML file. The team uses it at
+https://wanshah07.github.io/Wanshah-Test/app/ (see "The team link" below); it
+also runs on your own machine or server, with your own key.
 
     brief + files + angle + features  →  deck spec (JSON)  →  editor  →  .pptx / .html
 
@@ -93,22 +95,34 @@ single HTML file. Runs on your own machine or server, with your own key.
   per technical term, a plain-language line to end most slides on, layouts
   that never repeat back to back, a dark cover and close around light
   content, one honest caveat slide, illustrative numbers labelled as such,
-  and speaker notes written as what the presenter says. The facts rules
+  and speaker notes written as what the presenter says. Slides that show data
+  state the finding with its number in the title, fill the slide with one
+  visual (tiles, doughnut, highlighted bar chart, funnel, table), carry a
+  source line, and a data deck adds a "what the data can and cannot tell us"
+  slide and a Say / Don't say wording slide. The facts rules
   still come first. Settings, **Instructions for every deck**, shows these
   rules as text you can edit: your version replaces them in every new deck
   and every rewrite, and **Reset to the built-in rules** brings them back.
   Whatever you write sits below the facts rules, so it cannot make the
-  writer invent a figure or drop a source. New decks use the **Teal Explainer** look by default:
-  Arial titles, Calibri body, amber eyebrows, soft cards on a white-to-tint
-  wash with a faint particle field, a teal pull-quote band in Cambria
-  italic, and a dark cover whose second title line is lit. Pick another
-  default in Settings.
+  writer invent a figure or drop a source. New decks use the **Navy Briefing**
+  look by default, taken from a data debrief deck Wan held up as the standard:
+  Cambria titles in navy, Calibri body, content on pale blue panels with no
+  border, each headline figure in its own colour, navy table headers with
+  zebra rows, a doughnut with its shares listed beside it as cards, Say and
+  Don't say as a green column of ticks against a red column of crosses, and a
+  navy cover and close with the main finding in a panel and the next steps
+  numbered. Pick another default in Settings; **Teal Explainer** (the previous
+  default) is still there.
+- **Fill the frame** (every design). Cards in two or more rows share the
+  whole height, a single row of cards and a row of figures stand at a
+  readable size instead of sitting at the top, a table of five rows or fewer
+  is drawn large, and the same sizing goes into the PowerPoint.
 - **Themes.** Colours, fonts, radius, slide style, footer and logo per deck,
   plus series colours, capital titles, dark title slides, tiles or ring
   gauges, and a tag on every slide (e.g. For healthcare professionals only),
   with presets. Four presets were built from reference decks: Clinical
   Evidence, Booth Bright, Rose Aesthetic and Audit Report; each also tells
-  the writer which devices that design leans on. The default preset is the token set of my.facerinna.com
+  the writer which devices that design leans on. The Facerinna preset is the token set of my.facerinna.com
   (Fraunces and Inter, brand `#4898D8` on ink `#1D344E`, 20px radius); the
   app chrome uses the same tokens, light and dark.
 - **Brief by ticking.** What the deck is for, what it must include, the
@@ -195,10 +209,10 @@ silent after the timeout and is **not** retried, so a dead gateway costs one
 wait, not three.
 
 Reachability depends on the machine, not the app. Measured 25 Sep 2026:
-`api.mireld.my` answers (401 without a key) from the Composio sandbox;
-it sent nothing back to GitHub Actions runners on 19 Sep (three client
-shapes, all timeouts). A Codespace runs on GitHub's own cloud, so **Test**
-from inside it is the check that settles it there.
+`api.mireld.my` answers (401 without a key) from the Composio sandbox. It
+sent nothing back to GitHub Actions runners on 19 Sep (three client shapes,
+all timeouts), but on 28 Sep the team link's worker, which runs on a GitHub
+Actions runner, wrote a deck through it, so that silence no longer holds.
 
 **Google Gemini** is listed too
 (`https://generativelanguage.googleapis.com/v1beta/openai`), with a key from
@@ -246,7 +260,8 @@ One-time setup for Microsoft direct, about ten minutes:
 2. In the new registration, Authentication, set "Allow public client flows"
    to Yes and save.
 3. Copy the Application (client) ID. Put it in Settings, OneDrive pictures,
-   or in the `MS_CLIENT_ID` Codespaces secret or `.env`.
+   or in `MS_CLIENT_ID` in `.env`. Microsoft direct works on a Node server
+   only; the team link reads OneDrive through Composio.
 4. Settings, Connect OneDrive. Open the address shown, enter the code, sign
    in with the account that owns the folder. The page updates by itself.
 
@@ -261,7 +276,7 @@ through the folders, or paste a OneDrive share link, and press Pull pictures.
   three levels when ticked.
 - A work or school account may need an administrator to approve the app.
 - Sign-in uses the device code flow, so it needs no client secret and no
-  redirect address, which a codespace (whose address changes) could not give.
+  redirect address, which a server whose address changes could not give.
   The refresh token is stored encrypted with `APP_SECRET`.
 
 ### Private Google Drive files
@@ -289,32 +304,20 @@ OneDrive.
 - Pasting a new Composio key here or under OneDrive replaces it for both, and
   both accounts are then picked again.
 
-### Moving off Codespaces
+### The team link
 
 Slidecraft runs at https://wanshah07.github.io/Wanshah-Test/app/ on GitHub
-Pages, with its data in Supabase and heavy work done by a worker in GitHub
-Actions, so the link is always on and teammates can use it. The design and the
-one-time setup are in [docs/MIGRATION.md](docs/MIGRATION.md). The Codespace
-below still works for development.
+Pages, with its data in Supabase and heavy work (writing, reading files,
+PowerPoint export) done by a worker in GitHub Actions, so the link is always
+on and teammates can use it from anywhere. Wan adds each person (steps in
+[docs/MIGRATION.md](docs/MIGRATION.md), "What Wan does, once"). The AI key is
+the team's, kept as a GitHub Actions secret: it is used by the worker and
+never shown in the page. Every merge to `main` redeploys the link.
 
-### On GitHub, no laptop: Codespaces
-
-`.devcontainer/devcontainer.json` builds and starts the server inside a GitHub
-Codespace. Before the first launch add two Codespaces secrets for this
-repository (Settings → Secrets and variables → Codespaces): `APP_SECRET`
-(a long random string) and, optionally, `OPENAI_API_KEY`. Then Code →
-Codespaces → Create codespace on main. When it opens, port 8787 is forwarded
-and the browser tab opens on the app. The forwarded address is **private**:
-only your GitHub login can open it, which is a login screen for free until
-`AUTH_MODE=local` is wanted for other people (make the port public then).
-
-What a Codespace is and is not: it stops after 30 minutes idle (Settings →
-Codespaces → Default idle timeout, up to 4 hours) and starts again in about
-a minute; decks and uploads live in `/workspaces/slidecraft-data` inside the
-codespace and survive stops, but a codespace unused for 30 days is deleted,
-so export anything you want to keep. The free allowance on a personal
-account is 120 core-hours a month, which at 2 cores is 60 hours of running
-time. For an always-on address for a team, use the Docker image on a host.
+The Node server described above is for development and tests. `npm test`,
+the smoke test and the fit checks all run against it, and `npm run
+check:cloud` drives the Pages build end to end against a stand-in for
+Supabase with the real worker.
 
 ### Login
 

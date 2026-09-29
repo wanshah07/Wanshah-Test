@@ -10,7 +10,7 @@ import { addMedia, addSource, getMedia } from "./store.js";
 // Sign-in is the device code flow: the server asks Microsoft for a short code,
 // the user types it at microsoft.com/devicelogin, and the server collects a
 // refresh token. It needs only a public client id (no secret, no redirect
-// address), which matters because every codespace has a different address.
+// address), which matters because a server's address can change.
 // The refresh token is stored encrypted with APP_SECRET, like the writer key.
 
 const SCOPE = "Files.Read offline_access";

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { DEFAULT_THEME_ID } from "@slidecraft/shared";
 import { HOUSE_DEFAULT, HOUSE_MAX, houseFor, saveHouse } from "../llm/house.js";
 import { config } from "../config.js";
 import { maskKey } from "../crypto.js";
@@ -37,7 +38,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return { baseUrl: r.baseUrl, model: r.model, key: maskKey(r.key), complete: r.complete };
       })(),
       appTheme: s.app_theme || "system",
-      defaultTheme: s.default_theme || "house",
+      defaultTheme: s.default_theme || DEFAULT_THEME_ID,
     };
   });
 
