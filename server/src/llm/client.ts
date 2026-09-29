@@ -24,7 +24,51 @@ export const RAW_KEEP = 500;
 
 export function rawSnippet(text: string): string {
   const t = String(text ?? "").replace(/\s+/g, " ").trim();
-  return t.length > RAW_KEEP ? `${t.slice(0, RAW_KEEP)}…` : t;
+  if (t.length <= RAW_KEEP) return t;
+  // The end says as much as the start: a reply cut off mid-slide and one with prose after the JSON look
+  // the same at the front.
+  return `${t.slice(0, RAW_KEEP)}… [${t.length.toLocaleString("en-US")} characters in all; it ends: …${t.slice(-160)}]`;
+}
+
+/**
+ * Walks a reply as JSON text, outside strings: every complete top-level {...} it holds, and whether
+ * it ends with a bracket or a string still open (the reply was cut off).
+ */
+export function scanJson(text: string): { objects: string[]; open: boolean } {
+  const objects: string[] = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') {
+      if (depth > 0) inStr = true;
+    } else if (ch === "{" || ch === "[") {
+      if (depth === 0 && ch === "{") start = i;
+      if (depth > 0 || ch === "{") depth++;
+    } else if ((ch === "}" || ch === "]") && depth > 0) {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        objects.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return { objects, open: depth > 0 || inStr };
+}
+
+/** JSON.parse, and then again with the two slips models make most: trailing commas and // comments. */
+function parseLoose(t: string): unknown {
+  try {
+    return JSON.parse(t);
+  } catch {
+    const fixed = t.replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1");
+    return JSON.parse(fixed);
+  }
 }
 
 /** The JSON rules, written into the instructions for every call. */
@@ -149,25 +193,34 @@ async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: numbe
   throw last ?? new LlmError(`Call to ${host} failed`);
 }
 
-/** Pull a JSON object out of an answer that may carry code fences or prose around it. */
-export function extractJson(text: string): unknown {
+/**
+ * Pull a JSON object out of an answer that may carry code fences or prose around it, or several objects
+ * one after another (a plan, then the deck). With `want`, the object holding most of those keys wins.
+ */
+export function extractJson(text: string, want: string[] = []): unknown {
   const t = text.trim();
   try {
     return JSON.parse(t);
   } catch {
     /* fall through */
   }
-  const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced) {
+  const fenced = [...t.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)].map((m) => m[1]);
+  const found: unknown[] = [];
+  for (const chunk of [...fenced, ...scanJson(t).objects]) {
     try {
-      return JSON.parse(fenced[1]);
+      const v = parseLoose(chunk);
+      if (v && typeof v === "object" && !Array.isArray(v)) found.push(v);
     } catch {
-      /* fall through */
+      /* not this one */
     }
+  }
+  if (found.length) {
+    const score = (v: unknown) => want.filter((k) => k in (v as object)).length;
+    return found.reduce((best, v) => (score(v) > score(best) || (score(v) === score(best) && JSON.stringify(v).length > JSON.stringify(best).length) ? v : best));
   }
   const a = t.indexOf("{");
   const b = t.lastIndexOf("}");
-  if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
+  if (a >= 0 && b > a) return parseLoose(t.slice(a, b + 1));
   throw new Error("no JSON object in the answer");
 }
 
@@ -195,9 +248,12 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
   let mode: "schema" | "object" = "schema";
   let tokenKey: "max_completion_tokens" | "max_tokens" = "max_completion_tokens";
   let sendTemperature = !/^(o\d|gpt-5)/.test(a.auth.model);
-  // A reply that is not JSON gets one more turn, with the reply shown back and the rules restated.
+  // A reply that is not JSON, or JSON in the wrong shape, gets another turn with the reply shown back
+  // and the rules restated; a reply that is still not JSON gets one more.
   let followUp: { role: "assistant" | "user"; content: string }[] = [];
-  for (let round = 0; round < 5; round++) {
+  let corrections = 0;
+  const keys = Object.keys((a.schema.properties as Record<string, unknown>) ?? {});
+  for (let round = 0; round < 7; round++) {
     // The rules are written into the instructions on every call, not only set
     // as response_format: gateways and models that ignore the request setting
     // still read the instructions.
@@ -245,7 +301,7 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
     }
     let parsed: unknown;
     try {
-      parsed = extractJson(choice.message.content ?? "");
+      parsed = extractJson(choice.message.content ?? "", keys);
     } catch {
       parsed = undefined;
     }
@@ -254,7 +310,7 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       // and it happens most in plain JSON mode, where the schema is only in the instructions.
       const missing = missingKeys(parsed, a.schema);
       if (!missing.length) return parsed as T;
-      if (followUp.length) {
+      if (corrections >= 1) {
         // Still the wrong shape after being asked again: an object is handed on for the caller to
         // salvage, anything else (null, a list, a number) is a failure the caller can report.
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as T;
@@ -262,7 +318,7 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
         e.raw = rawSnippet(choice.message.content ?? "");
         throw e;
       }
-      const keys = Object.keys((a.schema.properties as Record<string, unknown>) ?? {});
+      corrections++;
       const had = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? Object.keys(parsed as object) : [];
       followUp = [
         { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
@@ -270,15 +326,26 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
       ];
       continue;
     }
-    if (!followUp.length) {
+    const content = choice.message.content ?? "";
+    // A reply that opens JSON and never closes it was cut off, whatever finish_reason the gateway sent.
+    const cut = scanJson(content).open;
+    if (corrections < 2) {
+      corrections++;
       followUp = [
-        { role: "assistant", content: (choice.message.content ?? "").slice(0, 4000) },
-        { role: "user", content: "That answer is not JSON, so it cannot be used. Answer again with only the JSON object the OUTPUT FORMAT rules describe: start with { and end with }, no prose, no markdown fences." },
+        { role: "assistant", content: content.slice(0, 4000) },
+        {
+          role: "user",
+          content: cut
+            ? `That answer stopped before the JSON was finished, so it cannot be used. Answer again, shorter: one JSON object whose top-level keys are exactly ${keys.join(", ")}; no plan, outline or notes before it; keep every text field brief. Only the JSON.`
+            : `That answer is not JSON, so it cannot be used. Answer again with only one JSON object whose top-level keys are exactly ${keys.join(", ")}: start with { and end with }, no plan or outline before it, no prose, no markdown fences.`,
+        },
       ];
       continue;
     }
-    const e = new LlmError("The model answered with something that is not JSON", 0, "parse");
-    e.raw = rawSnippet(choice.message.content ?? "");
+    const e = cut
+      ? new LlmError(`The model's answer stopped part way (${content.length.toLocaleString("en-US")} characters), so the endpoint probably caps how long an answer can be. Ask for fewer slides, or pick a writer model that can answer at length.`, 0, "length")
+      : new LlmError("The model answered with something that is not JSON", 0, "parse");
+    e.raw = rawSnippet(content);
     throw e;
   }
   throw new LlmError("The endpoint refused every request shape tried", 400, "unsupported");
