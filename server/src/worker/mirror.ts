@@ -48,7 +48,7 @@ const DECKS: Table = {
   toRemote: (r, owner) => ({ id: r.id, user_id: owner, title: r.title, doc: parsed(r.doc, {}), created_at: r.created_at }),
 };
 
-const SOURCE_COLS = ["id", "deck_id", "name", "rel_path", "kind", "bytes", "chars", "text", "media_id", "remote_id", "remote_etag", "created_at"];
+const SOURCE_COLS = ["id", "deck_id", "name", "rel_path", "kind", "bytes", "chars", "text", "media_id", "remote_id", "remote_etag", "condensed_key", "condensed", "created_at"];
 const SOURCES: Table = {
   remote: "sc_sources",
   local: "sources",

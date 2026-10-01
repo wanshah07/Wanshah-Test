@@ -495,6 +495,15 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
   const [pickLayout, setPickLayout] = useState(false);
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<Slide>) => onChange({ ...slide, ...patch });
+  // One flagged phrase at a time: the writer is asked to take that phrase out and keep the slide's facts.
+  const fixHit = async (h: SlopHit) => {
+    setBusy(true);
+    try {
+      await onRewrite(`Remove the ${h.note} ("${h.phrase}") from the ${h.field}; keep every fact and figure, change nothing else.`);
+    } finally {
+      setBusy(false);
+    }
+  };
   const rewrite = async () => {
     setBusy(true);
     try {
@@ -510,7 +519,7 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
       {hits.length > 0 && (
         <div className="field">
           <label>Flagged wording <span className="help">{hits.length} hit{hits.length === 1 ? "" : "s"}</span></label>
-          <div className="hits">{hits.map((h, i) => <div key={i} className="hit"><b>{h.field}</b> · "{h.phrase}" · {h.note}</div>)}</div>
+          <div className="hits">{hits.map((h, i) => <div key={i} className="hit row between" style={{ gap: 8 }}><span><b>{h.field}</b> · "{h.phrase}" · {h.note}</span><button className="btn btn-quiet btn-xs" disabled={busy} onClick={() => fixHit(h)} title="Ask the writer to remove this phrase and keep the facts">Fix</button></div>)}</div>
         </div>
       )}
       <div className="field">

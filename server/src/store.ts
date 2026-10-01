@@ -73,10 +73,19 @@ export interface SourceRow {
   media_id: string | null;
   /** Set for a picture pulled from OneDrive: a slide picture, not a document. */
   remote_id: string | null;
+  /** sha256 of the text and the condensing instruction the cached notes were made under; null when never condensed. */
+  condensed_key?: string | null;
+  /** The notes a condensing run made of this source, good while condensed_key still matches. */
+  condensed?: string | null;
 }
 
 export function listSources(deckId: string): SourceRow[] {
-  return getDb().prepare("SELECT id, name, rel_path, kind, chars, text, media_id, remote_id FROM sources WHERE deck_id = ? ORDER BY created_at").all(deckId) as unknown as SourceRow[];
+  return getDb().prepare("SELECT id, name, rel_path, kind, chars, text, media_id, remote_id, condensed_key, condensed FROM sources WHERE deck_id = ? ORDER BY created_at").all(deckId) as unknown as SourceRow[];
+}
+
+/** Keeps the notes a condensing run made of a source, so the next run under the same text and instruction skips the call. */
+export function saveCondensed(sourceId: string, key: string, notes: string): void {
+  getDb().prepare("UPDATE sources SET condensed_key = ?, condensed = ? WHERE id = ?").run(key, notes, sourceId);
 }
 
 /** Pictures uploaded as sources whose content nobody has read yet. OneDrive pictures are slide pictures and are left out. */

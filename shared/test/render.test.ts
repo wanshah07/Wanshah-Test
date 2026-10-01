@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { verdictTone, isVersusPair, isStepList, pieShares, DEFAULT_THEME_ID, renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS, sanitizeSlide, sanitizeTheme, themeGuide, ringPercent, mapTiles, mapTone, stepRate, glowOf, particles, fontsUrl, SLIDE_CSS } from "../src/index.js";
+import { THEME_PRESETS, verdictTone, isVersusPair, isStepList, pieShares, DEFAULT_THEME_ID, renderSlideHtml, renderDeckHtml, chartSvg, diagramSvg, themePreset, blankSlide, normaliseSlide, LAYOUTS, sanitizeSlide, sanitizeTheme, themeGuide, ringPercent, mapTiles, mapTone, stepRate, glowOf, particles, fontsUrl, SLIDE_CSS } from "../src/index.js";
 import type { Deck, Slide } from "../src/index.js";
 
 const theme = themePreset("facerinna");
@@ -298,8 +298,8 @@ describe("the house design system", () => {
 
 describe("the briefing design", () => {
   const b = themePreset("briefing");
-  it("is the default for a new deck, with the navy serif palette", () => {
-    expect(DEFAULT_THEME_ID).toBe("briefing");
+  it("keeps the navy serif palette", () => {
+    expect(DEFAULT_THEME_ID).toBe("studio-green");
     expect(b).toMatchObject({ id: "briefing", fontDisplay: "Cambria", fontBody: "Calibri", slideStyle: "briefing", darkTitle: true });
     expect(b.colors).toMatchObject({ brandDeep: "#0B2D63", surface: "#EAF1FB", accent: "#E8174B" });
     expect(sanitizeTheme(b).slideStyle).toBe("briefing");
@@ -383,6 +383,20 @@ describe("Studio outputs and model lists", () => {
 });
 
 describe("bugs found in the review of 1 Oct 2026", () => {
+  it("draws every layout in each studio preset, with the section number and the dark-canvas mark", () => {
+    const studio = THEME_PRESETS.filter((t) => t.slideStyle === "studio");
+    expect(studio.map((t) => t.id)).toEqual(["studio-green", "graphite-teal", "warm-minimal", "sage-editorial", "navy-coral"]);
+    for (const t of studio) {
+      for (const layout of LAYOUTS) {
+        const html = renderSlideHtml(blankSlide(layout, "en"), t, { ...ctx, index: 4 });
+        expect(html).toContain("sc-style-studio");
+        expect(html).toContain('data-no="05"');
+        expect(html.includes("sc-dark-canvas")).toBe(t.id === "graphite-teal");
+      }
+    }
+    expect(sanitizeTheme({ ...studio[0], slideStyle: "studio" }).slideStyle).toBe("studio");
+  });
+
   it("reads a quiz answer given as a letter", async () => {
     const { sanitizeOutputData } = await import("../src/index.js");
     const q = sanitizeOutputData("quiz", { questions: [{ question: "Q", options: ["x", "y", "z"], answer: "B", explanation: "e" }, { question: "Q2", options: ["x", "y", "z"], answer: "c)", explanation: "e" }] }) as { questions: { answer: number }[] };

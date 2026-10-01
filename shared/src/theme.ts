@@ -268,7 +268,76 @@ export const THEME_PRESETS: Theme[] = [
     darkTitle: true,
     kpiStyle: "tiles",
   },
+  // The studio look, from the presentation references Wan collected (1 Oct 2026): a bright canvas with one
+  // confident accent, a soft accent disc in the corner, big bold headlines, oversized figures, cards without
+  // borders, and a cover whose right third is a block of the brand colour. Five colourways, one style.
+  {
+    id: "studio-green",
+    name: "Studio Green",
+    fontDisplay: "Plus Jakarta Sans",
+    fontBody: "Inter",
+    radius: 28,
+    slideNumbers: true,
+    colors: { bg: "#FFFFFF", surface: "#F3F6F1", ink: "#1B2621", ink2: "#4A5A52", muted: "#7A8A82", line: "#DDE5DA", brand: "#68963E", brandDeep: "#387042", accent: "#E1A130", gold: "#C2A14D" },
+    series: ["#387042", "#68963E", "#E1A130", "#1A3657", "#A6C8CC", "#B4C5A1"],
+    slideStyle: "studio",
+    kpiStyle: "tiles",
+  },
+  {
+    id: "graphite-teal",
+    name: "Graphite Tech",
+    fontDisplay: "Outfit",
+    fontBody: "Inter",
+    radius: 24,
+    slideNumbers: true,
+    colors: { bg: "#0A1923", surface: "#142631", ink: "#E6EEF1", ink2: "#BFD0D6", muted: "#80ADB1", line: "#204555", brand: "#278796", brandDeep: "#0F3A47", accent: "#E1A130", gold: "#E1A130" },
+    series: ["#41B8C6", "#278796", "#E1A130", "#80ADB1", "#E0E2E1", "#B8336A"],
+    slideStyle: "studio",
+    darkTitle: true,
+    kpiStyle: "tiles",
+  },
+  {
+    id: "warm-minimal",
+    name: "Warm Minimal",
+    fontDisplay: "Manrope",
+    fontBody: "Inter",
+    radius: 32,
+    slideNumbers: true,
+    colors: { bg: "#F6F5EF", surface: "#FFFFFF", ink: "#2B2B2B", ink2: "#5B5752", muted: "#8A8580", line: "#E6E0D5", brand: "#33B7BA", brandDeep: "#2A7F82", accent: "#E9AF8A", gold: "#D9822B" },
+    series: ["#33B7BA", "#E9AF8A", "#2A7F82", "#D9822B", "#A6C8CC", "#8A8580"],
+    slideStyle: "studio",
+    kpiStyle: "rings",
+  },
+  {
+    id: "sage-editorial",
+    name: "Sage Editorial",
+    fontDisplay: "Fraunces",
+    fontBody: "Inter",
+    fontQuote: "Fraunces",
+    radius: 20,
+    slideNumbers: true,
+    colors: { bg: "#ECE9E7", surface: "#E4DECC", ink: "#2F3A2E", ink2: "#55604F", muted: "#7E8878", line: "#CDC8B9", brand: "#8C9983", brandDeep: "#5E6B56", accent: "#BAAC95", gold: "#A3865A" },
+    series: ["#5E6B56", "#8C9983", "#BAAC95", "#A3865A", "#2F3A2E", "#CDC8B9"],
+    slideStyle: "studio",
+    darkTitle: true,
+    kpiStyle: "tiles",
+  },
+  {
+    id: "navy-coral",
+    name: "Navy Coral",
+    fontDisplay: "Plus Jakarta Sans",
+    fontBody: "Inter",
+    radius: 28,
+    slideNumbers: true,
+    colors: { bg: "#FFFFFF", surface: "#F3F5F7", ink: "#1A3657", ink2: "#44546A", muted: "#7A8798", line: "#E0E5EB", brand: "#1A3657", brandDeep: "#102540", accent: "#EFB091", gold: "#D9822B" },
+    series: ["#1A3657", "#EFB091", "#A6C4C8", "#D9822B", "#4A6FA5", "#7A8798"],
+    slideStyle: "studio",
+    kpiStyle: "tiles",
+  },
 ];
+
+const STUDIO_GUIDE =
+  "A modern template deck: one idea per slide, stated in a short bold title (under eight words), with the slide filled by one large visual. Open on a cover whose kpi row carries 3 hero figures. Use kpi tiles for headline numbers, cards of 3 or 4 for pillars, a flow for a process, a timeline for dates, a bar chart with the key category highlighted for rankings, a doughnut for shares, a table with verdict cells for comparisons, a gallery when pictures are provided. Keep bullets to 3 or 4 short lines and prefer a card or a tile to a bullet. Put a one-line callout on the slides whose point must be repeated. Use a section slide to open each part. Close with 3 or 4 takeaway chips.";
 
 /**
  * How each built-in design is used, for the writer: which devices it leans on
@@ -276,6 +345,11 @@ export const THEME_PRESETS: Theme[] = [
  * ring gauges) is applied by the renderer, so those never depend on the writer.
  */
 export const THEME_GUIDES: Record<string, string> = {
+  "studio-green": STUDIO_GUIDE,
+  "graphite-teal": STUDIO_GUIDE,
+  "warm-minimal": STUDIO_GUIDE,
+  "sage-editorial": STUDIO_GUIDE,
+  "navy-coral": STUDIO_GUIDE,
   briefing:
     "Data briefing for an internal team or a client. Navy cover with the headline figures as a hero row (kpi on the title slide). Every content slide's title states the finding and carries its number ('Two ingredients took 91% of the segment'). Fill the slide with one dominant visual: a funnel for how the numbers were reduced, number tiles for who took part, a doughnut for shares, a highlighted bar chart for a ranking, a table with verdict cells for the detail, numbered cards for what was learned. Pair a chart or table with one aside that tells the reader how to read it, and a navy callout for the line to repeat. Every slide that shows a number carries its source line. Include a two-column slide of what the data can and cannot tell us, and a Say / Don't say two-column when the figures will be quoted. Close on navy with 3 to 5 numbered next steps.",
   house:
@@ -294,8 +368,8 @@ export function themeGuide(id: string | undefined): string | undefined {
   return id ? THEME_GUIDES[id] : undefined;
 }
 
-/** The design a new deck starts in when the person has not chosen a default. */
-export const DEFAULT_THEME_ID = "briefing";
+/** The design a new deck starts in when the person has not chosen a default: the studio look, since 1 Oct 2026. */
+export const DEFAULT_THEME_ID = "studio-green";
 
 export function themePreset(id: string): Theme {
   const t = THEME_PRESETS.find((p) => p.id === id) ?? THEME_PRESETS[0];
@@ -437,7 +511,7 @@ export const FONT_CHOICES = [
 const cleanText = (s: string) => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, " ").trim();
 
 const COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const STYLES = ["clean", "panel", "gradient", "bloom", "briefing"];
+const STYLES = ["clean", "panel", "gradient", "bloom", "briefing", "studio"];
 
 /**
  * A theme safe to write into a style attribute, a class and a PPTX colour:

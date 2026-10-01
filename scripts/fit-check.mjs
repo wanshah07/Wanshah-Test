@@ -106,6 +106,10 @@ const render = async (s) => {
     return { ...r, bad };
   });
 };
+// The studio style has its own cover block, section number and tile sizes: every heavy slide again in it.
+for (const s of heavy.slice()) heavy.push({ ...s, id: `${s.id}-studio`, _theme: "studio-green" });
+heavy.push({ id: "cl-studio", layout: "closing", title: long(14), subtitle: long(20), bullets: Array.from({ length: 6 }, () => long(16)), _theme: "graphite-teal" });
+heavy.push({ id: "t-dark-studio", layout: "title", title: long(24), subtitle: long(30), kpi: Array.from({ length: 4 }, () => ({ value: "RM 1,250,000", label: long(10) })), _theme: "graphite-teal" });
 for (const s of heavy) {
   const r = await render(s);
   if (out) await page.screenshot({ path: path.join(out, `fit-${s.layout}-${s.id}.png`) });

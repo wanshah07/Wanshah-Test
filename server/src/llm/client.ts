@@ -379,6 +379,37 @@ export async function chatText(auth: LlmAuth, system: string, user: string | Con
   return choice?.message.content ?? "";
 }
 
+/**
+ * Runs `fn` over `items`, at most `cap` at a time, answers in the items' order. After the first
+ * failure no further item is started and that error is thrown: the others stop taking work rather
+ * than spend calls on a dead job. Items already in flight finish on their own.
+ */
+export async function mapPool<T, R>(items: T[], cap: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  let failed: unknown = null;
+  let hasFailed = false;
+  const workers = Array.from({ length: Math.max(1, Math.min(cap, items.length)) }, async () => {
+    while (next < items.length && !hasFailed) {
+      const i = next++;
+      try {
+        out[i] = await fn(items[i], i);
+      } catch (e) {
+        if (!hasFailed) {
+          hasFailed = true;
+          failed = e;
+        }
+        throw e;
+      }
+    }
+  });
+  const settled = await Promise.allSettled(workers);
+  if (hasFailed) throw failed;
+  const rejected = settled.find((s) => s.status === "rejected") as PromiseRejectedResult | undefined;
+  if (rejected) throw rejected.reason;
+  return out;
+}
+
 /** Returns PNG bytes. */
 export async function generateImage(auth: LlmAuth, prompt: string, size = "1536x1024"): Promise<Buffer> {
   const body: Record<string, unknown> = { model: auth.imageModel, prompt, n: 1, size };
