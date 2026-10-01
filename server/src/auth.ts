@@ -79,7 +79,9 @@ function userFromSession(request: FastifyRequest): User | null {
 /** Registers the auth hook. Public paths: the login endpoints and static files. */
 export function registerAuth(app: FastifyInstance): void {
   app.addHook("onRequest", async (request, reply) => {
-    const url = request.url.split("?")[0];
+    // The matched route pattern, never the raw URL: the router decodes percent-escapes before matching, so
+    // "/%61pi/decks" reaches the real handler while the raw URL does not start with "/api/".
+    const url = request.routeOptions?.url ?? request.url.split("?")[0];
     if (!url.startsWith("/api/")) return;
     if (url === "/api/auth/login" || url === "/api/auth/mode" || url === "/api/health") return;
     if (config.authMode === "off") {

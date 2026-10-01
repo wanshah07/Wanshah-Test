@@ -20,6 +20,7 @@ export interface JobRow {
   progress: { status?: string; progress?: string[] } | null;
   result: { status: number; body?: unknown; file?: { bucket: string; path: string; name: string; type: string; bytes: number }; work?: { id: string; kind: string; status: string; error: string | null; result: unknown } } | null;
   error: string | null;
+  created_at?: string;
 }
 
 export async function queueJob(req: JobRequest, kind: string, deckId: string | null): Promise<string> {
@@ -29,7 +30,7 @@ export async function queueJob(req: JobRequest, kind: string, deckId: string | n
 }
 
 export async function readJob(id: string): Promise<JobRow | null> {
-  const { data } = await sb().from("sc_jobs").select("id, deck_id, kind, status, progress, result, error").eq("id", id).maybeSingle();
+  const { data } = await sb().from("sc_jobs").select("id, deck_id, kind, status, progress, result, error, created_at").eq("id", id).maybeSingle();
   return (data as JobRow | null) ?? null;
 }
 

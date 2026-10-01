@@ -327,7 +327,7 @@ await new Promise((r) => sb.listen(SB_PORT, "127.0.0.1", r));
 await new Promise((r) => web.listen(WEB_PORT, "127.0.0.1", r));
 const APP = `http://127.0.0.1:${WEB_PORT}${BASE}`;
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ["--enable-blink-features=ProgrammaticScrollPromise"] });
 try {
   const ctx = await browser.newContext({ acceptDownloads: true });
   const page = await ctx.newPage();

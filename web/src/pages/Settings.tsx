@@ -151,10 +151,15 @@ export default function Settings() {
       const p = await api.oneDriveLogin();
       setOd((o) => (o ? { ...o, pending: p } : o));
       const poll = async () => {
-        const r = await api.oneDrivePoll();
-        if (r.state === "waiting") return void setTimeout(poll, Math.max(2, p.interval) * 1000);
-        if (r.state === "connected") toast(`OneDrive connected${r.account ? `: ${r.account}` : ""}`);
-        else setOdMsg(r.message || "Sign-in did not finish");
+        try {
+          const r = await api.oneDrivePoll();
+          if (r.state === "waiting") return void setTimeout(poll, Math.max(2, p.interval) * 1000);
+          if (r.state === "connected") toast(`OneDrive connected${r.account ? `: ${r.account}` : ""}`);
+          else setOdMsg(r.message || "Sign-in did not finish");
+        } catch (e) {
+          // A dropped poll must not leave Connect disabled for good: say so and let the button work again.
+          setOdMsg((e as Error).message);
+        }
         loadOd();
       };
       setTimeout(poll, Math.max(2, p.interval) * 1000);

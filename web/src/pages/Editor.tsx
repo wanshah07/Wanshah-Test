@@ -251,10 +251,8 @@ export default function Editor() {
     }
   };
   const rewrite = async (instruction: string) => {
-    if (saveTimer.current) {
-      window.clearTimeout(saveTimer.current);
-      await flush();
-    }
+    // The writer loads the deck from the store, so the edit must be there first, including one still saving.
+    await flushNow();
     try {
       const r = await api.rewrite(deck.id, slide.id, instruction);
       replaceSlide(r.slide);

@@ -129,6 +129,22 @@ describe("slow model calls never overwrite what was saved meanwhile", () => {
     expect(J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck.slides[0]).toMatchObject({ title: "One", bullets: ["a"] });
   });
 
+  it("keeps the deck's own title when the writer's title is not text, and still exports", async () => {
+    const id = await deckWithSlides();
+    gw.reply = { title: 2026, subtitle: { en: "T" }, slides: [JSON.parse(slideJson("Written"))] };
+    const r = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "x", slides: 1 } }));
+    for (let i = 0; i < 200; i++) {
+      const j = J(await app.inject({ method: "GET", url: `/api/jobs/${r.jobId}` }));
+      if (j.status === "done" || j.status === "failed") break;
+      await new Promise((res) => setTimeout(res, 50));
+    }
+    gw.reply = null;
+    const d = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
+    expect(d.title).toBe("race");
+    expect(d.subtitle).toBeUndefined();
+    expect((await app.inject({ method: "GET", url: `/api/decks/${id}/export.html` })).statusCode).toBe(200);
+  });
+
   it("reopens a signed-off slide for sign-off when it is rewritten", async () => {
     const id = await deckWithSlides();
     await app.inject({ method: "POST", url: `/api/decks/${id}/slides/s1/ok`, payload: { ok: true } });

@@ -118,11 +118,15 @@ function barSvgHorizontal(chart: ChartSpec, colors: ThemeColors, pal: string[], 
   const max = niceMax(Math.max(...all, 0));
   const minRaw = Math.min(...all, 0);
   const min = minRaw < 0 ? -niceMax(-minRaw) : 0;
+  const sCount = chart.series.length;
+  const label = (v: number) => `${fmt(v)}${chart.unit && sCount === 1 ? " " + chart.unit : ""}`;
+  // A negative bar's number sits to its left: room is kept for it, or it would print over the category names.
+  const negRoom = all.some((v) => v < 0) ? Math.min(iw * 0.35, Math.max(...all.filter((v) => v < 0).map((v) => label(v).length)) * 17 + 18) : 0;
+  const plotL = padL + negRoom, pw = iw - negRoom;
   // Bars grow from zero, to the right for a positive value and to the left for a negative one.
-  const xOf = (v: number) => padL + ((v - min) / (max - min)) * iw;
+  const xOf = (v: number) => plotL + ((v - min) / (max - min)) * pw;
   const n = chart.categories.length || 1;
   const slot = ih / n;
-  const sCount = chart.series.length;
   const groupH = slot * 0.7;
   const bh = groupH / sCount;
   const bars = barColours(chart, colors, pal);
@@ -138,7 +142,7 @@ function barSvgHorizontal(chart: ChartSpec, colors: ThemeColors, pal: string[], 
       const x0 = xOf(0), x1 = xOf(v);
       const left = Math.min(x0, x1), w = Math.abs(x1 - x0);
       g += `<rect x="${left}" y="${y + 2}" width="${w}" height="${bh - 4}" rx="6" fill="${bars ? bars[i] : pal[si % pal.length]}"/>`;
-      g += `<text x="${v < 0 ? left - 14 : left + w + 14}" y="${y + bh / 2 + 8}"${v < 0 ? ` text-anchor="end"` : ""} font-family="${font}" font-size="28" fill="${colors.ink}">${fmt(v)}${chart.unit && sCount === 1 ? " " + esc(chart.unit) : ""}</text>`;
+      g += `<text x="${v < 0 ? left - 14 : left + w + 14}" y="${y + bh / 2 + 8}"${v < 0 ? ` text-anchor="end"` : ""} font-family="${font}" font-size="28" fill="${colors.ink}">${esc(label(v))}</text>`;
     });
   });
   g += legend(chart, pal, colors, padL, H - 14, font);

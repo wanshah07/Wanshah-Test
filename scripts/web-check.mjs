@@ -15,7 +15,7 @@ try {
   const d = (await j(await fetch(base + `/api/decks/${id}`))).deck;
   d.slides = [{ id: "s1", layout: "bullets", title: "Bullets", bullets: ["one"] }, { id: "s2", layout: "chart", title: "Chart", chart: { kind: "column", categories: ["a", "b"], series: [{ name: "s", values: [1, 2] }] } }, { id: "s3", layout: "title", title: "Third" }];
   await fetch(base + `/api/decks/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(d) });
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ["--enable-blink-features=ProgrammaticScrollPromise"] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = []; page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${base}/deck/${id}`);

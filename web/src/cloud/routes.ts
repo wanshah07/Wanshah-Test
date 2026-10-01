@@ -199,10 +199,18 @@ function answer(j: JobRow): unknown {
   return file ? { file } : body;
 }
 
+const PENDING_LIMIT_MS = 20 * 60_000;
+
 /** The job as the page's Job type describes it, however far the worker has got. */
 function asPageJob(j: JobRow) {
   const base = { id: j.id, deckId: j.deck_id ?? "" };
-  if (j.status === "pending") return { ...base, status: "queued", progress: ["Waiting for the worker to start (usually under a minute)"], error: null, result: null };
+  if (j.status === "pending") {
+    // The worker is woken at once and polls every 15 minutes besides; a job still untaken after that is not
+    // going to start, and a spinner that never ends is worse than saying so.
+    const waited = j.created_at ? Date.now() - Date.parse(j.created_at) : 0;
+    if (waited > PENDING_LIMIT_MS) return { ...base, status: "failed", progress: [], error: "The worker did not start within 20 minutes. Check that the Worker workflow is enabled on GitHub and try again; if it does start later, this job will still finish and the page will show it after a reload.", result: null };
+    return { ...base, status: "queued", progress: ["Waiting for the worker to start (usually under a minute)"], error: null, result: null };
+  }
   if (j.status === "error") return { ...base, status: "failed", progress: j.progress?.progress ?? [], error: j.error, result: null };
   const w = j.result?.work;
   if (j.status === "done" && w) return { ...base, status: w.status === "done" ? "done" : "failed", progress: j.progress?.progress ?? [], error: w.error, result: w.result };
@@ -333,10 +341,13 @@ const routes: [string, RegExp, Handler][] = [
     "PUT",
     /^\/api\/decks\/([^/]+)$/,
     async (p, body) => {
-      const cur = await loadDeck(p[1]);
+      // The row alone: an autosave runs every second while typing, and loading the full deck would read every
+      // source's text and sign every picture each time, for a result nothing uses.
+      const row = await deckRow(p[1]);
+      const cur = (row.doc ?? {}) as Deck;
       if (!validDeck(body) || body.id !== p[1]) throw new ApiError("invalid_deck", 400, "invalid_deck");
       // Sources, the OneDrive link, the stored brief and the guide belong to the worker's side, as on the server.
-      const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief, guide: cur.guide };
+      const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: String(row.created_at ?? cur.createdAt ?? new Date().toISOString()), sources: [], onedrive: cur.onedrive, brief: cur.brief, guide: cur.guide };
       if (!next.onedrive) delete next.onedrive;
       if (!next.brief) delete next.brief;
       if (!next.guide) delete next.guide;
@@ -640,7 +651,7 @@ const routes: [string, RegExp, Handler][] = [
       if (!cur) throw notFound();
       const name = b?.name?.trim() || cur.name;
       const theme = sanitizeTheme({ ...(b?.theme ?? cur.theme), id: `design:${p[1]}`, name });
-      const r = check(await sb().from("sc_designs").update({ name, notes: b?.notes ?? cur.notes, theme }).eq("id", p[1]).select("*").single());
+      const r = check(await sb().from("sc_designs").update({ name, notes: b?.notes !== undefined ? String(b.notes).slice(0, 4000) : cur.notes, theme }).eq("id", p[1]).select("*").single());
       return toDesign(r as unknown as Row);
     },
   ],
@@ -703,7 +714,7 @@ async function savePrompt(id: string | undefined, b: Row) {
   if (!name || !text) throw new ApiError("A prompt needs a name and some text.", 400, "invalid");
   if (id) {
     const r = check(await sb().from("sc_prompts").update({ name, text, is_default: !!b.isDefault }).eq("id", id).select("id")) as Row[];
-    if (!r.length) throw new ApiError("A prompt needs a name and some text.", 400, "invalid");
+    if (!r.length) throw notFound();
   } else {
     id = uid("p");
     check(await sb().from("sc_prompts").insert({ id, user_id: await userId(), name, text, is_default: !!b.isDefault }));

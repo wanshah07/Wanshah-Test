@@ -1,7 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { angleById, DEFAULT_THEME_ID, LAYOUTS, newId, sanitizeSlide, sanitizeTheme, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
+import fs from "node:fs";
+import path from "node:path";
+import { angleById, deckMediaIds, DEFAULT_THEME_ID, LAYOUTS, newId, sanitizeSlide, sanitizeTheme, scanDeck, themePreset, type Deck, type Slide } from "@slidecraft/shared";
+import { config } from "../config.js";
 import { getDb, now } from "../db.js";
-import { loadDeck, saveDeck } from "../store.js";
+import { deleteMedia, getMedia, loadDeck, saveDeck } from "../store.js";
 import { newDeck } from "../llm/generate.js";
 import { readSettings } from "../settings.js";
 import { getDesign } from "../library.js";
@@ -63,8 +66,34 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete("/api/decks/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const r = getDb().prepare("DELETE FROM decks WHERE id = ? AND user_id = ?").run(id, req.user.id);
-    if (!r.changes) return reply.code(404).send({ error: "not_found" });
+    const db = getDb();
+    const gone = loadDeck(req.user.id, id);
+    if (!gone) return reply.code(404).send({ error: "not_found" });
+    // Its own pictures, and the ones it shows that came from a deck already deleted (a duplicate keeps its
+    // original's pictures alive, and takes them along once it is the last deck showing them).
+    const own = (db.prepare("SELECT id FROM media WHERE deck_id = ? AND user_id = ?").all(id, req.user.id) as { id: string }[]).map((m) => m.id);
+    db.prepare("DELETE FROM decks WHERE id = ? AND user_id = ?").run(id, req.user.id);
+    const rest = db.prepare("SELECT id, doc FROM decks WHERE user_id = ?").all(req.user.id) as { id: string; doc: string }[];
+    const alive = new Set(rest.map((d) => d.id));
+    const used = new Set(rest.flatMap((d) => {
+      try {
+        return deckMediaIds(JSON.parse(d.doc));
+      } catch {
+        return [];
+      }
+    }));
+    for (const mid of new Set([...own, ...deckMediaIds(gone)])) {
+      if (used.has(mid)) continue;
+      const m = getMedia(req.user.id, mid);
+      // A library picture (no deck) is kept for the next deck; one owned by a living deck is that deck's.
+      if (!m || !m.deck_id || alive.has(m.deck_id)) continue;
+      deleteMedia(req.user.id, mid);
+    }
+    try {
+      fs.unlinkSync(path.join(config.dataDir, "writer-replies", `${id}.json`));
+    } catch {
+      /* none kept */
+    }
     return { ok: true };
   });
 
