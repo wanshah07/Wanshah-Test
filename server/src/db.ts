@@ -141,6 +141,8 @@ function migrate(d: DatabaseSync): void {
   const srcCols = (d.prepare("PRAGMA table_info(sources)").all() as { name: string }[]).map((c) => c.name);
   // A picture pulled from OneDrive keeps the item id and version, so a second pull skips what has not changed.
   for (const c of ["remote_id", "remote_etag"]) if (!srcCols.includes(c)) d.exec(`ALTER TABLE sources ADD COLUMN ${c} TEXT`);
+  // The notes a condensing run made of a long source, keyed by the text and the instruction they were made under.
+  for (const c of ["condensed_key", "condensed"]) if (!srcCols.includes(c)) d.exec(`ALTER TABLE sources ADD COLUMN ${c} TEXT`);
 }
 
 export function now(): string {

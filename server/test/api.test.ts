@@ -63,7 +63,7 @@ describe("api", () => {
     expect(r.statusCode).toBe(200);
     deckId = r.json().id;
     // New decks use the briefing design unless the user chose another default.
-    expect(r.json().theme.id).toBe("briefing");
+    expect(r.json().theme.id).toBe("studio-green");
     expect(r.json().angle).toBe("training");
   });
 

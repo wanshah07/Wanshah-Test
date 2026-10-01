@@ -259,6 +259,83 @@ const RAW_CSS = `
   font-family:var(--font-quote),Georgia,serif;font-style:italic;font-weight:400;font-size:36px;text-align:center;padding:18px 56px}
 .sc-slide.sc-style-bloom .sc-cite{font-style:italic}
 .sc-slide.sc-style-bloom.sc-dark .sc-hero .hs{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
+/* studio: a bright canvas with one accent. A soft brand disc in the top-right corner, a short accent bar over a
+   big bold title, cards and tiles without borders on soft shadows, a brand table header, pill callouts, a section
+   slide carrying its number in giant faint type, and a cover whose right third is a block of the brand colour
+   holding the hero figures. On a dark colourway (ink light) the same shapes read at a stronger tint. */
+.sc-slide.sc-style-studio{background:var(--bg)}
+.sc-slide.sc-style-studio::before{content:"";position:absolute;right:-450px;top:-450px;width:900px;height:900px;border-radius:50%;
+  background:color-mix(in srgb,var(--brand) 8%,transparent);pointer-events:none}
+.sc-slide.sc-style-studio.sc-dark-canvas::before{background:color-mix(in srgb,var(--brand) 14%,transparent)}
+.sc-slide.sc-style-studio .sc-body{inset:88px 120px 120px 120px;gap:30px}
+.sc-slide.sc-style-studio .sc-h,.sc-slide.sc-style-studio .sc-card .hd,.sc-slide.sc-style-studio .sc-kpi .v,.sc-slide.sc-style-studio .sc-hero .v,.sc-slide.sc-style-studio .sc-ring .v{font-family:var(--font-display),Inter,system-ui,sans-serif}
+.sc-slide.sc-style-studio .sc-h{font-weight:800;font-size:72px;letter-spacing:-.02em;line-height:1.08}
+.sc-slide.sc-style-studio .sc-h::before{content:"";display:block;width:160px;height:12px;border-radius:6px;background:var(--brand);margin-bottom:28px}
+.sc-slide.sc-style-studio .sc-h .sc-kicker{color:var(--brand);font-weight:700;letter-spacing:.18em;font-size:22px;margin-bottom:18px}
+.sc-slide.sc-style-studio .sc-rule{display:none}
+.sc-slide.sc-style-studio .sc-dek{color:var(--ink2);font-size:30px}
+.sc-slide.sc-style-studio .sc-card,.sc-slide.sc-style-studio .sc-kpi,.sc-slide.sc-style-studio .sc-step,.sc-slide.sc-style-studio .sc-col:not(.sc-vcol),
+.sc-slide.sc-style-studio .sc-eq .term:not(.res),.sc-slide.sc-style-studio .sc-hub .node,.sc-slide.sc-style-studio .sc-facts,.sc-slide.sc-style-studio .sc-aside,
+.sc-slide.sc-style-studio .sc-hero .hs{background:var(--surface);border:0;box-shadow:0 12px 36px rgba(0,0,0,.06)}
+.sc-slide.sc-style-studio .sc-card{border-top:0;padding:calc(36px * var(--k, 1)) calc(38px * var(--k, 1))}
+.sc-slide.sc-style-studio .sc-card .no{background:var(--cc,var(--brand));width:calc(56px * var(--k, 1));height:calc(56px * var(--k, 1))}
+.sc-slide.sc-style-studio .sc-card .hd{font-weight:800;font-size:36px;letter-spacing:-.01em}
+.sc-slide.sc-style-studio .sc-kpi{text-align:left;padding:44px 44px}
+.sc-slide.sc-style-studio .sc-kpi .v{color:var(--kc,var(--brand));font-size:132px;font-weight:800;letter-spacing:-.03em}
+.sc-slide.sc-style-studio .sc-kpi .l{font-size:30px;font-weight:700}
+.sc-slide.sc-style-studio .sc-ring .v{color:var(--brand);font-weight:800}
+.sc-slide.sc-style-studio table.sc-table{border:0;background:var(--bg);box-shadow:0 12px 36px rgba(0,0,0,.06)}
+.sc-slide.sc-style-studio table.sc-table th{background:var(--brand);color:#fff;font-weight:700;letter-spacing:.04em}
+.sc-slide.sc-style-studio table.sc-table td{border-top:0}
+.sc-slide.sc-style-studio table.sc-table tbody tr:nth-child(even) td{background:var(--surface)}
+.sc-slide.sc-style-studio table.sc-table td:first-child{font-weight:700}
+.sc-slide.sc-style-studio table.sc-matrix th.rh{background:var(--surface);color:var(--ink)}
+.sc-slide.sc-style-studio .sc-facts .fl{background:var(--brand);color:#fff}
+.sc-slide.sc-style-studio .sc-aside{border-left:0}
+.sc-slide.sc-style-studio .sc-aside h4{color:var(--brand)}
+.sc-slide.sc-style-studio .sc-callout{background:var(--brand);border-radius:999px;padding:22px 48px;font-weight:700;text-align:center}
+.sc-slide.sc-style-studio .sc-step{border:0}
+.sc-slide.sc-style-studio .sc-step.a-right::after{border-left-color:var(--brand)}
+.sc-slide.sc-style-studio .sc-step.a-down::after{border-top-color:var(--brand)}
+.sc-slide.sc-style-studio .sc-fig img{border-radius:calc(var(--radius) * 1.2);box-shadow:0 18px 50px rgba(0,0,0,.12)}
+.sc-slide.sc-style-studio .sc-gallery .ph{border:0;box-shadow:0 12px 36px rgba(0,0,0,.08)}
+.sc-slide.sc-style-studio .sc-hero .v{color:var(--brand)}
+/* section: the whole slide in the deep brand colour, its number in giant faint type */
+.sc-slide.sc-style-studio.sc-section{background:var(--brand-deep)}
+.sc-slide.sc-style-studio.sc-section::before{display:none}
+.sc-slide.sc-style-studio.sc-section::after{content:attr(data-no);position:absolute;right:80px;bottom:-60px;font-family:var(--font-display);font-weight:800;
+  font-size:calc(440px * var(--k, 1));line-height:1;color:rgba(255,255,255,.10);letter-spacing:-.05em;pointer-events:none}
+.sc-slide.sc-style-studio.sc-section .sc-h{color:#fff;font-size:96px}
+.sc-slide.sc-style-studio.sc-section .sc-h::before{background:rgba(255,255,255,.7)}
+.sc-slide.sc-style-studio.sc-section .sc-h .sc-kicker{color:rgba(255,255,255,.72)}
+.sc-slide.sc-style-studio.sc-section .sc-sub{color:rgba(255,255,255,.88)}
+/* cover and close: the headline on the left two thirds, a brand block on the right third holding the figures */
+.sc-slide.sc-style-studio.sc-title::after,.sc-slide.sc-style-studio.sc-closing::after{content:"";position:absolute;left:1280px;top:0;right:0;bottom:0;width:auto;height:auto;border-radius:64px 0 0 64px;
+  background:var(--brand);pointer-events:none}
+.sc-slide.sc-style-studio.sc-title::before,.sc-slide.sc-style-studio.sc-closing::before{display:none}
+.sc-slide.sc-style-studio.sc-title .sc-body,.sc-slide.sc-style-studio.sc-closing .sc-body{padding:140px 720px 140px 140px;inset:0;gap:36px;position:absolute;z-index:1}
+.sc-slide.sc-style-studio.sc-title .sc-h,.sc-slide.sc-style-studio.sc-closing .sc-h{font-size:100px;line-height:1.04;max-width:none;letter-spacing:-.03em}
+.sc-slide.sc-style-studio .sc-h{overflow-wrap:normal;hyphens:none}
+.sc-slide.sc-style-studio.sc-title .sc-h .l2,.sc-slide.sc-style-studio.sc-closing .sc-h .l2{color:var(--brand)}
+.sc-slide.sc-style-studio.sc-title .sc-sub,.sc-slide.sc-style-studio.sc-closing .sc-sub{font-size:36px;max-width:none}
+.sc-slide.sc-style-studio.sc-title .sc-hero{position:absolute;left:1360px;right:120px;top:140px;bottom:140px;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:56px;max-width:none}
+.sc-slide.sc-style-studio.sc-title .sc-hero .hs{background:transparent;border:0;box-shadow:none;padding:0}
+.sc-slide.sc-style-studio.sc-title .sc-hero .v{color:#fff;font-size:88px;font-weight:800;letter-spacing:-.03em}
+.sc-slide.sc-style-studio.sc-title .sc-hero .l{color:rgba(255,255,255,.85);font-size:26px;font-weight:600}
+.sc-slide.sc-dark-canvas .sc-badge.v-plain{background:rgba(255,255,255,.14);color:#fff}
+.sc-slide.sc-style-studio.sc-closing:not(:has(.sc-chips))::after{display:none}
+.sc-slide.sc-style-studio.sc-closing:not(:has(.sc-chips)) .sc-body{padding-right:240px}
+.sc-slide.sc-style-studio.sc-closing:not(:has(.sc-chips)) .sc-foot{color:var(--muted)}
+.sc-slide.sc-style-studio.sc-closing:not(:has(.sc-chips)) .sc-num{color:var(--ink2)}
+.sc-slide.sc-style-studio.sc-closing .sc-chips span{background:var(--surface);border:0;color:var(--ink);font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.sc-slide.sc-style-studio.sc-closing ol.sc-next .no{background:var(--brand)}
+.sc-slide.sc-style-studio.sc-dark{background:var(--brand-deep)}
+.sc-slide.sc-style-studio.sc-dark .sc-h .l2{color:var(--glow)}
+.sc-slide.sc-style-studio.sc-dark .sc-sub{color:rgba(255,255,255,.88)}
+.sc-slide.sc-style-studio.sc-dark.sc-closing .sc-chips span{background:rgba(255,255,255,.14);color:#fff}
+.sc-slide.sc-style-studio.sc-title .sc-cite,.sc-slide.sc-style-studio.sc-title .sc-foot,.sc-slide.sc-style-studio.sc-closing .sc-foot{z-index:1}
+.sc-slide.sc-style-studio.sc-title .sc-foot,.sc-slide.sc-style-studio.sc-closing .sc-foot{color:rgba(255,255,255,.8)}
+.sc-slide.sc-style-studio.sc-title .sc-num,.sc-slide.sc-style-studio.sc-closing .sc-num{color:#fff}
 /* takeaways on the closing slide */
 .sc-slide .sc-chips{display:flex;flex-wrap:wrap;gap:20px;max-width:1600px}
 .sc-slide .sc-chips span{padding:16px 30px;border-radius:999px;font-size:26px;font-weight:600;background:color-mix(in srgb,var(--brand) 10%,var(--surface));color:var(--ink);border:2px solid var(--line)}

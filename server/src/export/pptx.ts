@@ -37,6 +37,31 @@ function fontOk(name: string): string {
   return /^(system-ui|ui-sans-serif)$/i.test(name) ? "Calibri" : name;
 }
 
+// The studio style is compared as a string so this file does not depend on the style union
+// in the shared package carrying it yet.
+function isStudio(t: Theme): boolean {
+  return String(t.slideStyle) === "studio";
+}
+
+/** Whether a colour reads as dark, for the studio presets whose canvas is near black. */
+function isDark(c: string): boolean {
+  const h = hex(c);
+  const ch = (i: number) => parseInt(h.slice(i, i + 2), 16);
+  return 0.299 * ch(0) + 0.587 * ch(2) + 0.114 * ch(4) < 128;
+}
+
+/** A line pptxgenjs writes but PowerPoint never draws: the shape has no border. */
+function noLine(colour: string): { color: string; transparency: number } {
+  return { color: hex(colour), transparency: 100 };
+}
+
+/** The studio style's soft accent disc, a quarter of it showing at the top right corner of a content slide. */
+function studioDisc(ps: PSlide, c: Ctx): void {
+  const col = c.theme.colors;
+  const d = px(900);
+  ps.addShape(c.pres.ShapeType.ellipse, { x: W - d / 2, y: -d / 2, w: d, h: d, fill: { color: hex(col.brand), transparency: isDark(col.bg) ? 86 : 92 }, line: noLine(col.brand) });
+}
+
 interface Ctx {
   pres: Pres;
   theme: Theme;
@@ -125,7 +150,8 @@ function cards(ps: PSlide, items: NonNullable<Slide["cards"]>, x: number, y: num
     else panel(ps, cx, cy, cw, ch, c);
     // A design with its own series colours gives each card its own header colour.
     const cc = c.theme.series?.length ? hex(c.theme.series[i % c.theme.series.length]) : hex(col.brand);
-    if (!bloom && c.theme.slideStyle !== "briefing") ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: cc }, line: { color: cc } });
+    // The studio card has no stripe either: a shadow, a brand disc for the number, nothing else.
+    if (!bloom && c.theme.slideStyle !== "briefing" && !isStudio(c.theme)) ps.addShape(c.pres.ShapeType.rect, { x: cx, y: cy, w: cw, h: 0.07, fill: { color: cc }, line: { color: cc } });
     ps.addShape(c.pres.ShapeType.ellipse, { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fill: { color: cc }, line: { color: cc } });
     ps.addText(String(i + 1), { x: cx + 0.2, y: cy + (top - dot) / 2 + 0.03, w: dot, h: dot, fontSize: Math.round(13 * (dot / 0.4)), bold: true, color: "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(c.theme.fontBody) });
     if (it.tag) {
@@ -145,8 +171,11 @@ function titleText(s: Slide, t: Theme): string {
 
 function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; color?: string; kicker?: string } = {}): number {
   const t = c.theme;
-  const y = opts.y ?? px(96);
+  const studio = isStudio(t);
+  // The studio title block starts lower to leave room for the accent bar above it.
+  const y = opts.y ?? px(studio ? 144 : 96);
   let w = W - px(240);
+  if (studio) ps.addShape(c.pres.ShapeType.roundRect, { x: px(120), y: y - px(40), w: px(160), h: px(12), fill: { color: hex(t.colors.brand) }, line: noLine(t.colors.brand), rectRadius: px(6) });
   if (s.badge) {
     // The verdict pill sits top right, level with the title; the title wraps before it.
     const b = plain(s.badge).toUpperCase();
@@ -158,11 +187,12 @@ function title(ps: PSlide, s: Slide, c: Ctx, opts: { y?: number; size?: number; 
   let yy = y;
   const kicker = s.kicker || opts.kicker;
   if (kicker) {
-    ps.addText(kicker.toUpperCase(), { x: px(120), y: yy, w, h: px(36), fontSize: fitFont(kicker.toUpperCase(), w, px(36), 12, 8, { bold: true, maxLines: 1 }), bold: true, charSpacing: 3, color: opts.color ?? hex(t.slideStyle === "bloom" ? t.colors.accent : t.slideStyle === "briefing" ? t.colors.brand : t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
+    ps.addText(kicker.toUpperCase(), { x: px(120), y: yy, w, h: px(36), fontSize: fitFont(kicker.toUpperCase(), w, px(36), 12, 8, { bold: true, maxLines: 1 }), bold: true, charSpacing: studio ? 4 : 3, color: opts.color ?? hex(t.slideStyle === "bloom" ? t.colors.accent : t.slideStyle === "briefing" || studio ? t.colors.brand : t.colors.brandDeep), fontFace: fontOk(t.fontBody) });
     yy += px(44);
   }
   // The title takes at most three lines and a quarter of the slide; its box is as tall as its text.
-  const max = opts.size ?? 30;
+  // The studio title is 72 px on the canvas, which is 36 pt.
+  const max = opts.size ?? (studio ? 36 : 30);
   const tt = titleText(s, t);
   const size = fitFont(tt, w, 3 * max * 1.2 / 72 + 0.1, max, 14, { bold: true, maxLines: 3 });
   const h = Math.min(textHeightIn([tt], w, size, { bold: true }), H * 0.28);
@@ -199,6 +229,11 @@ function panel(ps: PSlide, x: number, y: number, w: number, h: number, c: Ctx): 
   // The briefing style's panel: pale blue, no border, no shadow.
   if (c.theme.slideStyle === "briefing") {
     ps.addShape(c.pres.ShapeType.roundRect, { x, y, w, h, fill: { color: hex(c.theme.colors.surface) }, line: { color: hex(c.theme.colors.surface), width: 0.5 }, rectRadius: Math.min(0.15, px(c.theme.radius)) });
+    return;
+  }
+  // The studio style's card: the surface colour, no border, a soft close shadow.
+  if (isStudio(c.theme)) {
+    ps.addShape(c.pres.ShapeType.roundRect, { x, y, w, h, fill: { color: hex(c.theme.colors.surface) }, line: noLine(c.theme.colors.surface), rectRadius: Math.min(0.25, px(c.theme.radius)), shadow: { type: "outer", blur: 12, offset: 4, angle: 90, color: "000000", opacity: 0.08 } });
     return;
   }
   // The bloom style's card: white, no border, a soft wide shadow.
@@ -314,17 +349,19 @@ function table(ps: PSlide, t: NonNullable<Slide["table"]>, x: number, y: number,
   const col = c.theme.colors;
   // The briefing style: a navy header row, zebra rows, the first column bold in navy.
   const brief = c.theme.slideStyle === "briefing";
+  // The studio style: a brand header row, rows alternating the canvas and surface colours, no rules.
+  const studio = isStudio(c.theme);
   const rows: TableRows = [
-    t.header.map((hd) => ({ text: plain(hd), options: { bold: true, color: brief ? "FFFFFF" : hex(col.brandDeep), fill: { color: brief ? hex(col.brandDeep) : hex(col.surface) }, fontSize: size } })),
+    t.header.map((hd) => ({ text: plain(hd), options: { bold: true, color: brief || studio ? "FFFFFF" : hex(col.brandDeep), fill: { color: brief ? hex(col.brandDeep) : studio ? hex(col.brand) : hex(col.surface) }, fontSize: size } })),
     ...t.rows.map((r, ri) =>
       r.map((v, ci) => {
         const tone = verdictTone(plain(v));
-        const zebra = brief && ri % 2 ? "F5F8FD" : "FFFFFF";
+        const zebra = studio ? hex(ri % 2 ? col.surface : col.bg) : brief && ri % 2 ? "F5F8FD" : "FFFFFF";
         return { text: plain(v), options: tone ? { color: TONE[tone].ink, fill: { color: TONE[tone].bg }, bold: true, fontSize: size } : { color: brief && ci === 0 ? hex(col.brandDeep) : hex(col.ink), bold: brief && ci === 0, fill: { color: zebra }, fontSize: size } };
       }),
     ),
   ];
-  ps.addTable(rows, { x, y, w, colW, border: { type: "solid", color: hex(c.theme.colors.line), pt: 0.75 }, fontFace: fontOk(c.theme.fontBody), valign: "middle", autoPage: false, rowH: heights });
+  ps.addTable(rows, { x, y, w, colW, border: studio ? { type: "none" } : { type: "solid", color: hex(c.theme.colors.line), pt: 0.75 }, fontFace: fontOk(c.theme.fontBody), valign: "middle", autoPage: false, rowH: heights });
 }
 
 const YES_RE = /^(yes|ya|✓|true|wajib|required|mandatory)$/i;
@@ -765,6 +802,63 @@ function sized(ps: PSlide): PSlide {
   return ps;
 }
 
+/**
+ * The studio cover and close: the headline on the left two thirds, a brand block filling the right third
+ * with a rounded left edge, the hero figures stacked inside it in white, takeaways as white pills on the left.
+ */
+function studioCover(ps: PSlide, s: Slide, i: number, c: Ctx): void {
+  const t = c.theme;
+  const col = t.colors;
+  const dark = !!t.darkTitle;
+  const ink = dark ? "FFFFFF" : hex(col.ink);
+  ps.background = { color: dark ? hex(col.brandDeep) : hex(col.bg) };
+  // The block runs past the right edge so only its left corners show rounded.
+  const bx = px(1280);
+  ps.addShape(c.pres.ShapeType.roundRect, { x: bx, y: 0, w: W - bx + 1, h: H, fill: { color: hex(col.brand) }, line: noLine(col.brand), rectRadius: px(64) });
+  const lx = px(120), lw = bx - px(240);
+  const hero = s.layout === "title" ? (s.kpi ?? []).slice(0, 4) : [];
+  const steps = s.layout === "closing" && isStepList(s.bullets);
+  const chips = s.layout === "closing" && !steps ? (s.bullets ?? []).slice(0, 4).map(plain) : [];
+  const low = steps || chips.length ? 0.9 : 0;
+  const tt = titleText(s, t);
+  if (s.kicker) ps.addText(plain(s.kicker).toUpperCase(), { x: lx, y: 1.6 - low, w: lw, h: 0.35, fontSize: 12, bold: true, charSpacing: 4, color: dark ? "FFFFFF" : hex(col.brand), fontFace: fontOk(t.fontBody) });
+  // The headline is 112 px on the canvas, which is 56 pt.
+  ps.addText(tt.replace(/\n+/g, "\n"), { x: lx, y: 2.0 - low, w: lw, h: 2.4, fontSize: fitFont(tt.replace(/\n+/g, "\n"), lw, 2.4, 56, 18, { bold: true, lineSpacing: 1.05 }), bold: true, color: ink, fontFace: fontOk(t.fontDisplay), valign: "bottom", fit: "shrink" });
+  const sub = [s.subtitle, s.body].filter(Boolean).map((x) => plain(x!)).join("\n");
+  if (sub) ps.addText(sub, { x: lx, y: 4.55 - low, w: lw, h: 1.3, fontSize: fitFont(sub, lw, 1.3, 18, 8), color: dark ? "E6ECF3" : hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
+  if (hero.length) {
+    const hx = bx + px(80), hw = W - bx - px(160);
+    const rh = Math.min(1.3, (H - 1.6) / hero.length);
+    const top = (H - rh * hero.length) / 2;
+    hero.forEach((k, j) => {
+      const hy = top + j * rh;
+      ps.addText(plain(k.value), { x: hx, y: hy, w: hw, h: rh * 0.58, fontSize: fitFont(plain(k.value), hw, rh * 0.58, 36, 10, { bold: true, maxLines: 1 }), bold: true, color: "FFFFFF", fontFace: fontOk(t.fontDisplay), valign: "bottom" });
+      ps.addText(plain(k.label), { x: hx, y: hy + rh * 0.6, w: hw, h: rh * 0.38, fontSize: fitFont(plain(k.label), hw, rh * 0.38, 12, 6), color: "FFFFFF", fontFace: fontOk(t.fontBody), valign: "top", fit: "shrink" });
+    });
+  }
+  if (steps) {
+    const items = s.bullets!.slice(0, 6).map(plain);
+    const top = 5.15 - low, room = H - px(120) - top, gap = 0.1;
+    const rh = Math.min(0.55, (room - gap * (items.length - 1)) / items.length);
+    const size = Math.min(...items.map((x) => fitFont(x, lw - 0.7, rh, 16, 7)));
+    const dot = Math.min(0.4, rh - 0.05);
+    items.forEach((x, j) => {
+      const ry = top + j * (rh + gap);
+      ps.addShape(c.pres.ShapeType.ellipse, { x: lx, y: ry + (rh - dot) / 2, w: dot, h: dot, fill: { color: dark ? "FFFFFF" : hex(col.brand) }, line: noLine(col.brand) });
+      ps.addText(String(j + 1), { x: lx, y: ry + (rh - dot) / 2, w: dot, h: dot, fontSize: Math.round(14 * dot / 0.4), bold: true, color: dark ? hex(col.brandDeep) : "FFFFFF", align: "center", valign: "middle", fontFace: fontOk(t.fontBody) });
+      ps.addText(x, { x: lx + dot + 0.2, y: ry, w: lw - dot - 0.2, h: rh, fontSize: size, color: ink, valign: "middle", fontFace: fontOk(t.fontBody), fit: "shrink" });
+    });
+  }
+  if (chips.length) {
+    // Two pills a row at most, so each keeps a readable width in two thirds of the slide.
+    const per = Math.min(2, chips.length);
+    const cw = (lw - 0.25 * (per - 1)) / per;
+    const cs = Math.min(...chips.map((x) => fitFont(x, cw - 0.3, 0.55, 13, 7, { bold: true })));
+    chips.forEach((x, j) => ps.addText(x, { x: lx + (j % per) * (cw + 0.25), y: 5.95 - low + Math.floor(j / per) * 0.75, w: cw, h: 0.6, fontSize: cs, bold: true, align: "center", valign: "middle", color: hex(col.brand), fill: { color: "FFFFFF" }, line: noLine("FFFFFF"), shape: c.pres.ShapeType.roundRect, rectRadius: 0.3, shadow: { type: "outer", blur: 12, offset: 4, angle: 90, color: "000000", opacity: 0.08 }, fontFace: fontOk(t.fontBody), fit: "shrink" }));
+  }
+  chrome(ps, s, i, c, dark);
+}
+
 function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
   const t = c.theme;
   const col = t.colors;
@@ -775,6 +869,10 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
   switch (s.layout) {
     case "title":
     case "closing": {
+      if (isStudio(t)) {
+        studioCover(ps, s, i, c);
+        return;
+      }
       const dark = !!t.darkTitle;
       const bloom = t.slideStyle === "bloom";
       const brief = t.slideStyle === "briefing";
@@ -839,6 +937,16 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     }
     case "section": {
       background(ps, s, c, true, hex(col.brandDeep));
+      if (isStudio(t)) {
+        // The studio section: the slide's number huge and faint at the bottom right, the title at 96 px (48 pt).
+        const num = String(i + 1).padStart(2, "0");
+        ps.addText(num, { x: W - 6.2, y: H - 3.6, w: 6, h: 3.4, fontSize: 210, bold: true, color: "FFFFFF", transparency: 90, align: "right", valign: "bottom", fontFace: fontOk(t.fontDisplay), margin: 0 });
+        ps.addText(plain(s.kicker || (c.lang === "ms" ? "Bahagian" : "Section")).toUpperCase(), { x: px(160), y: 2.2, w: 6, h: 0.4, fontSize: 12, bold: true, charSpacing: 4, color: "FFFFFF", transparency: 30, fontFace: fontOk(t.fontBody) });
+        ps.addText(titleText(s, t), { x: px(160), y: 2.65, w: W - px(320), h: 2.0, fontSize: fitFont(titleText(s, t), W - px(320), 2.0, 48, 16, { bold: true, lineSpacing: 1.05 }), bold: true, color: "FFFFFF", fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
+        if (s.subtitle) fitText(ps, s.subtitle, { x: px(160), y: 4.75, w: W - px(320), h: 1 }, 16, { color: "FFFFFF", transparency: 30, fontFace: fontOk(t.fontBody), valign: "top" }, 8);
+        chrome(ps, s, i, c, true);
+        return;
+      }
       ps.addText((c.lang === "ms" ? "BAHAGIAN" : "SECTION"), { x: px(160), y: 2.3, w: 6, h: 0.4, fontSize: 12, bold: true, charSpacing: 3, color: "FFFFFF", transparency: 25, fontFace: fontOk(t.fontBody) });
       ps.addText(titleText(s, t), { x: px(160), y: 2.7, w: W - px(320), h: 1.6, fontSize: fitFont(titleText(s, t), W - px(320), 1.6, 40, 16, { bold: true, lineSpacing: 1.1 }), bold: true, color: "FFFFFF", fontFace: fontOk(t.fontDisplay), valign: "top", fit: "shrink" });
       ps.addShape(c.pres.ShapeType.rect, { x: px(160), y: 4.4, w: 0.85, h: 0.06, fill: { color: "FFFFFF" }, line: { color: "FFFFFF" } });
@@ -850,6 +958,8 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
       break;
   }
   background(ps, s, c, false, hex(col.bg));
+  // The studio disc goes down first so everything else sits over it.
+  if (isStudio(t)) studioDisc(ps, c);
   if (t.slideStyle === "panel") panel(ps, px(96), px(72), W - px(192), H - px(176), c);
   const y0 = title(ps, s, c);
   // A callout banner takes the foot of the body, side panels the right of it; the content fits in what is left.
@@ -859,6 +969,9 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
     if (t.slideStyle === "bloom") {
       // The pull-quote band: a teal pill, the line in the quote font, italic, centred.
       ps.addText(txt, { x: contentX, y: bodyBottom - ch, w: W - px(240), h: ch, fontSize: fitFont(txt, W - px(240) - 0.8, ch - 0.1, 17, 8), italic: true, color: "FFFFFF", fill: { color: hex(col.brand) }, line: { color: hex(col.brand) }, align: "center", valign: "middle", margin: [24, 24, 4, 4], fontFace: fontOk(t.fontQuote ?? t.fontDisplay), shape: c.pres.ShapeType.roundRect, rectRadius: ch / 2, fit: "shrink" });
+    } else if (isStudio(t)) {
+      // The studio callout is a brand pill.
+      ps.addText(txt, { x: contentX, y: bodyBottom - ch, w: W - px(240), h: ch, fontSize: fitFont(txt, W - px(240) - 0.8, ch - 0.1, 14, 8, { bold: true }), bold: true, color: "FFFFFF", fill: { color: hex(col.brand) }, line: noLine(col.brand), valign: "middle", margin: [24, 24, 4, 4], fontFace: fontOk(t.fontBody), shape: c.pres.ShapeType.roundRect, rectRadius: ch / 2, fit: "shrink" });
     } else ps.addText(txt, { x: contentX, y: bodyBottom - ch, w: W - px(240), h: ch, fontSize: fitFont(txt, W - px(240) - 0.6, ch - 0.1, 14, 8, { bold: true }), bold: true, color: "FFFFFF", fill: { color: hex(col.brandDeep) }, line: { color: hex(col.brandDeep) }, valign: "middle", margin: [18, 18, 4, 4], fontFace: fontOk(t.fontBody), shape: c.pres.ShapeType.roundRect, rectRadius: Math.min(0.15, px(t.radius)), fit: "shrink" });
     bodyBottom -= ch + 0.15;
   }
@@ -958,6 +1071,8 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
       const th = Math.min(3.2, (room - gap * (rowsN - 1)) / rowsN);
       // The briefing style centres each figure and draws it in its own series colour.
       const brief = t.slideStyle === "briefing";
+      // The studio tile: the figure at 132 px on the canvas (56 pt) in the brand colour, the note in ink2.
+      const studio = isStudio(t);
       const kpal = seriesPalette(col, t.series).map(hex);
       const top = y0 + (room - (th * rowsN + gap * (rowsN - 1))) / 2;
       items.forEach((k, idx) => {
@@ -967,10 +1082,10 @@ function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
         panel(ps, x, ty, tw, th, c);
         const vh = Math.min(1.1, th * 0.42);
         const al = brief ? "center" : "left";
-        ps.addText(plain(k.value), { x: x + 0.2, y: ty + th * 0.1, w: tw - 0.4, h: vh, fontSize: fitFont(plain(k.value), tw - 0.4, vh, brief ? 54 : 40, 10, { bold: true, maxLines: 1 }), bold: true, color: brief ? kpal[idx % kpal.length] : hex(col.brandDeep), fontFace: fontOk(t.fontDisplay), align: al, valign: "middle", fit: "shrink" });
+        ps.addText(plain(k.value), { x: x + 0.2, y: ty + th * 0.1, w: tw - 0.4, h: vh, fontSize: fitFont(plain(k.value), tw - 0.4, vh, brief ? 54 : studio ? 56 : 40, 10, { bold: true, maxLines: 1 }), bold: true, color: brief ? kpal[idx % kpal.length] : hex(studio ? col.brand : col.brandDeep), fontFace: fontOk(t.fontDisplay), align: al, valign: "middle", fit: "shrink" });
         const lh = Math.min(0.6, th * 0.25);
         ps.addText(plain(k.label), { x: x + 0.2, y: ty + th * 0.1 + vh + 0.05, w: tw - 0.4, h: lh, fontSize: fitFont(plain(k.label), tw - 0.4, lh, 13, 6, { bold: true }), bold: true, color: hex(col.ink), fontFace: fontOk(t.fontBody), align: al, valign: "top", fit: "shrink" });
-        if (k.note) fitText(ps, k.note, { x: x + 0.2, y: ty + th * 0.1 + vh + lh + 0.1, w: tw - 0.4, h: Math.max(0.2, th - (th * 0.1 + vh + lh + 0.2)) }, 10, { color: hex(col.muted), fontFace: fontOk(t.fontBody), align: al, valign: "top" });
+        if (k.note) fitText(ps, k.note, { x: x + 0.2, y: ty + th * 0.1 + vh + lh + 0.1, w: tw - 0.4, h: Math.max(0.2, th - (th * 0.1 + vh + lh + 0.2)) }, 10, { color: hex(studio ? col.ink2 : col.muted), fontFace: fontOk(t.fontBody), align: al, valign: "top" });
       });
       if (s.body) fitText(ps, s.body, { x: contentX, y: bodyBottom - 0.45, w: contentW, h: 0.4 }, 12, { color: hex(col.ink2), fontFace: fontOk(t.fontBody), valign: "top" });
       break;

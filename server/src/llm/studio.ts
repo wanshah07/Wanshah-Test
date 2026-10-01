@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import { addOutput, listSources, loadDeck } from "../store.js";
 import { fastAuth, resolveAuth } from "../settings.js";
 import { chatJson, LlmError, RAW_KEEP, type LlmAuth } from "./client.js";
-import { condenseAll, log, setJob } from "./generate.js";
+import { condenseAll, log, namedSources, setJob } from "./generate.js";
 import { sourceName, LANG_RULES } from "./prompts.js";
 import { mockAnswer, mockStudio } from "./mock.js";
 
@@ -130,9 +130,9 @@ export function sourcesBlock(sources: Src[]): string {
 async function readSources(auth: LlmAuth | null, deckId: string, only: string[] | undefined, focus: string, lang: "en" | "ms", say: (l: string) => void): Promise<Src[]> {
   let rows = listSources(deckId);
   if (only?.length) rows = rows.filter((r) => only.includes(r.id));
-  const named = rows.map((r) => ({ name: r.rel_path || r.name, kind: r.kind, text: r.text }));
+  const named = namedSources(rows);
   const total = named.reduce((a, s) => a + s.text.length, 0);
-  if (!auth || total <= config.sourceBudget) return named;
+  if (!auth || total <= config.sourceBudget) return named.map((s) => ({ name: s.name, kind: s.kind, text: s.text }));
   say(`Sources total ${total.toLocaleString()} characters: condensing them to the facts first`);
   const sys = [
     "You extract the facts a writer will need from one source document.",

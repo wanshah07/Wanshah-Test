@@ -1,11 +1,12 @@
 import { ANGLES, angleById, autoFixSlide, cleanModelId, DEFAULT_FEATURES, newId, normaliseSlide, themeGuide, themePreset, VISUAL_FEATURES, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
 import { config } from "../config.js";
 import { getDb, now } from "../db.js";
-import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, updateDeck, updateSlide, type SourceRow } from "../store.js";
+import { addMedia, getMedia, listSources, loadDeck, saveCondensed, saveDeck, unreadPictures, updateDeck, updateSlide, type SourceRow } from "../store.js";
 import { NOTHING, readPicture, visionFor } from "./vision.js";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { chatJson, chatText, generateImage, LlmError, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
+import { chatJson, chatText, generateImage, LlmError, mapPool, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
 import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
 import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
@@ -155,41 +156,65 @@ export function mockPlan(p: GenerateParams, hasNumbers: boolean): Plan {
   return { title: null, angle: "regulatory-briefing", audience: "management and product teams", slides: 12, features: { charts: hasNumbers, tables: true, diagrams: true, kpis: true, sections: true, summary: true, qa: false }, reason: `Stand-in plan for: ${p.prompt.slice(0, 60)}` };
 }
 
-/** Sources with their text, condensed when the total is over the budget. */
+/** A source as the condenser sees it: its text, and the notes a previous run cached for it. */
+export interface NamedSource {
+  /** The sources row, when there is one: where the cached notes are written back. */
+  id?: string;
+  name: string;
+  kind: string;
+  text: string;
+  condensed_key?: string | null;
+  condensed?: string | null;
+}
+
+/** What a cached set of notes is good for: this exact text under this exact instruction. */
+export function condenseKey(text: string, sys: string): string {
+  return crypto.createHash("sha256").update(text).update("\n\u0000\n").update(sys).digest("hex");
+}
+
+/** How many parts a long source is read in, and how long each is. */
+const PART_CHARS = 60000;
+const MAX_PARTS = 8;
+
 /**
  * Every long source cut into parts and each part condensed to its facts, four calls at a time on the
  * quick model: a pile of sources is read in the time of its longest part, not the sum of them all.
+ * A source whose notes were cached under the same text and the same instruction is not read again:
+ * a regenerate on the same deck with the same brief condenses nothing.
  */
-export async function condenseAll(named: { name: string; kind: string; text: string }[], auth: LlmAuth, sys: string, say: (l: string) => void): Promise<{ name: string; kind: string; text: string }[]> {
-  const tasks: { si: number; ci: number; text: string; of: number; name: string }[] = [];
+export async function condenseAll(named: NamedSource[], auth: LlmAuth, sys: string, say: (l: string) => void): Promise<{ name: string; kind: string; text: string }[]> {
+  const tasks: { si: number; ci: number; text: string; name: string }[] = [];
+  const cachedParts = new Map<number, string>();
+  let partsFromCache = 0;
+  let partsInAll = 0;
   named.forEach((s, si) => {
     if (s.kind === "image" || s.text.length < 6000) return;
-    const chunks: string[] = [];
-    for (let i = 0; i < s.text.length && chunks.length < 8; i += 60000) chunks.push(s.text.slice(i, i + 60000));
-    if (s.text.length > 8 * 60000) say(`${s.name}: only the first ${Math.round((8 * 60000) / 1000)}k characters of ${Math.round(s.text.length / 1000)}k are read`);
-    chunks.forEach((text, ci) => tasks.push({ si, ci, text, of: chunks.length, name: s.name }));
-  });
-  if (tasks.length) say(`Condensing ${tasks.length} part${tasks.length === 1 ? "" : "s"} of ${new Set(tasks.map((t) => t.si)).size} source${new Set(tasks.map((t) => t.si)).size === 1 ? "" : "s"}, 4 at a time`);
-  const results = new Map<string, string>();
-  const quick = fastAuth(auth);
-  let next = 0;
-  // One failed part fails the lot: the others stop taking parts rather than spend calls on a dead job.
-  let failed = false;
-  const workers = Array.from({ length: Math.min(4, tasks.length) }, async () => {
-    while (next < tasks.length && !failed) {
-      const t = tasks[next++];
-      try {
-        results.set(`${t.si}:${t.ci}`, await chatText(quick, sys, `### ${t.name}\n${t.text}`));
-      } catch (e) {
-        failed = true;
-        throw e;
-      }
+    const parts = Math.min(MAX_PARTS, Math.ceil(s.text.length / PART_CHARS));
+    partsInAll += parts;
+    if (s.condensed_key && typeof s.condensed === "string" && s.condensed_key === condenseKey(s.text, sys)) {
+      cachedParts.set(si, s.condensed);
+      partsFromCache += parts;
+      return;
     }
+    if (s.text.length > MAX_PARTS * PART_CHARS) say(`${s.name}: only the first ${Math.round((MAX_PARTS * PART_CHARS) / 1000)}k characters of ${Math.round(s.text.length / 1000)}k are read`);
+    for (let ci = 0; ci < parts; ci++) tasks.push({ si, ci, text: s.text.slice(ci * PART_CHARS, (ci + 1) * PART_CHARS), name: s.name });
   });
-  await Promise.all(workers);
+  if (partsInAll) say(`${partsFromCache} of ${partsInAll} part${partsInAll === 1 ? "" : "s"} from cache`);
+  if (tasks.length) say(`Condensing ${tasks.length} part${tasks.length === 1 ? "" : "s"} of ${new Set(tasks.map((t) => t.si)).size} source${new Set(tasks.map((t) => t.si)).size === 1 ? "" : "s"}, 4 at a time`);
+  const quick = fastAuth(auth);
+  // One failed part fails the lot: the others stop taking parts rather than spend calls on a dead job.
+  const answers = await mapPool(tasks, 4, (t) => chatText(quick, sys, `### ${t.name}\n${t.text}`));
+  const results = new Map<string, string>();
+  tasks.forEach((t, i) => results.set(`${t.si}:${t.ci}`, answers[i]));
   const out = named.map((s, si) => {
+    const cached = cachedParts.get(si);
+    if (cached !== undefined) return { name: s.name, kind: s.kind, text: cached };
     const parts = tasks.filter((t) => t.si === si).sort((a, b) => a.ci - b.ci);
-    return parts.length ? { ...s, text: parts.map((t) => results.get(`${t.si}:${t.ci}`) ?? "").join("\n\n") } : s;
+    if (!parts.length) return { name: s.name, kind: s.kind, text: s.text };
+    const text = parts.map((t) => results.get(`${t.si}:${t.ci}`) ?? "").join("\n\n");
+    // Kept against the source for the next run that asks the same thing of the same text.
+    if (s.id) saveCondensed(s.id, condenseKey(s.text, sys), text);
+    return { name: s.name, kind: s.kind, text };
   });
   // Many small sources add up the same way one big one does: past the budget the pile is trimmed, and said so.
   let room = CONDENSED_TOTAL;
@@ -210,10 +235,15 @@ export async function condenseAll(named: { name: string; kind: string; text: str
 /** The most text the writer is handed in one call, after condensing. */
 const CONDENSED_TOTAL = 400_000;
 
+/** The sources as the condenser and the writer read them, with the notes cached on each row. */
+export function namedSources(rows: SourceRow[]): NamedSource[] {
+  return rows.map((r) => ({ id: r.id, name: r.rel_path || r.name, kind: r.kind, text: r.text, condensed_key: r.condensed_key ?? null, condensed: r.condensed ?? null }));
+}
+
 async function prepareSources(jobId: string, auth: LlmAuth | null, p: GenerateParams, rows: SourceRow[]): Promise<{ sources: { name: string; kind: string; text: string }[]; condensed: boolean }> {
-  const named = rows.map((r) => ({ name: r.rel_path || r.name, kind: r.kind, text: r.text }));
+  const named = namedSources(rows);
   const total = named.reduce((a, s) => a + s.text.length, 0);
-  if (total <= config.sourceBudget || !auth) return { sources: named, condensed: false };
+  if (total <= config.sourceBudget || !auth) return { sources: named.map((s) => ({ name: s.name, kind: s.kind, text: s.text })), condensed: false };
   log(jobId, `Sources total ${total.toLocaleString()} characters, over the ${config.sourceBudget.toLocaleString()} budget: condensing each to the facts`);
   const sys = condensePrompt(p);
   return { sources: await condenseAll(named, auth, sys, (l) => log(jobId, l)), condensed: true };
@@ -495,24 +525,36 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     const reader = config.mockLlm ? null : pictureAuth(userId);
     if (reader) await readUploadedPictures(jobId, userId, deckId, reader);
     const rows = listSources(deckId);
-    const { sources, condensed } = await prepareSources(jobId, auth, p, rows);
+    // The planner reads only the start of each source, so it runs while the long ones are being
+    // condensed rather than after: the two calls are independent, and the plan is ready when the
+    // notes are. A failure on either side ends the job without waiting for the other.
+    let planning: Promise<Plan> | null = null;
     if (p.auto) {
       log(jobId, "Auto: reading the material to choose the angle, audience, length and layouts");
-      const hasPictures = rows.some((r) => r.kind === "image" && r.media_id);
-      const hasNumbers = sources.some((x) => /\d{2,}/.test(x.text));
-      let plan: Plan;
-      if (config.mockLlm || !auth) plan = mockPlan(p, hasNumbers);
+      const peek = namedSources(rows);
+      const hasNumbers = peek.some((x) => /\d{2,}/.test(x.text));
+      if (config.mockLlm || !auth) planning = Promise.resolve(mockPlan(p, hasNumbers));
       else {
-        try {
-          plan = await chatJson({ auth: fastAuth(auth), system: planSystem(), user: planUser(p, sources), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
-        } catch (e) {
-          // The plan only picks settings; a model that will not give one still gets to write the deck.
-          if (!(e instanceof LlmError) || !["parse", "length", "unsupported"].includes(String(e.code))) throw e;
-          log(jobId, `Auto: the model did not return a plan (${e.message}), so standard settings are used`);
-          if (e.raw !== undefined) log(jobId, `Model reply (first ${RAW_KEEP} characters): ${e.raw || "(empty)"}`);
-          plan = fallbackPlan(p, hasNumbers, sources.length);
-        }
+        const quick = auth;
+        planning = (async () => {
+          try {
+            return await chatJson<Plan>({ auth: fastAuth(quick), system: planSystem(), user: planUser(p, peek), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+          } catch (e) {
+            // The plan only picks settings; a model that will not give one still gets to write the deck.
+            if (!(e instanceof LlmError) || !["parse", "length", "unsupported"].includes(String(e.code))) throw e;
+            log(jobId, `Auto: the model did not return a plan (${e.message}), so standard settings are used`);
+            if (e.raw !== undefined) log(jobId, `Model reply (first ${RAW_KEEP} characters): ${e.raw || "(empty)"}`);
+            return fallbackPlan(p, hasNumbers, peek.length);
+          }
+        })();
+        // If condensing fails first the job ends there; the plan's own failure must not go unobserved.
+        planning.catch(() => undefined);
       }
+    }
+    const { sources, condensed } = await prepareSources(jobId, auth, p, rows);
+    if (planning) {
+      const hasPictures = rows.some((r) => r.kind === "image" && r.media_id);
+      const plan = await planning;
       applyPlan(p, plan, hasPictures);
       const on = (["charts", "tables", "diagrams", "kpis", "sections"] as const).filter((k) => p.features[k]);
       log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}.${plan.reason ? " " + plan.reason : ""}`);
@@ -636,21 +678,19 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     } else if (p.imageMode === "generate" && auth) {
       // Every frame waiting for a picture: image slides first, then gallery frames. At most four in all.
       const frames = [...imageSlides.map((s) => (s.image ??= {})), ...slides.filter((s) => s.layout === "gallery").flatMap((s) => s.gallery ?? [])];
-      let n = 0;
-      for (const img of frames) {
-        if (n >= 4) break;
-        const prompt = img.prompt;
-        if (!prompt || img.mediaId) continue;
-        n++;
-        log(jobId, `Generating picture ${n}: ${prompt.slice(0, 60)}`);
+      const wanted = frames.filter((img) => img.prompt && !img.mediaId).slice(0, 4);
+      wanted.forEach((img, i) => log(jobId, `Generating picture ${i + 1}: ${img.prompt!.slice(0, 60)}`));
+      // The pictures do not depend on one another: all of them at once, and one that fails costs only itself.
+      await mapPool(wanted, 4, async (img, i) => {
+        const n = i + 1;
         try {
-          const png = await generateImage(auth, `${prompt}. Clean, well lit, no text, no logos, no watermark.`);
+          const png = await generateImage(auth, `${img.prompt}. Clean, well lit, no text, no logos, no watermark.`);
           const m = addMedia(userId, deckId, `generated-${n}.png`, "image/png", png, "generated");
           img.mediaId = m.id;
         } catch (e) {
           log(jobId, `Picture ${n} failed: ${(e as Error).message}`);
         }
-      }
+      });
     }
     // Whatever is still text-heavy is redrawn from its own words.
     const redrawn = visualise(slides, p.features);
@@ -790,7 +830,7 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
   }
   // Unconfirmed is not a no: try, and a picture the model refuses is logged and left as a slide picture.
   if (v === "unknown") log(jobId, `Could not confirm that ${auth.model} reads pictures; trying anyway.`);
-  let n = 0;
+  const todo: { r: SourceRow; path: string; mime: string }[] = [];
   for (const r of pics.slice(0, READ_LIMIT)) {
     const m = r.media_id ? getMedia(userId, r.media_id) : null;
     if (!m || !fs.existsSync(m.path)) continue;
@@ -798,14 +838,17 @@ export async function readUploadedPictures(jobId: string, userId: string, deckId
       log(jobId, `Picture ${r.rel_path || r.name} not read: ${m.mime === "image/svg+xml" ? "SVG is not sent to the model" : "larger than 8 MB"}.`);
       continue;
     }
-    n++;
-    log(jobId, `Reading picture ${n} with ${auth.model}: ${r.rel_path || r.name}`);
+    todo.push({ r, path: m.path, mime: m.mime });
+  }
+  todo.forEach(({ r }, i) => log(jobId, `Reading picture ${i + 1} with ${auth.model}: ${r.rel_path || r.name}`));
+  // Each picture is its own call: four at a time, and one the model refuses is logged and left as a slide picture.
+  await mapPool(todo, 4, async ({ r, path: file, mime }) => {
     try {
-      const text = await readPicture(auth, r.rel_path || r.name, fs.readFileSync(m.path), m.mime);
+      const text = await readPicture(auth, r.rel_path || r.name, fs.readFileSync(file), mime);
       getDb().prepare("UPDATE sources SET text = ?, chars = ? WHERE id = ?").run(text, text === NOTHING ? 0 : text.length, r.id);
     } catch (e) {
       log(jobId, `Picture ${r.rel_path || r.name} could not be read: ${(e as Error).message}`);
     }
-  }
+  });
   if (pics.length > READ_LIMIT) log(jobId, `Read the first ${READ_LIMIT} pictures; the other ${pics.length - READ_LIMIT} are used as slide pictures only.`);
 }

@@ -80,15 +80,24 @@ export default function Settings() {
       toast((e as Error).message, true);
     }
   };
+  const failing = (e: unknown) => toast((e as Error).message, true);
   const clearKey = async () => {
-    await api.saveSettings({ openaiKey: null });
-    toast("Key removed");
-    load();
+    try {
+      await api.saveSettings({ openaiKey: null });
+      toast("Key removed");
+      load();
+    } catch (e) {
+      failing(e);
+    }
   };
   const saveModels = async () => {
-    await api.saveSettings({ model, imageModel });
-    toast("Models saved");
-    load();
+    try {
+      await api.saveSettings({ model, imageModel });
+      toast("Models saved");
+      load();
+    } catch (e) {
+      failing(e);
+    }
   };
   const test = async () => {
     setTesting(true);
@@ -101,19 +110,30 @@ export default function Settings() {
       setImageModels(r.imageModels ?? []);
       // Only the picture answer changes; reloading everything would drop an unsaved model name.
       if (r.vision === "yes" || r.vision === "no" || r.vision === "unknown") setS((x) => (x ? { ...x, vision: r.vision as S["vision"] } : x));
+    } catch (e) {
+      setTestOk(false);
+      setTestMsg((e as Error).message);
     } finally {
       setTesting(false);
     }
   };
   const setAppTheme = async (t: AppTheme) => {
     applyAppTheme(t);
-    await api.saveSettings({ appTheme: t });
-    load();
+    try {
+      await api.saveSettings({ appTheme: t });
+      load();
+    } catch (e) {
+      failing(e);
+    }
   };
   const setDefaultTheme = async (id: string) => {
-    await api.saveSettings({ defaultTheme: id });
-    load();
-    toast("Default theme set");
+    try {
+      await api.saveSettings({ defaultTheme: id });
+      load();
+      toast("Default theme set");
+    } catch (e) {
+      failing(e);
+    }
   };
 
   const findAccounts = async () => {
@@ -139,8 +159,12 @@ export default function Settings() {
     }
   };
   const pickAccount = async (a: { id: string; label: string }) => {
-    setOd(await api.saveOneDrive({ composioAccount: a.id, composioAccountLabel: a.label }));
-    toast(`OneDrive through Composio: ${a.label}`);
+    try {
+      setOd(await api.saveOneDrive({ composioAccount: a.id, composioAccountLabel: a.label }));
+      toast(`OneDrive through Composio: ${a.label}`);
+    } catch (e) {
+      failing(e);
+    }
   };
   const saveOd = async () => {
     try {
@@ -173,8 +197,12 @@ export default function Settings() {
     }
   };
   const disconnectOd = async () => {
-    setOd(await api.disconnectOneDrive());
-    toast("OneDrive disconnected");
+    try {
+      setOd(await api.disconnectOneDrive());
+      toast("OneDrive disconnected");
+    } catch (e) {
+      failing(e);
+    }
   };
 
   return (

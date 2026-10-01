@@ -110,11 +110,15 @@ export default function NewDeck() {
 
   const addPaste = async () => {
     if (!pasteText.trim()) return;
-    const id = await ensureDeck();
-    const r = await api.addText(id, pasteName, pasteText);
-    setSources((s) => [...s, r]);
-    setPasteName("");
-    setPasteText("");
+    try {
+      const id = await ensureDeck();
+      const r = await api.addText(id, pasteName, pasteText);
+      setSources((s) => [...s, r]);
+      setPasteName("");
+      setPasteText("");
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
   };
 
   const removeSource = async (s: SourceRef) => {

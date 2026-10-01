@@ -20,9 +20,13 @@ export default function Decks() {
     load();
   }, []);
   const del = async (d: DeckSummary) => {
-    await api.deleteDeck(d.id);
-    toast("Deleted");
-    load();
+    try {
+      await api.deleteDeck(d.id);
+      toast("Deleted");
+      load();
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
   };
   const notebook = async () => {
     try {
@@ -33,8 +37,12 @@ export default function Decks() {
     }
   };
   const dup = async (d: DeckSummary) => {
-    const c = await api.duplicateDeck(d.id);
-    nav(`/deck/${c.id}`);
+    try {
+      const c = await api.duplicateDeck(d.id);
+      nav(`/deck/${c.id}`);
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
   };
   return (
     <main className="page">
@@ -74,7 +82,7 @@ export default function Decks() {
               <div className="row" style={{ marginTop: 12 }}>
                 <Link to={`/deck/${d.id}/notebook`} className="btn btn-ghost btn-sm">Notebook</Link>
                 <Link to={`/deck/${d.id}`} className="btn btn-ghost btn-sm">Slides</Link>
-                <a href={appHref(`/deck/${d.id}/present`)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">Present</a>
+                {d.slides > 0 && <a href={appHref(`/deck/${d.id}/present`)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">Present</a>}
                 <button className="btn btn-quiet btn-sm" onClick={() => dup(d)}>Duplicate</button>
                 <ConfirmButton confirm="Click again to delete for good" onConfirm={() => del(d)}>Delete</ConfirmButton>
               </div>

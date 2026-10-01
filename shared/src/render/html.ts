@@ -53,9 +53,9 @@ function heading(s: Slide, kicker?: string): string {
 /** Verdict words shown as coloured badges in tables and card tags. */
 export function verdictTone(text: string): "good" | "mid" | "bad" | "" {
   const t = text.trim().replace(/[.!]$/, "").toUpperCase();
-  if (/^(YES|YA|HIGH|TINGGI|PASS|LULUS|DONE|SIAP|GO|STRONG|✓|MET|ON TRACK|APPROVED|OFFICIAL)$/.test(t)) return "good";
-  if (/^(PARTLY|PARTIAL|SEBAHAGIAN|MEDIUM|MID|SEDERHANA|MID-HIGH|MID TO HIGH|PENDING|TBC|ESTIMATE|ANGGARAN|WATCH|MODERATE)$/.test(t)) return "mid";
-  if (/^(NO|TIDAK|LOW|RENDAH|FAIL|GAGAL|✗|NOT MET|AT RISK|NO GO|BLOCKED|WEAK)$/.test(t)) return "bad";
+  if (/^(YES|YA|HIGH|TINGGI|PASS|LULUS|DONE|SIAP|GO|STRONG|✓|MET|ON TRACK|APPROVED|OFFICIAL|ALLOWED|PERMITTED|DIBENARKAN|COMPLIANT|PATUH)$/.test(t)) return "good";
+  if (/^(PARTLY|PARTIAL|SEBAHAGIAN|MEDIUM|MID|SEDERHANA|MID-HIGH|MID TO HIGH|PENDING|TBC|ESTIMATE|ANGGARAN|WATCH|MODERATE|RESTRICTED|DIHADKAN|CONDITIONAL)$/.test(t)) return "mid";
+  if (/^(NO|TIDAK|LOW|RENDAH|FAIL|GAGAL|✗|NOT MET|AT RISK|NO GO|BLOCKED|WEAK|BANNED|PROHIBITED|DILARANG|REJECTED|NON-COMPLIANT)$/.test(t)) return "bad";
   return "";
 }
 
@@ -338,9 +338,20 @@ export function renderSlideHtml(s: Slide, rawTheme: Theme, ctx: RenderCtx): stri
   if (s.callout && !["title", "section", "closing"].includes(s.layout)) body += `<div class="sc-callout">${inline(s.callout)}</div>`;
   const cls = ["sc-slide", `sc-${s.layout}`, `sc-style-${t.slideStyle}`];
   if (t.upperTitles) cls.push("sc-upper");
+  // A dark canvas (light ink on a dark bg) asks for stronger tints than a white one.
+  if (isDark(c.bg)) cls.push("sc-dark-canvas");
   if (t.darkTitle && (s.layout === "title" || s.layout === "closing")) cls.push("sc-dark");
   const dots = t.slideStyle === "bloom" && s.layout !== "section" ? particlesSvg(s.id) : "";
-  return `<div class="${cls.join(" ")}" style="${themeVars(t)}" data-slide="${esc(s.id)}">${dots}${logoHtml(t, ctx)}<div class="sc-body">${body}</div>${chrome(s, t, ctx)}</div>`;
+  return `<div class="${cls.join(" ")}" style="${themeVars(t)}" data-slide="${esc(s.id)}" data-no="${String(ctx.index + 1).padStart(2, "0")}">${dots}${logoHtml(t, ctx)}<div class="sc-body">${body}</div>${chrome(s, t, ctx)}</div>`;
+}
+
+/** Whether a background colour is dark enough to want light ink over it. */
+export function isDark(hexColour: string): boolean {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hexColour.trim());
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 110;
 }
 
 function placeholder(text: string, lang: "en" | "ms"): string {

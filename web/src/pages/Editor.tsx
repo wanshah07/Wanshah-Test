@@ -305,7 +305,7 @@ export default function Editor() {
           <span className="small muted">{saving === "saving" ? "Saving" : saving === "dirty" ? "Unsaved" : saving === "saved" ? "Saved" : saving === "error" ? "Not saved" : ""}</span>
           <button className="btn btn-ghost btn-sm" onClick={() => setTab("sources")}>Add files / regenerate</button>
           <Link to={`/deck/${deck.id}/notebook`} className="btn btn-ghost btn-sm" data-testid="open-notebook">Notebook</Link>
-          <button className="btn btn-ghost btn-sm" onClick={() => openAfterSave(appHref(`/deck/${deck.id}/present`), true)}>Present</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => openAfterSave(appHref(`/deck/${deck.id}/present`), true)} disabled={deck.slides.length === 0} title={deck.slides.length ? "" : "Add a slide first"}>Present</button>
           <button className="btn btn-primary btn-sm" onClick={() => download("pptx")} disabled={!!exporting}>{exporting === "pptx" ? <><span className="spin" /> Building PPTX</> : "Download PPTX"}</button>
         </div>
       </div>

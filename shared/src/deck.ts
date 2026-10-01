@@ -224,7 +224,7 @@ export interface ThemeColors {
   gold: string;
 }
 
-export type SlideStyle = "clean" | "panel" | "gradient" | "bloom" | "briefing";
+export type SlideStyle = "clean" | "panel" | "gradient" | "bloom" | "briefing" | "studio";
 export type KpiStyle = "tiles" | "rings";
 
 export interface Theme {

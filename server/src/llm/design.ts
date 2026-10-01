@@ -1,5 +1,5 @@
 import { newId, type Features, type Slide } from "@slidecraft/shared";
-import { chatJson, type LlmAuth } from "./client.js";
+import { chatJson, mapPool, type LlmAuth } from "./client.js";
 import { SLIDE_SCHEMA } from "./schema.js";
 import { VISUAL } from "./visualise.js";
 import { houseDesign } from "./house.js";
@@ -11,6 +11,8 @@ import { houseDesign } from "./house.js";
 
 const STRUCTURAL = new Set(["title", "section", "closing"]);
 const SOURCE_BUDGET = 14_000;
+/** Text slides sent to the designer in one call; a deck with more is redesigned in parallel calls. */
+const DESIGN_BATCH = 8;
 
 export const DESIGN_SCHEMA = {
   type: "object",
@@ -89,18 +91,28 @@ export async function designPass(
 ): Promise<number> {
   const indices = textSlideIndices(slides).slice(0, 16);
   if (!indices.length) return 0;
-  const json = await chatJson<{ slides?: { index?: unknown; slide?: Record<string, unknown> }[] }>({
-    auth,
-    system: designSystem(f, lang, designNotes, houseRules),
-    user: designUser(slides, indices, sources),
-    schemaName: "design",
-    schema: DESIGN_SCHEMA,
-    maxTokens: Math.min(24000, 1600 * indices.length + 1500),
-  });
+  // Each slide is redesigned on its own, so the list is sent in batches at once rather than as one
+  // long answer: the answer's length is what the wait is made of. Nothing is applied unless every
+  // batch answered, the same as when it was one call.
+  const batches: number[][] = [];
+  for (let i = 0; i < indices.length; i += DESIGN_BATCH) batches.push(indices.slice(i, i + DESIGN_BATCH));
+  const system = designSystem(f, lang, designNotes, houseRules);
+  const answers = await mapPool(batches, 4, (batch) =>
+    chatJson<{ slides?: { index?: unknown; slide?: Record<string, unknown> }[] }>({
+      auth,
+      system,
+      user: designUser(slides, batch, sources),
+      schemaName: "design",
+      schema: DESIGN_SCHEMA,
+      maxTokens: Math.min(24000, 1600 * batch.length + 1500),
+    }),
+  );
   let n = 0;
-  for (const r of Array.isArray(json.slides) ? json.slides : []) {
+  const seen = new Set<number>();
+  for (const r of answers.flatMap((json) => (Array.isArray(json.slides) ? json.slides : []))) {
     const i = Number(r?.index);
-    if (!indices.includes(i) || !r.slide || typeof r.slide !== "object") continue;
+    if (!indices.includes(i) || seen.has(i) || !r.slide || typeof r.slide !== "object") continue;
+    seen.add(i);
     const old = slides[i];
     const next = build({ ...r.slide, title: (r.slide as { title?: unknown }).title || old.title });
     // Only a real visual replaces a slide; a redesign that came back as text changes nothing.

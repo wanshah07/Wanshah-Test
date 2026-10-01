@@ -5,6 +5,13 @@ grant all on all sequences in schema public to anon, authenticated, service_role
 grant all on storage.objects to authenticated;
 grant usage, select on all sequences in schema storage to authenticated;
 
+-- 007: the condensed-notes cache columns are on sc_sources.
+do $$ begin
+  if (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'sc_sources' and column_name in ('condensed_key', 'condensed')) <> 2
+  then raise exception 'FAILED: sc_sources lacks condensed_key / condensed (run 007_condensed.sql)'; end if;
+  raise notice 'ok   sc_sources carries the condensed-notes cache (007)';
+end $$;
+
 insert into auth.users values
   ('00000000-0000-0000-0000-00000000000a', 'wan@example.com'),
   ('00000000-0000-0000-0000-00000000000b', 'mate@example.com'),

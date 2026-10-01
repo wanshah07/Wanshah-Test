@@ -403,7 +403,28 @@ function Notebook({ id }: { id: string }) {
         <div className="modal-bg" onClick={() => setOpen(null)}>
           <div className="modal nb-viewer" onClick={(e) => e.stopPropagation()} data-testid="output-viewer">
             <div className="row between" style={{ marginBottom: 12 }}>
-              <h2>{KIND_ICON[open.kind]} {open.title}</h2>
+              <h2 className="row" style={{ gap: 10, flex: 1, minWidth: 0 }}>
+                <span>{KIND_ICON[open.kind]}</span>
+                <input
+                  type="text"
+                  defaultValue={open.title}
+                  key={open.id}
+                  title="Rename this output"
+                  style={{ flex: 1, minWidth: 0, font: "inherit", border: 0, background: "transparent", padding: 0 }}
+                  onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                  onBlur={async (e) => {
+                    const title = e.target.value.trim();
+                    if (!title || title === open.title) return;
+                    try {
+                      const r = await api.renameOutput(open.id, title);
+                      setOpen(r);
+                      reloadOutputs();
+                    } catch (err) {
+                      toast((err as Error).message, true);
+                    }
+                  }}
+                />
+              </h2>
               <button className="btn btn-quiet btn-sm" onClick={() => setOpen(null)}>✕</button>
             </div>
             <div className="nb-viewbody"><OutputBody key={open.id} o={open} /></div>
