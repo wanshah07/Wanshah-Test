@@ -135,7 +135,7 @@ export async function extractOne(name: string, buf: Buffer, relPath = name): Pro
     if ([".docx", ".pptx", ".xlsx", ".xlsm"].includes(ext)) await assertZipFits(buf);
     if (ext === ".docx") return { ...base, kind: "docx", text: clean((await mammoth.extractRawText({ buffer: buf })).value) };
     if (ext === ".pptx") return { ...base, kind: "pptx", text: clean(await pptxText(buf)) };
-    if ([".xlsx", ".xlsm", ".xls", ".csv", ".tsv"].includes(ext)) return { ...base, kind: "sheet", text: sheetText(buf) };
+    if ([".xlsx", ".xlsm", ".xls", ".csv", ".tsv"].includes(ext)) return { ...base, kind: "sheet", text: sheetText(buf, ext) };
     if ([".html", ".htm"].includes(ext)) return { ...base, kind: "html", text: clean(htmlToText(buf.toString("utf8"))) };
     if ([".md", ".txt", ".json", ".yaml", ".yml", ".rtf", ".xml"].includes(ext)) return { ...base, kind: "text", text: clean(buf.toString("utf8")) };
     if (IMAGE_MIME[ext]) {
@@ -159,7 +159,13 @@ async function pdfText(buf: Buffer): Promise<string> {
   const pdfjs = await import(spec);
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true }).promise;
   const pages: string[] = [];
+  let total = 0;
   for (let p = 1; p <= doc.numPages; p++) {
+    // Past the text budget nothing more is kept, so nothing more is parsed: a thousand-page PDF stops early.
+    if (total >= TEXT_MAX) {
+      pages.push(`[… ${doc.numPages - p + 1} more pages not read]`);
+      break;
+    }
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
     let line = "";
@@ -175,7 +181,9 @@ async function pdfText(buf: Buffer): Promise<string> {
       lastY = y;
     }
     parts.push(line.trim());
-    pages.push(`[p.${p}]\n${parts.filter(Boolean).join("\n")}`);
+    const text = `[p.${p}]\n${parts.filter(Boolean).join("\n")}`;
+    total += text.length;
+    pages.push(text);
   }
   await doc.destroy();
   return pages.join("\n\n");
@@ -278,11 +286,29 @@ function xmlText(xml: string): string {
     .split("\n").map((l) => l.trim()).filter(Boolean).join("\n");
 }
 
-function sheetText(buf: Buffer): string {
-  const wb = XLSX.read(buf, { type: "buffer", cellDates: true });
+const SHEET_ROWS = 2000;
+const SHEET_COLS = 100;
+
+function sheetText(buf: Buffer, ext = ".xlsx"): string {
+  // A CSV is text already: the first lines are enough, and parsing 40 MB of it as a workbook holds the server
+  // for seconds and hundreds of MB to keep 400 lines.
+  if (ext === ".csv" || ext === ".tsv") {
+    const lines = buf.toString("utf8").replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim());
+    const capped = lines.length > 400 ? [...lines.slice(0, 400), `[… ${lines.length - 400} more rows]`] : lines;
+    return `[sheet: ${ext.slice(1)}]\n${capped.join("\n")}`;
+  }
+  // Only the first rows are read: a sheet whose declared range runs to the last cell (Excel writes that when a
+  // whole column is formatted) would otherwise be walked cell by cell for minutes with the server blocked.
+  const wb = XLSX.read(buf, { type: "buffer", cellDates: true, sheetRows: SHEET_ROWS });
   const out: string[] = [];
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name];
+    if (ws["!ref"]) {
+      const r = XLSX.utils.decode_range(ws["!ref"]);
+      r.e.r = Math.min(r.e.r, r.s.r + SHEET_ROWS - 1);
+      r.e.c = Math.min(r.e.c, r.s.c + SHEET_COLS - 1);
+      ws["!ref"] = XLSX.utils.encode_range(r);
+    }
     const csv = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
     const lines = csv.split("\n");
     const capped = lines.length > 400 ? [...lines.slice(0, 400), `[… ${lines.length - 400} more rows]`] : lines;

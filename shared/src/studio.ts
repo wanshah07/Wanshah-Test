@@ -226,7 +226,9 @@ export function sanitizeOutputData(kind: OutputKind, raw: unknown): OutputData {
           const rawOpts = (Array.isArray(q.options ?? q.choices) ? (q.options ?? q.choices) as unknown[] : []).slice(0, 6).map((o) => txt(o, 400));
           const options = rawOpts.filter(Boolean);
           const given = q.answer ?? q.correct;
-          let raw = typeof given === "string" && !/^\d+$/.test(given.trim()) ? rawOpts.findIndex((o) => o && o === txt(given, 400)) : Number(given);
+          // "B", "b)" or "C." name an option by its letter; a number is its index; any other text is the option itself.
+          const letter = typeof given === "string" ? /^\s*([a-f])\s*[).:]?\s*$/i.exec(given) : null;
+          let raw = letter ? letter[1].toUpperCase().charCodeAt(0) - 65 : typeof given === "string" && !/^\d+$/.test(given.trim()) ? rawOpts.findIndex((o) => o && o === txt(given, 400)) : Number(given);
           if (!Number.isInteger(raw) || raw < 0 || raw >= rawOpts.length || !rawOpts[raw]) raw = -1;
           const answer = raw < 0 ? -1 : rawOpts.slice(0, raw).filter(Boolean).length;
           return { question: txt(q.question, 600), options, answer, explanation: txt(q.explanation, 1200), ...(txt(q.source, 300) ? { source: txt(q.source, 300) } : {}) };

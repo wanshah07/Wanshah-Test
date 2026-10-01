@@ -157,8 +157,8 @@ table.edit input{padding:5px 8px;font-size:12px}
 .log{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--surface-2);border-radius:var(--radius-sm);padding:12px;max-height:280px;overflow:auto;white-space:pre-wrap;color:var(--ink-2)}
 .spin{width:16px;height:16px;border:2px solid var(--brand-soft);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:50}
-.toast{background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;box-shadow:var(--shadow-md);font-size:13px;max-width:380px}
+.toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:50;pointer-events:none}
+.toast{background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;box-shadow:var(--shadow-md);font-size:13px;max-width:380px;pointer-events:auto}
 :root[data-theme="dark"] .toast{background:#F1F5FB;color:#16324F}
 .toast.err{background:var(--danger);color:#fff}
 .modal-bg{position:fixed;inset:0;background:rgba(11,22,32,.5);display:grid;place-items:center;z-index:40}

@@ -22,16 +22,17 @@ async function req<T>(method: string, url: string, body?: unknown, form?: FormDa
     body: form ? form : body !== undefined ? JSON.stringify(body) : undefined,
     credentials: "same-origin",
   });
-  if (res.status === 401) {
-    if (!location.pathname.startsWith("/login")) location.assign("/login?next=" + encodeURIComponent(location.pathname));
-    throw new ApiError("Not signed in", 401, "not_signed_in");
-  }
   const text = await res.text();
   let json: Record<string, unknown> = {};
   try {
     json = text ? JSON.parse(text) : {};
   } catch {
     json = { raw: text };
+  }
+  // A 401 with its own reason (a wrong password at sign-in) is that reason; any other 401 is a lapsed session.
+  if (res.status === 401 && json.error !== "bad_credentials") {
+    if (!location.pathname.startsWith("/login")) location.assign("/login?next=" + encodeURIComponent(location.pathname));
+    throw new ApiError("Not signed in", 401, "not_signed_in");
   }
   // 502/503/504 with no JSON body comes from a proxy in front of Slidecraft (a
   // reverse proxy or port forwarder), not from Slidecraft: its server is stopped, restarting or still building.

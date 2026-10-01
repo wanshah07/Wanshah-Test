@@ -111,10 +111,11 @@ export interface Plan {
 
 /** Folds a plan into the params. Notes and citations stay on; pictures follow what the deck holds. */
 export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): void {
-  p.angle = angleById(plan.angle).id;
-  if (plan.audience?.trim()) p.audience = plan.audience.trim().slice(0, 120);
+  // Strings only: in plain-JSON mode a model may answer with a list or an object where text was asked for.
+  p.angle = angleById(typeof plan.angle === "string" ? plan.angle : "custom").id;
+  if (typeof plan.audience === "string" && plan.audience.trim()) p.audience = plan.audience.trim().slice(0, 120);
   p.slides = Math.max(6, Math.min(30, Math.round(Number(plan.slides) || 12)));
-  if (!p.title && plan.title?.trim()) p.title = plan.title.trim().slice(0, 140);
+  if (!p.title && typeof plan.title === "string" && plan.title.trim()) p.title = plan.title.trim().slice(0, 140);
   const f = plan.features ?? ({} as Plan["features"]);
   // Every visual device stays available whatever the plan says: they are how a slide carries a point without a
   // paragraph, and the writer only uses one the sources can fill. A device the person unticked stays off.
@@ -165,6 +166,7 @@ export async function condenseAll(named: { name: string; kind: string; text: str
     if (s.kind === "image" || s.text.length < 6000) return;
     const chunks: string[] = [];
     for (let i = 0; i < s.text.length && chunks.length < 8; i += 60000) chunks.push(s.text.slice(i, i + 60000));
+    if (s.text.length > 8 * 60000) say(`${s.name}: only the first ${Math.round((8 * 60000) / 1000)}k characters of ${Math.round(s.text.length / 1000)}k are read`);
     chunks.forEach((text, ci) => tasks.push({ si, ci, text, of: chunks.length, name: s.name }));
   });
   if (tasks.length) say(`Condensing ${tasks.length} part${tasks.length === 1 ? "" : "s"} of ${new Set(tasks.map((t) => t.si)).size} source${new Set(tasks.map((t) => t.si)).size === 1 ? "" : "s"}, 4 at a time`);
@@ -185,11 +187,28 @@ export async function condenseAll(named: { name: string; kind: string; text: str
     }
   });
   await Promise.all(workers);
-  return named.map((s, si) => {
+  const out = named.map((s, si) => {
     const parts = tasks.filter((t) => t.si === si).sort((a, b) => a.ci - b.ci);
     return parts.length ? { ...s, text: parts.map((t) => results.get(`${t.si}:${t.ci}`) ?? "").join("\n\n") } : s;
   });
+  // Many small sources add up the same way one big one does: past the budget the pile is trimmed, and said so.
+  let room = CONDENSED_TOTAL;
+  let trimmed = 0;
+  for (const s of out) {
+    if (s.kind === "image") continue;
+    if (s.text.length <= room) room -= s.text.length;
+    else {
+      trimmed += s.text.length - Math.max(0, room);
+      s.text = room > 0 ? s.text.slice(0, room) : "";
+      room = 0;
+    }
+  }
+  if (trimmed) say(`The sources run past what the writer can read: ${Math.round(trimmed / 1000)}k characters at the end were left out`);
+  return out;
 }
+
+/** The most text the writer is handed in one call, after condensing. */
+const CONDENSED_TOTAL = 400_000;
 
 async function prepareSources(jobId: string, auth: LlmAuth | null, p: GenerateParams, rows: SourceRow[]): Promise<{ sources: { name: string; kind: string; text: string }[]; condensed: boolean }> {
   const named = rows.map((r) => ({ name: r.rel_path || r.name, kind: r.kind, text: r.text }));

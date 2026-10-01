@@ -100,6 +100,26 @@ export class Supabase {
     });
   }
 
+  /** Files in a bucket's folders (one level: <user>/<file>) created before `iso`. */
+  async listOlderThan(bucket: string, iso: string): Promise<string[]> {
+    const list = async (prefix: string) => {
+      const res = await this.call("POST", `/storage/v1/object/list/${bucket}`, { body: JSON.stringify({ prefix, limit: 1000, offset: 0, sortBy: { column: "created_at", order: "asc" } }), headers: { "Content-Type": "application/json" } });
+      return (await res.json()) as { name: string; id: string | null; created_at?: string }[];
+    };
+    const out: string[] = [];
+    for (const folder of await list("")) {
+      if (folder.id) continue; // a file at the root: not ours
+      for (const f of await list(folder.name)) if (f.id && f.created_at && f.created_at < iso) out.push(`${folder.name}/${f.name}`);
+    }
+    return out;
+  }
+
+  async removeOlderThan(bucket: string, iso: string): Promise<number> {
+    const paths = await this.listOlderThan(bucket, iso);
+    for (let i = 0; i < paths.length; i += 100) await this.removeFiles(bucket, paths.slice(i, i + 100));
+    return paths.length;
+  }
+
   async removeFiles(bucket: string, paths: string[]): Promise<void> {
     if (!paths.length) return;
     paths.forEach(safeObjectPath);

@@ -541,7 +541,7 @@ describe("pictures the writer may not be able to read", () => {
     const job = await waitJob(jobId);
     expect(job.status).toBe("done");
     expect(job.progress.join("\n")).toMatch(/Reading picture 1 with writer-1: label-table.png/);
-    expect(gw.users.at(-1)).toMatch(/### Picture: label-table.png[\s\S]*Effective \| 1 Jan 2027/);
+    expect(gw.users.at(-1)).toMatch(/<<<SOURCE label-table\.png \(a picture, transcribed[\s\S]*Effective \| 1 Jan 2027/);
     const again = J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "Again" } }));
     await waitJob(again.jobId);
     expect(gw.reads).toBe(1);
@@ -607,7 +607,7 @@ describe("a picture reader beside a writer that cannot see", () => {
     expect(job.status, job.error ?? "").toBe("done");
     expect(job.progress.join("\n")).toMatch(/Reading picture 1 with reader-1: poster.png/);
     expect(rd.reads).toBe(1);
-    expect(gw.users.at(-1)).toMatch(/### Picture: poster.png[\s\S]*Reduces acne lesions by 42% in 4 weeks/);
+    expect(gw.users.at(-1)).toMatch(/<<<SOURCE poster\.png \(a picture, transcribed[\s\S]*Reduces acne lesions by 42% in 4 weeks/);
     // Each key goes only to its own endpoint.
     expect(rd.auths.every((a) => a === "Bearer rk-reader")).toBe(true);
   });

@@ -5,6 +5,7 @@ import { decrypt, encrypt, maskKey } from "./crypto.js";
 import { getDb, now } from "./db.js";
 import { addMedia, addSource, deleteMedia, getMedia } from "./store.js";
 import { sniffPicture } from "./ingest/sniff.js";
+import { accountAllowed } from "./tenant.js";
 
 // Pictures from a OneDrive folder, read through Microsoft Graph.
 //
@@ -425,6 +426,8 @@ export async function composioAccounts(key: string, toolkit = "one_drive"): Prom
   const items = (j.items as Record<string, unknown>[] | undefined) ?? [];
   return items
     .filter((a) => String((a.toolkit as { slug?: string } | undefined)?.slug ?? toolkit).toLowerCase() === toolkit)
+    // On the team key, a member sees the accounts connected under their own id; the owner sees them all.
+    .filter((a) => accountAllowed(String(a.user_id ?? (a.user as { id?: string } | undefined)?.id ?? "").trim()))
     .map((a) => ({ id: String(a.id), label: String(a.alias ?? a.user_id ?? a.id), status: String(a.status ?? ""), created: String(a.created_at ?? "") }))
     // Two connections of one user share a label; tell them apart by when they were made and the end of their id.
     .map((a, _i, all) => {
@@ -462,6 +465,7 @@ async function composioTool(userId: string, slug: string, args: Record<string, u
     owner = await composioOwner(key, account);
     write(userId, { cz_user: owner });
   }
+  if (!accountAllowed(owner)) throw new OneDriveError("That OneDrive account is connected for someone else on the team. Pick one of your own in Settings.", "not_connected");
   const call = (version: string | null) => composioFetch(key, "POST", `/tools/execute/${slug}`, { connected_account_id: account, user_id: owner, arguments: args, ...(version ? { version } : {}) });
   let j: Record<string, unknown>;
   try {

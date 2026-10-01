@@ -327,6 +327,27 @@ describe("the worker", () => {
 });
 
 describe("mergeDoc", () => {
+  it("compares slides by content, not key order, as Postgres stores jsonb keys in its own order", async () => {
+    const { mergeDoc } = await import("../src/worker/merge.js");
+    // base and theirs as read back from the store (keys reordered); ours as the server wrote it.
+    const base = { title: "T", theme: { b: 1, a: 2 }, slides: [{ id: "a", title: "A0", layout: "bullets" }, { id: "b", title: "B0", layout: "bullets" }, { id: "c", title: "C0", layout: "bullets" }] };
+    const ours = { title: "T", theme: { a: 2, b: 1 }, slides: [{ layout: "bullets", id: "a", title: "A0" }, { layout: "bullets", id: "b", title: "B1" }, { layout: "bullets", id: "c", title: "C0" }] };
+    const theirs = { title: "T", theme: { b: 1, a: 2 }, slides: [{ id: "a", title: "A-edited", layout: "bullets" }, { id: "b", title: "B0", layout: "bullets" }, { id: "c", title: "C-edited", layout: "bullets" }] };
+    const m = mergeDoc(base, ours, theirs);
+    expect((m.slides as { id: string; title: string }[]).map((s) => s.title)).toEqual(["A-edited", "B1", "C-edited"]);
+  });
+
+  it("lets a member use only accounts connected under their own id, and the owner any", async () => {
+    const { accountAllowed, setCloudMember } = await import("../src/tenant.js");
+    expect(accountAllowed("anyone")).toBe(true);
+    setCloudMember({ userId: "u1", role: "member" });
+    expect(accountAllowed("u1")).toBe(true);
+    expect(accountAllowed("u2")).toBe(false);
+    setCloudMember({ userId: "u1", role: "owner" });
+    expect(accountAllowed("u2")).toBe(true);
+    setCloudMember(null);
+  });
+
   it("keeps both sides' changes, the worker's where both touched the same slide", async () => {
     const { mergeDoc } = await import("../src/worker/merge.js");
     const base = { title: "T", slides: [{ id: "a", t: 1 }, { id: "b", t: 1 }, { id: "c", t: 1 }] };

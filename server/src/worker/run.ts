@@ -124,7 +124,9 @@ export async function runJob(app: FastifyInstance, sb: Supabase, job: JobRow): P
   const req = job.request ?? {};
   const method = String(req.method || "POST").toUpperCase();
   const path = String(req.path || "");
+  const ownFiles = () => (req.files ?? []).map((f) => f.path).filter((p) => p.startsWith(job.user_id + "/") && !p.split("/").some((x) => !x || x === "." || x === ".."));
   if (!allowedPath(path, method) || !["GET", "POST", "PUT", "DELETE"].includes(method)) {
+    if (ownFiles().length) await sb.removeFiles("sc-inbox", ownFiles()).catch(() => undefined);
     await finish({ status: "error", error: "This request cannot run as a job." });
     log("job", job.id, "refused: not an allowed request");
     return "ok";
@@ -164,12 +166,25 @@ export async function runJob(app: FastifyInstance, sb: Supabase, job: JobRow): P
 
     const wrote = await flush(sb, loaded);
     if (req.files?.length) await sb.removeFiles("sc-inbox", req.files.map((f) => f.path)).catch(() => undefined);
-    await finish({ status: "done", result, error: null });
+    // The work is saved by now: a dropped write of the status must not turn it into a failure that re-runs it.
+    // Left as running after three tries, the sweep marks it; the deck is in the store either way.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await finish({ status: "done", result, error: null });
+        break;
+      } catch (e) {
+        if (attempt >= 2) {
+          log("job", job.id, "saved but its status could not be written", (e as Error).name);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
     log("job", job.id, "done", `http=${res.statusCode}`, `work=${result.work?.status ?? "-"}`, `+${wrote.added}`, `~${wrote.changed}`, `-${wrote.removed}`, `files=${wrote.files}`, `merged=${wrote.merged}`, `${((Date.now() - started) / 1000).toFixed(1)}s`);
     return "ok";
   } catch (e) {
     // A failed job's uploads are someone's confidential sources: they do not wait in the inbox for ever.
-    const own = (req.files ?? []).map((f) => f.path).filter((p) => p.startsWith(job.user_id + "/") && !p.split("/").some((x) => !x || x === "." || x === ".."));
+    const own = ownFiles();
     if (own.length) await sb.removeFiles("sc-inbox", own).catch(() => undefined);
     const code = (e as Error).message === "time_limit" ? "It took longer than the worker allows and was stopped. Try again, or with fewer sources." : "The worker could not finish this. Try again.";
     await finish({ status: "error", error: code }).catch(() => undefined);
@@ -187,6 +202,8 @@ export async function sweepStale(sb: Supabase, olderThanMs = LIMIT_MS + 5 * 60_0
   // Finished jobs the page has long since read: their request bodies (a brief, a question) need not stay.
   const day = new Date(Date.now() - 24 * 3600_000).toISOString();
   await sb.remove("sc_jobs", { status: "in.(done,error)", updated_at: `lt.${encodeURIComponent(day)}` }).catch(() => undefined);
+  // Exports nobody downloaded and uploads whose job never ran: a day is longer than any of them is needed.
+  for (const bucket of ["sc-exports", "sc-inbox"]) await sb.removeOlderThan(bucket, day).catch(() => undefined);
   const rows = await sb.update("sc_jobs", { status: "eq.running", started_at: `lt.${encodeURIComponent(cutoff)}` }, { status: "error", error: "The worker stopped before finishing. Try again." });
   return rows.length;
 }

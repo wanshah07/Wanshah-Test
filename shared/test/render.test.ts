@@ -383,6 +383,12 @@ describe("Studio outputs and model lists", () => {
 });
 
 describe("bugs found in the review of 1 Oct 2026", () => {
+  it("reads a quiz answer given as a letter", async () => {
+    const { sanitizeOutputData } = await import("../src/index.js");
+    const q = sanitizeOutputData("quiz", { questions: [{ question: "Q", options: ["x", "y", "z"], answer: "B", explanation: "e" }, { question: "Q2", options: ["x", "y", "z"], answer: "c)", explanation: "e" }] }) as { questions: { answer: number }[] };
+    expect(q.questions.map((x) => x.answer)).toEqual([1, 2]);
+  });
+
   it("rebuilds a slide's review and caps the lists a slide can carry", () => {
     const s = sanitizeSlide({ id: "a", layout: "bullets", title: "T", review: { ok: "yes", feedback: 5 } });
     expect(s.review).toEqual({ ok: false, feedback: [] });

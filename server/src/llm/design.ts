@@ -58,7 +58,7 @@ export function designUser(slides: Slide[], indices: number[], sources: { name: 
     if (!s.text || s.text === "NONE" || room <= 0) continue;
     const t = s.text.slice(0, room);
     room -= t.length;
-    src.push(`### ${s.name}\n${t}`);
+    src.push(`<<<SOURCE ${s.name.replace(/[\r\n#<>]+/g, " ").slice(0, 160)}>>>\n${t}\n<<<END SOURCE>>>`);
   }
   return [`SLIDES TO REDESIGN (${shown.length}):`, JSON.stringify(shown, null, 1), src.length ? `SOURCES (the figures you may use):\n${src.join("\n\n")}` : "SOURCES: none beyond the slides."].join("\n\n");
 }
