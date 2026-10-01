@@ -351,7 +351,11 @@ const routes: [string, RegExp, Handler][] = [
       if (!next.onedrive) delete next.onedrive;
       if (!next.brief) delete next.brief;
       if (!next.guide) delete next.guide;
-      await saveDoc(next);
+      // Only onto the version that was read: a deck the worker finished a moment ago is not written over.
+      next.updatedAt = new Date().toISOString();
+      const { sources: _s, ...doc } = next;
+      const won = check(await sb().from("sc_decks").update({ title: next.title, doc }).eq("id", p[1]).eq("updated_at", String(row.updated_at)).select("id")) as Row[];
+      if (!won.length) throw new ApiError("The deck changed while you were editing it.", 409, "deck_changed");
       return { deck: next, slop: scanDeck(next) };
     },
   ],

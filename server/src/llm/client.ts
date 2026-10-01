@@ -174,7 +174,9 @@ async function call(auth: LlmAuth, path: string, body: unknown, timeoutMs: numbe
         continue;
       }
       if (res.status >= 500) {
-        // A busy model ("high demand", 503) needs longer than a blip to clear.
+        // A busy model ("high demand", 503) needs longer than a blip to clear. Any other 5xx is sent again
+        // once: a gateway that answered 502 after the model finished would otherwise bill the deck three times.
+        if (res.status !== 503 && attempt >= 1) throw last;
         await new Promise((r) => setTimeout(r, (res.status === 503 ? 5000 : 1500) * (attempt + 1)));
         continue;
       }

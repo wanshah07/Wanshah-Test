@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, LENGTH_CHOICES, VISUAL_FEATURES, newId, scanDeck, type Deck, type FitResult, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { mergeDoc, ANGLES, blankSlide, composeAudience, composeBrief, pendingFeedback, DEFAULT_FEATURES, LENGTH_CHOICES, VISUAL_FEATURES, newId, scanDeck, type Deck, type FitResult, type Features, type Layout, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
 import { api, cloud, exportDeck, type Job } from "../api";
 import { appHref } from "../cloud/client";
 import { SlideFrame } from "../components/SlideFrame";
@@ -30,6 +30,8 @@ export default function Editor() {
   const [addOpen, setAddOpen] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const latest = useRef<Deck | null>(null);
+  // The deck as the store last had it: the base a conflicting save is merged against.
+  const saved = useRef<Deck | null>(null);
   // Polls stop when the page is left: a finished job must not pull the person back from wherever they went.
   const alive = useRef(true);
   useEffect(() => () => void (alive.current = false), []);
@@ -41,6 +43,7 @@ export default function Editor() {
     api.deck(id).then((r) => {
       setDeck(r.deck);
       latest.current = r.deck;
+      saved.current = r.deck;
       setSel(0);
     }).catch((e) => setMissing((e as { status?: number }).status === 404 ? "This deck does not exist, or it was deleted." : (e as Error).message));
   }, [id]);
@@ -83,8 +86,27 @@ export default function Editor() {
     inFlight.current = true;
     try {
       await api.saveDeck(d);
+      saved.current = d;
       setSaving(again.current ? "saving" : "saved");
     } catch (e) {
+      if ((e as { code?: string }).code === "deck_changed") {
+        // The worker wrote the deck while this was being edited: merge its work with the edits here, worker's
+        // version first where both touched the same slide, and save that.
+        try {
+          const srv = (await api.deck(d.id)).deck;
+          const merged = mergeDoc((saved.current ?? srv) as unknown as Record<string, unknown>, srv as unknown as Record<string, unknown>, (latest.current ?? d) as unknown as Record<string, unknown>) as unknown as Deck;
+          merged.sources = srv.sources;
+          latest.current = merged;
+          saved.current = srv;
+          setDeck(merged);
+          setSel((i) => Math.min(i, Math.max(0, merged.slides.length - 1)));
+          again.current = true;
+          toast("The deck was updated while you edited it. Your edits were merged in.");
+          return;
+        } catch {
+          /* fall through to the ordinary retry */
+        }
+      }
       setSaving("error");
       toast("Save failed: " + (e as Error).message + ". Trying again in a few seconds.", true);
       // The edit is still only on this screen: try again, and keep the leave-warning on until it lands.
@@ -236,6 +258,7 @@ export default function Editor() {
             const next = { ...cur, slides };
             setDeck(next);
             latest.current = next;
+            saved.current = r.deck;
             if (edited) update(next);
             else setSaving("saved");
             toast(j.status === "done" ? j.progress[j.progress.length - 1]?.replace(/^\S+ /, "") || "Feedback applied" : j.error || "Failed", j.status === "failed");
@@ -294,7 +317,7 @@ export default function Editor() {
             <button className="btn btn-quiet btn-xs" onClick={dupSlide} title="Duplicate">Dup</button>
             <button className="btn btn-quiet btn-xs" onClick={() => move(-1)} disabled={sel === 0}>↑</button>
             <button className="btn btn-quiet btn-xs" onClick={() => move(1)} disabled={sel >= deck.slides.length - 1}>↓</button>
-            <button className="btn btn-quiet btn-xs" onClick={delSlide} disabled={deck.slides.length <= 1} title="Delete slide">✕</button>
+            <ConfirmButton className="btn btn-quiet btn-xs" confirm="Delete slide?" onConfirm={delSlide} disabled={deck.slides.length <= 1}>✕</ConfirmButton>
           </div>
           <div className="list">
             {deck.slides.map((s, i) => (
@@ -352,7 +375,11 @@ export default function Editor() {
           {tab === "slide" && !slide && <p className="muted small">No slide selected.</p>}
           {tab === "theme" && <ThemePanel deckId={deck.id} theme={deck.theme} designId={deck.designId} onChange={setTheme} onDesign={(t, designId) => update({ ...deck, theme: t, designId })} />}
           {tab === "export" && <ExportPanel deck={deck} slopCount={slopCount} open={download} busy={exporting} />}
-          {tab === "sources" && <SourcesPanel deck={deck} onDeck={(d) => { setDeck(d); latest.current = d; setSel(0); setSaving("saved"); }} />}
+          {/* Mounted whatever the tab, only hidden: a regeneration started here must still land when the person
+              is back on the Slide tab, or the page keeps the old slides and the next autosave writes them back. */}
+          <div hidden={tab !== "sources"}>
+            <SourcesPanel deck={deck} onDeck={(d) => { setDeck(d); latest.current = d; saved.current = d; setSel(0); setSaving("saved"); }} />
+          </div>
         </aside>
       </div>
 

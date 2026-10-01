@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api, type Settings } from "../api";
 import { framed } from "../lib/files";
+import { hardReload, newerBuildExists } from "../lib/build";
 
 export function Shell() {
   const [me, setMe] = useState<Settings["user"] | null>(null);
@@ -9,9 +10,24 @@ export function Shell() {
   const [member, setMember] = useState(true);
   const nav = useNavigate();
   const [inFrame] = useState(framed);
+  // Coming back to a tab left open across a deploy: say a newer build is ready, at most once every few minutes.
+  const [newer, setNewer] = useState(false);
+  useEffect(() => {
+    let last = 0;
+    const check = () => {
+      if (Date.now() - last < 5 * 60_000) return;
+      last = Date.now();
+      void newerBuildExists().then((n) => n && setNewer(true));
+    };
+    check();
+    window.addEventListener("focus", check);
+    return () => window.removeEventListener("focus", check);
+  }, []);
   // A file dropped beside a drop zone would otherwise replace the whole page with the file.
   useEffect(() => {
     const stop = (e: DragEvent) => {
+      // Files only: dragged text must still drop into a text box.
+      if (!e.dataTransfer?.types.includes("Files")) return;
       if (!(e.target as HTMLElement | null)?.closest?.(".drop")) e.preventDefault();
     };
     window.addEventListener("dragover", stop);
@@ -56,6 +72,11 @@ export function Shell() {
           )}
         </div>
       </header>
+      {newer && (
+        <div className="banner warn" style={{ margin: "10px auto 0", maxWidth: 1100 }}>
+          A newer version of Slidecraft is ready. <button className="btn btn-primary btn-xs" onClick={hardReload}>Reload now</button>
+        </div>
+      )}
       {!member && me && (
         <div className="banner warn" style={{ margin: "10px auto 0", maxWidth: 1100 }}>
           You are signed in as <b>{me.email}</b>, but the workspace owner has not added you yet, so there is nothing to show and nothing can be saved. Ask them to add this email, then reload.

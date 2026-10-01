@@ -3,6 +3,7 @@ import { getDb, now } from "./db.js";
 import { guardedLookup } from "./export/fetchPicture.js";
 import { composioFetch, composioKey, composioOwner, OneDriveError } from "./onedrive.js";
 import { GoogleLinkError, MAX_LINK_BYTES, type GoogleLink, type LinkFile } from "./ingest/google.js";
+import { accountAllowed } from "./tenant.js";
 
 // Private Google Drive files through the Google Drive account the person has
 // connected in Composio. The same Composio API key as OneDrive, and a Google
@@ -61,6 +62,7 @@ async function gdTool(userId: string, slug: string, args: Record<string, unknown
       owner = await composioOwner(key, r.gd_account, "googledrive");
       write(userId, { gd_user: owner });
     }
+    if (!accountAllowed(owner)) throw new GoogleLinkError("That Google account is connected for someone else on the team. Pick one of your own in Settings.", "not_shared");
     const j = await composioFetch(key, "POST", `/tools/execute/${slug}`, { connected_account_id: r.gd_account, user_id: owner, arguments: args, version: "latest" });
     if (j.successful === false) {
       const data = (j.data as { status_code?: number } | undefined) ?? {};

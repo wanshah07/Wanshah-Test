@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { THEME_PRESETS } from "@slidecraft/shared";
 import { api, cloud, type OneDriveStatus, type Settings as S } from "../api";
 import { GdriveCard } from "../components/GdriveCard";
@@ -36,10 +36,15 @@ export default function Settings() {
   useEffect(() => {
     loadOd().catch(() => {});
   }, []);
+  // What the store held when the boxes were last filled: a reload after another save only overwrites a box
+  // that still shows that value, so a model typed or picked and not yet saved is kept.
+  const loaded = useRef<{ model: string; imageModel: string } | null>(null);
   const load = () => api.settings().then((r) => {
     setS(r);
-    setModel(r.model);
-    setImageModel(r.imageModel);
+    const was = loaded.current;
+    setModel((m) => (!was || m === was.model ? r.model : m));
+    setImageModel((m) => (!was || m === was.imageModel ? r.imageModel : m));
+    loaded.current = { model: r.model, imageModel: r.imageModel };
     setProvider(r.endpoint.provider);
     setBaseUrl(r.endpoint.baseUrl);
   });

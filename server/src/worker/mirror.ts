@@ -8,6 +8,7 @@ import { mediaPath } from "../store.js";
 import { eq, inList, type Supabase } from "./supabase.js";
 import { mergeDoc } from "./merge.js";
 import { deckMediaIds } from "@slidecraft/shared";
+import { setCloudMember } from "../tenant.js";
 
 // One job runs against a fresh in-memory copy of one person's data. The server
 // code sees a single local user (AUTH_MODE=off), so it can only ever touch what
@@ -152,6 +153,9 @@ export async function load(sb: Supabase, owner: string, scope: { deck?: string; 
   }
   ensureLocalUser();
   const own = { user_id: eq(owner) };
+  // No row, or no table in a stand-in, is a plain member: the narrower rule.
+  const [member] = await sb.select("sc_members", own, { columns: "role" }).catch(() => []);
+  setCloudMember({ userId: owner, role: String(member?.role ?? "member") });
 
   const [settings] = await sb.select("sc_settings", own);
   if (settings) {
@@ -338,5 +342,6 @@ export async function flush(sb: Supabase, l: Loaded): Promise<Flushed> {
 
 /** Removes what a job left on disk. */
 export function clearDisk(): void {
+  setCloudMember(null);
   for (const d of [config.mediaDir, config.sourcesDir, path.join(config.dataDir, "writer-replies")]) fs.rmSync(d, { recursive: true, force: true });
 }

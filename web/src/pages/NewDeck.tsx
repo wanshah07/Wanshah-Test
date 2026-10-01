@@ -46,6 +46,18 @@ export default function NewDeck() {
   const prompt = composeBrief(brief);
   const audience = composeAudience(brief.audiences, brief.audienceText);
 
+  // A brief typed and not yet turned into a deck is work: the browser asks before a reload or a closed tab.
+  const unused = useRef(false);
+  unused.current = step < 4 && !!(prompt.trim() || title.trim() || sources.length);
+  useEffect(() => {
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (!unused.current) return;
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, []);
+
   useEffect(() => {
     api.settings().then((s) => setThemeId(s.defaultTheme)).catch(() => {});
     api.designs().then(setDesigns).catch(() => {});
@@ -123,17 +135,21 @@ export default function NewDeck() {
         else await api.applyPreset(id, themeId);
       }
       const { jobId } = await api.generate(id, { prompt, auto, title, lang, angle, audience, slides, features: auto ? autoFeatures : features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
+      let misses = 0;
       const tick = async () => {
         if (!alive.current) return;
         try {
           const j = await api.job(jobId);
+          misses = 0;
           setJob(j);
           if (j.status === "done") {
             toast("Deck ready");
             nav(`/deck/${id}`);
           } else if (j.status !== "failed") setTimeout(tick, 1500);
         } catch (e) {
-          setStartError((e as Error).message);
+          // One dropped poll is not a failed job: the writer is still at work. Ask again a few times first.
+          if (++misses < 5) return void setTimeout(tick, 3000);
+          setStartError(`Lost track of the job: ${(e as Error).message}. Reload to see whether it finished.`);
         }
       };
       tick();
