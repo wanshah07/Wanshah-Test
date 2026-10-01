@@ -1,9 +1,10 @@
 # Slidecraft
 
-A slide deck builder for briefs and files. You give it a brief, the documents
-it should read, an angle and the features you want; it writes the deck with
-OpenAI, you edit it in the browser, and you take it out as PowerPoint or as a
-single HTML file. The team uses it at
+A notebook for your sources, and a slide deck builder on top of it. You give
+it the documents to read; it answers questions about them with the sentences
+that support each answer, writes reports, flashcards, quizzes, mind maps,
+data tables and infographics from them, and builds a designed slide deck you
+edit in the browser and take out as PowerPoint or a single HTML file. The team uses it at
 https://wanshah07.github.io/Wanshah-Test/app/ (see "The team link" below); it
 also runs on your own machine or server, with your own key.
 
@@ -11,6 +12,33 @@ also runs on your own machine or server, with your own key.
 
 ## What it does
 
+- **Notebooks** (the home page). Each notebook has three columns, laid out
+  the way NotebookLM lays out the same work:
+  - **Sources** on the left: files, a Google Drive link or pasted text, each
+    with a tick box. Untick a source and the chat and the Studio leave it out.
+  - **Chat** in the middle: a notebook guide (what the sources cover, their
+    topics, three questions to start with), then questions answered from the
+    ticked sources only. Each answer carries numbered citations that open the
+    sentence it rests on, three follow-up questions, and **Save to note**.
+  - **Studio** on the right: Slide deck, Report (briefing doc, study guide,
+    FAQ, timeline, blog post or custom), Flashcards, Quiz, Mind map, Data
+    table and Infographic. Each opens a dialog with the choices that kind
+    takes (format, language, fewer or more, difficulty, length, and what to
+    focus on) and runs in the background while you carry on. Every output is
+    kept on the notebook, opens in a viewer (flashcards turn over, a quiz is
+    scored, a mind map folds), and downloads as Markdown, CSV for a table, or
+    a web page for an infographic.
+- **Choose the AI model.** A picker in the notebook lists the models the
+  owner allows (`AI_MODELS`), so a hard question can go to the strongest
+  model and a quick list to a cheaper one. The model used is shown on each
+  answer and output.
+- **Faster work.**
+  - Long sources are condensed four parts at a time, and on a quicker model
+    when `AI_FAST_MODEL` is set. The planning step uses that model too.
+  - On the team link the worker stays warm for five minutes after a job. A
+    question, a Studio output or a rewrite that follows starts at once
+    instead of waiting for a new runner.
+  - The worker keeps its installed packages between runs.
 - **Auto** (on by default). Nothing to fill in: the AI reads the sources,
   chooses the angle, audience, number of slides and layouts, logs what it
   chose and why, then writes. Anything ticked or typed still steers it, and
@@ -309,7 +337,9 @@ OneDrive.
 Slidecraft runs at https://wanshah07.github.io/Wanshah-Test/app/ on GitHub
 Pages, with its data in Supabase and heavy work (writing, reading files,
 PowerPoint export) done by a worker in GitHub Actions, so the link is always
-on and teammates can use it from anywhere. Wan adds each person (steps in
+on and teammates can use it from anywhere. The model picker lists the
+models in the `AI_MODELS` repository variable; `AI_FAST_MODEL` and
+`SC_IDLE_MS` are repository variables too. Wan adds each person (steps in
 [docs/MIGRATION.md](docs/MIGRATION.md), "What Wan does, once"). The AI key is
 the team's, kept as a GitHub Actions secret: it is used by the worker and
 never shown in the page. Every merge to `main` redeploys the link.
@@ -358,6 +388,9 @@ Supabase with the real worker.
 | `AUTH_MODE` | `off` (single user, default) or `local` (email and password). |
 | `OPENAI_API_KEY` | Server-wide key. Optional; a key saved in Settings takes precedence. |
 | `OPENAI_MODEL` | Writer model, default `gpt-4.1`. Per-user override in Settings. |
+| `AI_MODELS` | The models a person may pick in the notebook, comma separated, each optionally `id=Label`: `claude-opus-5.5=Claude Opus 5.5 (best), gpt-6-luna=GPT-6 Luna (fast)`. Empty allows any model. On the server's key a model not in the list falls back to the default. |
+| `AI_FAST_MODEL` | A quicker model for the reading steps (planning, condensing long sources, the notebook guide). Unset uses the writer model. |
+| `SC_IDLE_MS` | Worker only: how long it stays warm after its last job, default 300000 (5 minutes). `0` stops at once. |
 | `OPENAI_IMAGE_MODEL` | Image model, default `gpt-image-1`. |
 | `OPENAI_BASE_URL` | Another OpenAI-compatible endpoint, if you use one. |
 | `DATA_DIR` | Database, uploads and media. Default `./data`. |

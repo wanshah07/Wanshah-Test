@@ -1,4 +1,4 @@
-import { ANGLES, angleById, autoFixSlide, DEFAULT_FEATURES, newId, normaliseSlide, themeGuide, themePreset, VISUAL_FEATURES, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
+import { ANGLES, angleById, autoFixSlide, cleanModelId, DEFAULT_FEATURES, newId, normaliseSlide, themeGuide, themePreset, VISUAL_FEATURES, type Deck, type DiagramSpec, type Features, type Slide } from "@slidecraft/shared";
 import { config } from "../config.js";
 import { getDb, now } from "../db.js";
 import { addMedia, getMedia, listSources, loadDeck, saveDeck, unreadPictures, updateDeck, updateSlide, type SourceRow } from "../store.js";
@@ -9,7 +9,7 @@ import { chatJson, chatText, generateImage, LlmError, RAW_KEEP, rawSnippet, type
 import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
 import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
-import { resolveAuth } from "../settings.js";
+import { fastAuth, resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
 import { getDesign, promptTexts } from "../library.js";
 import { pictureAuth } from "../reader.js";
@@ -83,6 +83,7 @@ export function normaliseParams(raw: Record<string, unknown>, fallbackAngle = "c
     imageMode: features.images ? imageMode : "none",
     auto: raw.auto === true,
     off: VISUAL_FEATURES.filter((k) => given[k] === false),
+    ...(cleanModelId(raw.model) ? { model: cleanModelId(raw.model) } : {}),
   };
 }
 
@@ -154,28 +155,42 @@ export function mockPlan(p: GenerateParams, hasNumbers: boolean): Plan {
 }
 
 /** Sources with their text, condensed when the total is over the budget. */
+/**
+ * Every long source cut into parts and each part condensed to its facts, four calls at a time on the
+ * quick model: a pile of sources is read in the time of its longest part, not the sum of them all.
+ */
+export async function condenseAll(named: { name: string; kind: string; text: string }[], auth: LlmAuth, sys: string, say: (l: string) => void): Promise<{ name: string; kind: string; text: string }[]> {
+  const tasks: { si: number; ci: number; text: string; of: number; name: string }[] = [];
+  named.forEach((s, si) => {
+    if (s.kind === "image" || s.text.length < 6000) return;
+    const chunks: string[] = [];
+    for (let i = 0; i < s.text.length && chunks.length < 8; i += 60000) chunks.push(s.text.slice(i, i + 60000));
+    chunks.forEach((text, ci) => tasks.push({ si, ci, text, of: chunks.length, name: s.name }));
+  });
+  if (tasks.length) say(`Condensing ${tasks.length} part${tasks.length === 1 ? "" : "s"} of ${new Set(tasks.map((t) => t.si)).size} source${new Set(tasks.map((t) => t.si)).size === 1 ? "" : "s"}, 4 at a time`);
+  const results = new Map<string, string>();
+  const quick = fastAuth(auth);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(4, tasks.length) }, async () => {
+    while (next < tasks.length) {
+      const t = tasks[next++];
+      results.set(`${t.si}:${t.ci}`, await chatText(quick, sys, `### ${t.name}\n${t.text}`));
+    }
+  });
+  await Promise.all(workers);
+  return named.map((s, si) => {
+    const parts = tasks.filter((t) => t.si === si).sort((a, b) => a.ci - b.ci);
+    return parts.length ? { ...s, text: parts.map((t) => results.get(`${t.si}:${t.ci}`) ?? "").join("\n\n") } : s;
+  });
+}
+
 async function prepareSources(jobId: string, auth: LlmAuth | null, p: GenerateParams, rows: SourceRow[]): Promise<{ sources: { name: string; kind: string; text: string }[]; condensed: boolean }> {
   const named = rows.map((r) => ({ name: r.rel_path || r.name, kind: r.kind, text: r.text }));
   const total = named.reduce((a, s) => a + s.text.length, 0);
   if (total <= config.sourceBudget || !auth) return { sources: named, condensed: false };
   log(jobId, `Sources total ${total.toLocaleString()} characters, over the ${config.sourceBudget.toLocaleString()} budget: condensing each to the facts`);
-  const out: { name: string; kind: string; text: string }[] = [];
   const sys = condensePrompt(p);
-  for (const s of named) {
-    if (s.kind === "image" || s.text.length < 6000) {
-      out.push(s);
-      continue;
-    }
-    const chunks: string[] = [];
-    for (let i = 0; i < s.text.length && chunks.length < 8; i += 60000) chunks.push(s.text.slice(i, i + 60000));
-    const notes: string[] = [];
-    for (const [i, c] of chunks.entries()) {
-      log(jobId, `Condensing ${s.name}${chunks.length > 1 ? ` (part ${i + 1}/${chunks.length})` : ""}`);
-      notes.push(await chatText(auth, sys, `### ${s.name}\n${c}`));
-    }
-    out.push({ ...s, text: notes.join("\n\n") });
-  }
-  return { sources: out, condensed: true };
+  return { sources: await condenseAll(named, auth, sys, (l) => log(jobId, l)), condensed: true };
 }
 
 function coerceDiagram(raw: unknown): DiagramSpec | undefined {
@@ -430,8 +445,9 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     setJob(jobId, { status: "running" });
     const deck = loadDeck(userId, deckId);
     if (!deck) throw new Error("deck not found");
-    const auth = config.mockLlm ? null : resolveAuth(userId);
+    const auth = config.mockLlm ? null : resolveAuth(userId, p.model);
     if (!config.mockLlm && !auth) throw new LlmError("No OpenAI key. Add one in Settings.", 0, "no_key");
+    if (auth) log(jobId, `Writer model: ${auth.model}${fastAuth(auth).model !== auth.model ? `; reading and planning on ${fastAuth(auth).model}` : ""}`);
     p.house = promptTexts(userId, deck.brief?.prompts);
     p.houseRules = houseFor(userId);
     p.designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : themeGuide(deck.theme?.id);
@@ -462,7 +478,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       if (config.mockLlm || !auth) plan = mockPlan(p, hasNumbers);
       else {
         try {
-          plan = await chatJson({ auth, system: planSystem(), user: planUser(p, sources), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+          plan = await chatJson({ auth: fastAuth(auth), system: planSystem(), user: planUser(p, sources), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
         } catch (e) {
           // The plan only picks settings; a model that will not give one still gets to write the deck.
           if (!(e instanceof LlmError) || !["parse", "length", "unsupported"].includes(String(e.code))) throw e;

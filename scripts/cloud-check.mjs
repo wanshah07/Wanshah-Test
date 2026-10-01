@@ -31,8 +31,8 @@ const check = (name, ok) => {
 
 // ------------------------------------------------------------------ Supabase stand-in
 
-const db = { sc_members: [], sc_settings: [], sc_decks: [], sc_sources: [], sc_media: [], sc_designs: [], sc_prompts: [], sc_jobs: [] };
-const TOUCH = new Set(["sc_settings", "sc_decks", "sc_designs", "sc_prompts", "sc_jobs"]);
+const db = { sc_members: [], sc_settings: [], sc_decks: [], sc_sources: [], sc_media: [], sc_designs: [], sc_prompts: [], sc_outputs: [], sc_jobs: [] };
+const TOUCH = new Set(["sc_settings", "sc_decks", "sc_designs", "sc_prompts", "sc_outputs", "sc_jobs"]);
 const users = []; // { id, email, password }
 const files = new Map(); // "bucket/path" -> Buffer
 const signed = new Map(); // token -> "bucket/path"
@@ -99,6 +99,8 @@ function mayInsert(table, r, who) {
   if (table === "sc_members") return false;
   if (table === "sc_jobs") return r.status === "pending" && !r.result && !r.error && !r.attempts;
   if (table === "sc_sources" && r.deck_id) return db.sc_decks.some((d) => d.id === r.deck_id && d.user_id === who.uid);
+  // An output hangs off the person's own notebook only (supabase/005_outputs.sql).
+  if (table === "sc_outputs") return db.sc_decks.some((d) => d.id === r.deck_id && d.user_id === who.uid);
   return true;
 }
 function project(rows, select) {
@@ -268,6 +270,7 @@ const sb = http.createServer((req, res) => {
       const hit = db[table].filter((r) => visible(table, r, who) && matches(r, filters) && (table !== "sc_jobs" || who.service || ["done", "error"].includes(r.status)));
       db[table] = db[table].filter((r) => !hit.includes(r));
       if (table === "sc_decks") db.sc_sources = db.sc_sources.filter((s) => !hit.some((d) => d.id === s.deck_id));
+      if (table === "sc_decks") db.sc_outputs = db.sc_outputs.filter((s) => !hit.some((d) => d.id === s.deck_id));
       return prefer.includes("return=representation") ? reply(hit) : send(204);
     }
     send(405, { message: "method" });
@@ -345,7 +348,7 @@ try {
   const wan = users.find((u) => u.email === "wan@example.com");
   db.sc_members.push({ user_id: wan.id, role: "owner" });
   await page.reload();
-  await page.locator("h1", { hasText: "Decks" }).waitFor({ timeout: 15000 });
+  await page.locator("h1", { hasText: "Notebooks" }).waitFor({ timeout: 15000 });
   check("once added, the decks page shows and the notice is gone", (await page.locator("text=has not added you yet").count()) === 0);
 
   // A deck, written by the worker.
@@ -404,6 +407,27 @@ try {
   check("Present shows the deck with no server", await frame.locator(".sc-slide.on").isVisible());
   await present.close();
 
+  // The notebook: the chat and the Studio run on the worker; notes and outputs are read and removed in the page.
+  await page.goto(`${APP}#/deck/${deckId}/notebook`);
+  await page.locator("[data-testid=notebook]").waitFor({ timeout: 15000 });
+  await page.locator("[data-testid=nb-guide] .nb-starters button").first().waitFor({ timeout: 30000 });
+  check("the notebook guide is written by the worker and kept on the notebook", !!db.sc_decks.find((d) => d.id === deckId)?.doc.guide?.summary);
+  await page.fill("[data-testid=nb-question]", "What is the limit?");
+  await page.click("[data-testid=nb-ask]");
+  await page.locator(".nb-answer").first().waitFor({ timeout: 30000 });
+  check("a question is answered by the worker from the sources", (await page.locator(".nb-answer", { hasText: "2%" }).count()) === 1);
+  await page.click(".nb-answer button:has-text('Save to note')");
+  await page.locator(".nb-out", { hasText: "What is the limit?" }).waitFor({ timeout: 15000 });
+  check("a note is saved straight to Supabase as its owner's", db.sc_outputs.some((o) => o.kind === "note" && o.user_id === wan.id && o.deck_id === deckId));
+  await page.click("[data-testid=tile-mindmap]");
+  await page.click("[data-testid=studio-generate]");
+  await page.locator("[data-testid=output-viewer] .ov-mind").waitFor({ timeout: 40000 });
+  check("the worker makes a mind map and the page opens it", db.sc_outputs.some((o) => o.kind === "mindmap" && o.user_id === wan.id) && (await page.locator(".ov-node").count()) >= 3);
+  await page.click("[data-testid=output-viewer] button:has-text('Delete')");
+  await page.click("[data-testid=output-viewer] button:has-text('Click again')");
+  await page.locator("[data-testid=output-viewer]").waitFor({ state: "detached", timeout: 15000 });
+  check("deleting an output removes it from Supabase", !db.sc_outputs.some((o) => o.kind === "mindmap"));
+
   // Settings has no key fields.
   await page.goto(`${APP}#/settings`);
   await page.getByRole("heading", { name: "AI", exact: true }).waitFor({ timeout: 15000 });
@@ -420,7 +444,8 @@ try {
   await page.fill("input[type=email]", "wan@example.com");
   await page.fill("input[type=password]", "a brand new password");
   await page.click("button:has-text('Sign in')");
-  await page.locator("h1", { hasText: "Decks" }).waitFor({ timeout: 15000 }).catch(() => {});
+  // The heading draws before the list arrives: wait for the card itself.
+  await page.locator(".deckcard").first().waitFor({ timeout: 15000 }).catch(() => {});
   check("and sign in with the new one", (await page.locator(".deckcard").count()) === 1);
 
   // A teammate sees none of it.
@@ -436,7 +461,7 @@ try {
   await mate.locator("text=has not added you yet").waitFor({ timeout: 15000 }).catch(() => {});
   db.sc_members.push({ user_id: m.id, role: "member" });
   await mate.reload();
-  await mate.locator("h1", { hasText: "Decks" }).waitFor({ timeout: 15000 });
+  await mate.locator("h1", { hasText: "Notebooks" }).waitFor({ timeout: 15000 });
   await mate.waitForTimeout(1500);
   check("a teammate's deck list does not show the owner's deck", (await mate.locator(".deckcard").count()) === 0);
   await mate.goto(`${APP}#/deck/${deckId}`);
@@ -445,6 +470,10 @@ try {
   const token = tokenFor(m);
   const direct = await (await fetch(`${SB}/rest/v1/sc_decks?select=*`, { headers: { apikey: ANON, authorization: `Bearer ${token}` } })).json();
   check("the teammate's own token reads no other deck", Array.isArray(direct) && direct.length === 0);
+  const outs = await (await fetch(`${SB}/rest/v1/sc_outputs?select=*`, { headers: { apikey: ANON, authorization: `Bearer ${token}` } })).json();
+  check("nor any of the owner's notes or Studio outputs", Array.isArray(outs) && outs.length === 0 && db.sc_outputs.length > 0);
+  const forged = await fetch(`${SB}/rest/v1/sc_outputs`, { method: "POST", headers: { apikey: ANON, authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify([{ id: "o_x", user_id: m.id, deck_id: deckId, kind: "note", title: "x", data: {} }]) });
+  check("and cannot put one on the owner's notebook", forged.status >= 400 && !db.sc_outputs.some((o) => o.id === "o_x"));
   await ctx2.close();
 
   // With sign-ups off, as in a shared project: a visitor is told who makes accounts.

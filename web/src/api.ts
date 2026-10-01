@@ -1,4 +1,4 @@
-import { renderDeckHtml, type Deck, type OneDriveLink, type Slide, type SlopHit, type SourceRef, type Theme } from "@slidecraft/shared";
+import { renderDeckHtml, type ChatAnswer, type ChatTurn, type Deck, type ModelChoice, type NotebookGuide, type OneDriveLink, type Output, type Slide, type SlopHit, type SourceRef, type StudioOptions, type Theme } from "@slidecraft/shared";
 import { ApiError } from "./apiError";
 import { cloud, sb } from "./cloud/client";
 import { cloudRequest } from "./cloud/routes";
@@ -66,7 +66,7 @@ export interface Job {
   status: "queued" | "running" | "done" | "failed";
   progress: string[];
   error: string | null;
-  result: { deckId: string } | null;
+  result: { deckId: string; outputId?: string } | null;
 }
 
 export interface Settings {
@@ -228,6 +228,16 @@ export const api = {
   saveReader: (b: { key?: string | null; baseUrl?: string | null; model?: string | null }) => req<{ ok: true }>("PUT", "/api/settings/reader", b),
   clearReader: () => req<{ ok: true }>("DELETE", "/api/settings/reader"),
   testReader: (b: { key?: string; baseUrl?: string; model?: string }) => req<{ ok: boolean; message: string; models?: string[]; vision?: string }>("POST", "/api/settings/reader/test", b),
+  // The notebook: models to pick from, the Studio, the chat, the guide.
+  models: () => req<{ current: string; models: ModelChoice[]; fast: string | null; open: boolean }>("GET", "/api/models"),
+  outputs: (deckId: string) => req<Output[]>("GET", `/api/decks/${deckId}/outputs`),
+  output: (oid: string) => req<Output>("GET", `/api/outputs/${oid}`),
+  renameOutput: (oid: string, title: string) => req<Output>("PUT", `/api/outputs/${oid}`, { title }),
+  deleteOutput: (oid: string) => req<{ ok: true }>("DELETE", `/api/outputs/${oid}`),
+  saveNote: (deckId: string, b: { title?: string; data: { text: string; question?: string; citations?: { source: string; quote: string }[] } }) => req<Output>("POST", `/api/decks/${deckId}/outputs`, b),
+  studio: (deckId: string, o: StudioOptions) => req<{ jobId: string }>("POST", `/api/decks/${deckId}/studio`, o),
+  ask: (deckId: string, b: { question: string; history: ChatTurn[]; model?: string; sourceIds?: string[] }) => req<ChatAnswer>("POST", `/api/decks/${deckId}/ask`, b),
+  guide: (deckId: string, refresh = false) => req<NotebookGuide>("POST", `/api/decks/${deckId}/guide`, { refresh }),
   testKey: (openaiKey?: string, baseUrl?: string, model?: string) => req<{ ok: boolean; message: string; models?: string[]; imageModels?: string[]; vision?: string }>("POST", "/api/settings/test-key", { openaiKey, baseUrl, model }),
 };
 

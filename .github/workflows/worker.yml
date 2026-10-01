@@ -44,7 +44,9 @@ jobs:
           n=$(curl -fsS "$SUPABASE_URL/rest/v1/sc_jobs?select=id&status=in.(pending,running)&limit=1" \
                 -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | jq length)
           echo "jobs waiting or running: $n"
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "$n" = "0" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+          # A wake-up whose job a warm run already took finds nothing: it stops here instead of
+          # installing and idling a second time. Only a manual run goes on regardless.
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$n" = "0" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
       - if: steps.queue.outputs.run == 'true'
         uses: actions/checkout@v4
       - if: steps.queue.outputs.run == 'true'
@@ -52,8 +54,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # The installed packages are kept between runs, keyed on the lockfile, so a wake-up skips the install.
       - if: steps.queue.outputs.run == 'true'
-        run: npm ci --no-audit --no-fund && npm run build -w shared && npm run build -w server
+        id: deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            shared/node_modules
+            server/node_modules
+          key: worker-deps-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: steps.queue.outputs.run == 'true' && steps.deps.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
+      - if: steps.queue.outputs.run == 'true'
+        run: npm run build -w shared && npm run build -w server
       - if: steps.queue.outputs.run == 'true'
         name: Run the jobs
         env:
@@ -61,5 +75,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          AI_MODELS: ${{ vars.AI_MODELS }}
+          AI_FAST_MODEL: ${{ vars.AI_FAST_MODEL }}
+          SC_IDLE_MS: ${{ vars.SC_IDLE_MS }}
           COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
         run: node server/dist/worker/index.js

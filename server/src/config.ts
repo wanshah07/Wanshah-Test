@@ -39,6 +39,10 @@ export const config = {
   openaiModel: process.env.OPENAI_MODEL || "gpt-4.1",
   openaiImageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
   openaiBase: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+  /** The models a person may choose from ("id=Label, id2"); empty allows any. */
+  aiModels: process.env.AI_MODELS || "",
+  /** A quicker model for the steps that only read and sort (planning, condensing long sources); unset uses the writer model. */
+  fastModel: process.env.AI_FAST_MODEL || "",
   mockLlm: process.env.MOCK_LLM === "1",
   /** Pause inside a mock generation, so progress is visible and a second request can be refused. */
   mockDelayMs: Number(process.env.MOCK_LLM_DELAY_MS || 0),

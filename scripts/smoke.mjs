@@ -36,7 +36,7 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`http://localhost:${PORT}/`);
-  check("decks page renders", await page.locator("h1", { hasText: "Decks" }).isVisible());
+  check("notebooks page renders", await page.locator("h1", { hasText: "Notebooks" }).isVisible());
   // Library: a design from a screenshot, and a saved prompt ticked by default.
   await page.goto(`http://localhost:${PORT}/designs`);
   await page.locator("h1", { hasText: "Designs" }).waitFor({ timeout: 10000 });
@@ -256,7 +256,7 @@ try {
   // Inside another page (VS Code's preview pane), say so and offer a real tab.
   await page.setContent(`<iframe src="http://localhost:${PORT}/" style="width:1200px;height:700px"></iframe>`);
   const inner = page.frameLocator("iframe");
-  await inner.locator("h1", { hasText: "Decks" }).waitFor({ timeout: 10000 });
+  await inner.locator("h1", { hasText: "Notebooks" }).waitFor({ timeout: 10000 });
   check("framed page shows the open-in-a-tab banner", await inner.locator("text=Open it in its own browser tab").isVisible());
   await page.goto(`http://localhost:${PORT}/`);
   await page.locator(".deckcard").first().waitFor({ timeout: 10000 });
@@ -282,6 +282,44 @@ try {
   }
   await page.click("button:has-text('Add files / regenerate')");
   check("Regenerate remembers Auto", await page.locator("[data-testid=regen-auto] input").isChecked());
+  // The notebook: sources, a chat that answers from them, and the Studio.
+  await page.goto(`http://localhost:${PORT}/`);
+  await page.click("[data-testid=new-notebook]");
+  await page.locator("[data-testid=notebook]").waitFor({ timeout: 10000 });
+  check("New notebook opens an empty notebook", (await page.locator("[data-testid=tile-quiz]").isDisabled()) && (await page.locator("[data-testid=nb-question]").isDisabled()));
+  await page.click("button:has-text('+ Paste text')");
+  await page.fill(".nb-sources input[placeholder=Name]", "annex.txt");
+  await page.fill(".nb-sources textarea", "Salicylic acid is capped at 2% in rinse-off products and 0.5% in leave-on products.");
+  await page.click(".nb-sources button:has-text('Add')");
+  await page.locator(".nb-src", { hasText: "annex.txt" }).waitFor({ timeout: 10000 });
+  await page.locator("[data-testid=nb-guide] .nb-starters button").first().waitFor({ timeout: 10000 });
+  check("the notebook guide sums up the sources and offers questions", (await page.locator("[data-testid=nb-guide] .nb-starters button").count()) === 3);
+  await page.fill("[data-testid=nb-question]", "What is the rinse-off limit?");
+  await page.click("[data-testid=nb-ask]");
+  await page.locator(".nb-msg.assistant .nb-answer").first().waitFor({ timeout: 15000 });
+  check("a question is answered from the sources, with a citation", (await page.locator(".nb-answer", { hasText: "2%" }).count()) === 1 && (await page.locator(".nb-cite").count()) >= 1);
+  await page.click(".nb-cite");
+  check("a citation shows the source sentence", await page.locator(".nb-quote", { hasText: "annex.txt" }).isVisible());
+  await page.click(".nb-answer button:has-text('Save to note')");
+  await page.locator(".nb-out", { hasText: "What is the rinse-off limit?" }).waitFor({ timeout: 10000 });
+  check("an answer is saved as a note", true);
+  await page.click("[data-testid=tile-quiz]");
+  check("the Studio dialog offers difficulty and amount", (await page.locator("[data-testid=studio-dialog] button:has-text('Hard')").count()) === 1 && (await page.locator("[data-testid=studio-dialog] button:has-text('More')").count()) === 1);
+  await page.click("[data-testid=studio-dialog] button:has-text('Hard')");
+  await page.click("[data-testid=studio-generate]");
+  await page.locator("[data-testid=output-viewer]").waitFor({ timeout: 20000 });
+  check("a quiz is made and opened", (await page.locator(".ov-q").count()) >= 2);
+  await page.click(".ov-q >> nth=0 >> .ov-opt >> nth=1");
+  check("answering a quiz question marks it and explains it", (await page.locator(".ov-opt.right").count()) === 1 && (await page.locator(".ov-why").count()) === 1 && (await page.locator("[data-testid=quiz-score]").innerText()).includes("1 right"));
+  await page.click("[data-testid=output-viewer] button:has-text('✕')");
+  await page.click("[data-testid=tile-flashcards]");
+  await page.click("[data-testid=studio-generate]");
+  await page.locator("[data-testid=flashcard]").waitFor({ timeout: 20000 });
+  const front = await page.locator("[data-testid=flashcard] .txt").innerText();
+  await page.click("[data-testid=flashcard]");
+  check("a flashcard turns over to its answer", (await page.locator("[data-testid=flashcard] .txt").innerText()) !== front && (await page.locator(".ov-card.back").count()) === 1);
+  await page.click("[data-testid=output-viewer] button:has-text('✕')");
+  check("the Studio keeps every output", (await page.locator("[data-testid=nb-outputs] .nb-out").count()) === 3);
   check("no browser pop-ups used", dialogs === 0);
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);

@@ -82,6 +82,15 @@ const PROMPTS: Table = {
   toRemote: (r, owner) => ({ ...pick(r, PROMPT_COLS.filter((c) => c !== "updated_at")), user_id: owner, is_default: !!r.is_default }),
 };
 
+const OUTPUT_COLS = ["id", "deck_id", "kind", "title", "model", "source_count", "created_at", "updated_at"];
+const OUTPUTS: Table = {
+  remote: "sc_outputs",
+  local: "outputs",
+  cols: ["user_id", ...OUTPUT_COLS, "data"],
+  toLocal: (r) => ({ ...pick(r, OUTPUT_COLS), user_id: LOCAL_USER_ID, data: json(r.data) ?? "{}" }),
+  toRemote: (r, owner) => ({ ...pick(r, OUTPUT_COLS.filter((c) => c !== "updated_at")), user_id: owner, data: parsed(r.data, {}) }),
+};
+
 // Settings: Supabase column -> local column. Keys are not here: the worker reads them from its environment.
 const SETTINGS_MAP: [string, string][] = [
   ["model", "openai_model"],
@@ -100,7 +109,7 @@ const SETTINGS_MAP: [string, string][] = [
   ["vision_for", "vision_for"],
 ];
 
-const TABLES = [DECKS, SOURCES, MEDIA, DESIGNS, PROMPTS];
+const TABLES = [DECKS, SOURCES, MEDIA, DESIGNS, PROMPTS, OUTPUTS];
 
 export interface Loaded {
   owner: string;
@@ -134,7 +143,7 @@ const hashOf = (p: string) => (fs.existsSync(p) ? crypto.createHash("sha256").up
  * deck, its sources and its pictures come too; pictures not tied to a deck
  * (design previews, the library) always come, and designs and prompts always do.
  */
-export async function load(sb: Supabase, owner: string, scope: { deck?: string; media?: string; source?: string }): Promise<Loaded> {
+export async function load(sb: Supabase, owner: string, scope: { deck?: string; media?: string; source?: string; output?: string }): Promise<Loaded> {
   openMemoryDb();
   for (const d of [config.mediaDir, config.sourcesDir]) {
     fs.rmSync(d, { recursive: true, force: true });
@@ -164,12 +173,18 @@ export async function load(sb: Supabase, owner: string, scope: { deck?: string; 
     extraSources = await sb.select("sc_sources", { ...own, id: eq(scope.source) });
     deckId = (extraSources[0]?.deck_id as string | null) ?? null;
   }
+  if (scope.output) {
+    const [o] = await sb.select("sc_outputs", { ...own, id: eq(scope.output) }, { columns: "deck_id" });
+    deckId = (o?.deck_id as string | null) ?? null;
+  }
   const deckBase = new Map<string, { doc: Row; updatedAt: string }>();
   let decks: Row[] = [];
   let sources: Row[] = [];
+  let outputs: Row[] = [];
   if (deckId) {
     decks = await sb.select("sc_decks", { ...own, id: eq(deckId) });
     if (decks.length) sources = await sb.select("sc_sources", { ...own, deck_id: eq(deckId) }, { order: "created_at.asc" });
+    if (decks.length) outputs = await sb.select("sc_outputs", { ...own, deck_id: eq(deckId) });
     for (const d of decks) deckBase.set(String(d.id), { doc: (d.doc ?? {}) as Row, updatedAt: String(d.updated_at) });
   }
   const byId = new Map<string, Row>();
@@ -190,6 +205,7 @@ export async function load(sb: Supabase, owner: string, scope: { deck?: string; 
   insertLocal(MEDIA, media.map(MEDIA.toLocal));
   insertLocal(DESIGNS, designs.map(DESIGNS.toLocal));
   insertLocal(PROMPTS, prompts.map(PROMPTS.toLocal));
+  insertLocal(OUTPUTS, outputs.map(OUTPUTS.toLocal));
 
   const fileHash = new Map<string, string>();
   for (const m of media) {
@@ -263,7 +279,7 @@ export async function flush(sb: Supabase, l: Loaded): Promise<Flushed> {
     }
   }
 
-  for (const t of [SOURCES, MEDIA, DESIGNS, PROMPTS]) {
+  for (const t of [SOURCES, MEDIA, DESIGNS, PROMPTS, OUTPUTS]) {
     const d = byTable.get(t.local)!;
     await sb.insert(t.remote, d.added.map((r) => t.toRemote(r, owner)));
     for (const r of d.changed) {
@@ -273,7 +289,7 @@ export async function flush(sb: Supabase, l: Loaded): Promise<Flushed> {
   }
 
   // Removals, children first.
-  for (const t of [SOURCES, PROMPTS, DESIGNS, MEDIA, DECKS]) {
+  for (const t of [OUTPUTS, SOURCES, PROMPTS, DESIGNS, MEDIA, DECKS]) {
     const ids = byTable.get(t.local)!.removed;
     if (!ids.length) continue;
     if (t === MEDIA) {

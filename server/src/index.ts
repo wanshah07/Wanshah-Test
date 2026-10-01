@@ -17,6 +17,7 @@ import { settingsRoutes } from "./routes/settings.js";
 import { oneDriveRoutes } from "./routes/onedrive.js";
 import { gdriveRoutes } from "./routes/gdrive.js";
 import { libraryRoutes } from "./routes/library.js";
+import { studioRoutes } from "./routes/studio.js";
 
 export async function buildApp(): Promise<ReturnType<typeof Fastify>> {
   ensureDirs();
@@ -36,6 +37,7 @@ export async function buildApp(): Promise<ReturnType<typeof Fastify>> {
   await app.register(sourceRoutes);
   await app.register(mediaRoutes);
   await app.register(generateRoutes);
+  await app.register(studioRoutes);
   await app.register(exportRoutes);
   await app.register(settingsRoutes);
   await app.register(oneDriveRoutes);

@@ -2,7 +2,14 @@ import {
   angleById,
   checkSource,
   HOUSE_DEFAULT,
+  cleanModelId,
   DEFAULT_THEME_ID,
+  parseModelList,
+  pickModel,
+  sanitizeOutput,
+  sanitizeOutputData,
+  type NoteData,
+  type Output,
   HOUSE_MAX,
   houseValue,
   LAYOUTS,
@@ -62,6 +69,10 @@ async function deckRow(id: string): Promise<Row> {
   const r = check(await sb().from("sc_decks").select("id, title, doc, created_at, updated_at").eq("id", id).maybeSingle());
   if (!r) throw notFound();
   return r;
+}
+
+function outputOf(r: Row): Output | null {
+  return sanitizeOutput({ id: r.id, deckId: r.deck_id, kind: r.kind, title: r.title, data: r.data, model: r.model ?? undefined, sourceCount: r.source_count ?? undefined, createdAt: r.created_at, updatedAt: r.updated_at });
 }
 
 async function sourceRefs(deckId: string): Promise<SourceRef[]> {
@@ -308,10 +319,11 @@ const routes: [string, RegExp, Handler][] = [
     async (p, body) => {
       const cur = await loadDeck(p[1]);
       if (!validDeck(body) || body.id !== p[1]) throw new ApiError("invalid_deck", 400, "invalid_deck");
-      // Sources, the OneDrive link and the stored brief belong to the worker's side, as on the server.
-      const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief };
+      // Sources, the OneDrive link, the stored brief and the guide belong to the worker's side, as on the server.
+      const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief, guide: cur.guide };
       if (!next.onedrive) delete next.onedrive;
       if (!next.brief) delete next.brief;
+      if (!next.guide) delete next.guide;
       await saveDoc(next);
       return { deck: next, slop: scanDeck(next) };
     },
@@ -371,6 +383,70 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   ["POST", /^\/api\/decks\/([^/]+)\/generate$/, async (p, b) => startWork(`/api/decks/${p[1]}/generate`, b ?? {}, "generate")],
+  // The Studio: outputs are read, renamed and deleted here; making one is the worker's.
+  ["POST", /^\/api\/decks\/([^/]+)\/studio$/, async (p, b) => startWork(`/api/decks/${p[1]}/studio`, b ?? {}, "studio")],
+  ["GET", /^\/api\/decks\/([^/]+)\/outputs$/, async (p) => {
+    await deckRow(p[1]);
+    const rows = check(await sb().from("sc_outputs").select("*").eq("deck_id", p[1]).order("created_at", { ascending: false })) as Row[];
+    return rows.map(outputOf).filter((o): o is Output => !!o);
+  }],
+  [
+    "POST",
+    /^\/api\/decks\/([^/]+)\/outputs$/,
+    async (p, b) => {
+      await deckRow(p[1]);
+      const data = sanitizeOutputData("note", b?.data) as NoteData;
+      if (!data.text) throw new ApiError("A note needs some text.", 400, "invalid");
+      const title = typeof b?.title === "string" && b.title.trim() ? b.title.trim().slice(0, 200) : data.text.slice(0, 60);
+      const [row] = check(await sb().from("sc_outputs").insert({ id: uid("o"), deck_id: p[1], kind: "note", title, data }).select("*")) as Row[];
+      return outputOf(row);
+    },
+  ],
+  ["GET", /^\/api\/outputs\/([^/]+)$/, async (p) => {
+    const row = check(await sb().from("sc_outputs").select("*").eq("id", p[1]).maybeSingle()) as Row | null;
+    const o = row ? outputOf(row) : null;
+    if (!o) throw notFound();
+    return o;
+  }],
+  [
+    "PUT",
+    /^\/api\/outputs\/([^/]+)$/,
+    async (p, b) => {
+      const title = String(b?.title ?? "").trim().slice(0, 200);
+      if (!title) throw new ApiError("A title is needed.", 400, "invalid");
+      const [row] = check(await sb().from("sc_outputs").update({ title }).eq("id", p[1]).select("*")) as Row[];
+      if (!row) throw notFound();
+      return outputOf(row);
+    },
+  ],
+  [
+    "DELETE",
+    /^\/api\/outputs\/([^/]+)$/,
+    async (p) => {
+      const rows = check(await sb().from("sc_outputs").delete().eq("id", p[1]).select("id")) as Row[];
+      if (!rows.length) throw notFound();
+      return { ok: true };
+    },
+  ],
+  // A guide written for the sources the notebook still has is read from the notebook; otherwise the worker writes one.
+  [
+    "POST",
+    /^\/api\/decks\/([^/]+)\/guide$/,
+    async (p, b) => {
+      const r = await deckRow(p[1]);
+      const g = (r.doc as Deck).guide;
+      const rows = check(await sb().from("sc_sources").select("id, chars").eq("deck_id", p[1]).order("created_at")) as Row[];
+      const key = rows.map((x) => `${x.id}:${x.chars}`).join(",");
+      if (g && g.sourceKey === key && b?.refresh !== true) return g;
+      return viaWorker("POST", `/api/decks/${p[1]}/guide`, b ?? {}, undefined);
+    },
+  ],
+  ["GET", /^\/api\/models$/, async () => {
+    const listed = parseModelList(import.meta.env.VITE_AI_MODELS);
+    const current = pickModel(undefined, (await settingsRow()).model as string | null, cleanModelId(import.meta.env.VITE_AI_DEFAULT) || listed[0]?.id || "", listed);
+    const models = !current || listed.some((m) => m.id === current) ? listed : [{ id: current, label: current }, ...listed];
+    return { current, models, fast: null, open: !listed.length };
+  }],
   ["POST", /^\/api\/decks\/([^/]+)\/feedback\/apply$/, async (p) => startWork(`/api/decks/${p[1]}/feedback/apply`, {}, "feedback")],
   ["GET", /^\/api\/jobs\/([^/]+)$/, async (p) => {
     const j = await readJob(p[1]);

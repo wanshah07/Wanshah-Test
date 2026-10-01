@@ -54,7 +54,7 @@ try {
   check("a missing deck says so", await page.locator("text=This deck does not exist").isVisible());
   // Phone width: nothing wider than the screen.
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  for (const url of ["/", "/new", `/deck/${id}`, "/settings", "/designs", "/prompts"]) {
+  for (const url of ["/", "/new", `/deck/${id}`, `/deck/${id}/notebook`, "/settings", "/designs", "/prompts"]) {
     await phone.goto(base + url); await phone.waitForTimeout(700);
     const sw = await phone.evaluate(() => document.documentElement.scrollWidth);
     check(`no sideways scroll at 390px on ${url}`, sw <= 392, `scrollWidth ${sw}`);
