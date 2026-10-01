@@ -26,3 +26,33 @@ export function mockDeckJson(p: GenerateParams, sourceNames: string[]): { title:
 export function mockRewrite(slide: Record<string, unknown>, instruction: string): Record<string, unknown> {
   return { ...slide, title: `${slide.title}`, notes: `${slide.notes ?? ""}\n[mock rewrite: ${instruction}]`.trim() };
 }
+
+/** A Studio output with the shape each kind takes, so tests and MOCK_LLM runs need no model. */
+export function mockStudio(o: { kind: string; format?: string }, sourceNames: string[]): Record<string, unknown> {
+  const src = sourceNames[0] ?? "the sources";
+  switch (o.kind) {
+    case "report":
+      return { title: "Briefing: salicylic acid limits", summary: "Salicylic acid is capped at 2% in rinse-off products.", sections: [{ heading: "Key findings", paragraphs: ["The rinse-off limit is 2%."], points: ["Leave-on is capped at 0.5%"] }, { heading: "What to do", paragraphs: ["Check every rinse-off formula."], points: [] }], citations: [src] };
+    case "flashcards":
+      return { title: "Salicylic acid cards", cards: [{ front: "Rinse-off limit", back: "2%", source: src }, { front: "Leave-on limit", back: "0.5%", source: null }, { front: "Label warning", back: "Not for children under 3", source: src }] };
+    case "quiz":
+      return { title: "Salicylic acid quiz", questions: [{ question: "What is the rinse-off limit?", options: ["0.5%", "2%", "3%", "5%"], answer: 1, explanation: "Annex III sets 2% for rinse-off.", source: src }, { question: "Which warning applies?", options: ["Not for children under 3", "Flammable", "Keep frozen", "None"], answer: 0, explanation: "The annex requires it.", source: null }] };
+    case "mindmap":
+      return { title: "Salicylic acid", nodes: [{ id: "n1", parent: null, label: "Salicylic acid", note: null }, { id: "n2", parent: "n1", label: "Limits", note: null }, { id: "n3", parent: "n2", label: "Rinse-off 2%", note: "Annex III" }, { id: "n4", parent: "n1", label: "Labelling", note: null }, { id: "n5", parent: "n4", label: "Under 3 warning", note: null }] };
+    case "table":
+      return { title: "Limits by product type", columns: ["Product type", "Limit", "Source"], rows: [["Rinse-off", "2%", src], ["Leave-on", "0.5%", src]], note: "Limits as a share of the finished product.", source: src };
+    case "infographic":
+      return { title: "Salicylic acid at a glance", headline: "Salicylic acid is capped at 2% in rinse-off", subtitle: "What the annex sets", stats: [{ value: "2%", label: "rinse-off cap" }, { value: "0.5%", label: "leave-on cap" }, { value: "3", label: "years minimum age" }], sections: [{ heading: "Limits", points: ["2% rinse-off", "0.5% leave-on"] }, { heading: "Labels", points: ["Not for children under 3"] }], takeaway: "Check the product type before the percentage.", source: src };
+    default:
+      return {};
+  }
+}
+
+export function mockAnswer(question: string, sourceNames: string[]): { answer: string; citations: { source: string; quote: string }[]; followUps: string[] } {
+  const src = sourceNames[0];
+  return {
+    answer: src ? `From ${src}: salicylic acid is capped at 2% in rinse-off products. (You asked: ${question.slice(0, 80)})` : "This notebook has no sources yet, so there is nothing to answer from.",
+    citations: src ? [{ source: src, quote: "2%" }] : [],
+    followUps: src ? ["What is the leave-on limit?", "Which warning must the label carry?", "Does the limit apply in Malaysia?"] : [],
+  };
+}

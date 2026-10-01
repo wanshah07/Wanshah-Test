@@ -69,10 +69,31 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'ok   cannot upload into another person''s folder';
 end $$;
 
+-- Studio outputs: Wan's own, on Wan's own notebook only
+insert into public.sc_outputs (id, deck_id, kind, title, data) values ('o_wan', 'd_wan', 'quiz', 'Quiz', '{"questions":[]}');
+select pg_temp.expect((select user_id from public.sc_outputs where id = 'o_wan') = '00000000-0000-0000-0000-00000000000a', 'a new output belongs to whoever made it');
+do $$ begin
+  insert into public.sc_outputs (id, deck_id, kind, title) values ('o_x', 'd_mate', 'note', 'x');
+  raise exception 'FAILED: put an output on another person''s notebook';
+exception when insufficient_privilege then raise notice 'ok   cannot put an output on another person''s notebook';
+end $$;
+do $$ begin
+  update public.sc_outputs set deck_id = 'd_mate' where id = 'o_wan';
+  raise exception 'FAILED: moved an output onto another person''s notebook';
+exception when insufficient_privilege then raise notice 'ok   cannot move an output onto another person''s notebook';
+end $$;
+do $$ begin
+  insert into public.sc_outputs (id, user_id, deck_id, kind, title) values ('o_forge', '00000000-0000-0000-0000-00000000000b', 'd_wan', 'note', 'x');
+  raise exception 'FAILED: forged an output for someone else';
+exception when insufficient_privilege then raise notice 'ok   cannot make an output in someone else''s name';
+end $$;
+
 -- A teammate
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
 select pg_temp.expect((select count(*) from public.sc_decks) = 1 and (select title from public.sc_decks) = 'Mate deck', 'a teammate sees only their own deck');
 select pg_temp.expect((select count(*) from public.sc_sources) = 0 and (select count(*) from public.sc_jobs) = 0, 'and none of Wan''s sources or jobs');
+select pg_temp.expect((select count(*) from public.sc_outputs) = 0, 'and none of Wan''s Studio outputs');
+delete from public.sc_outputs where id = 'o_wan';
 select pg_temp.expect((select count(*) from storage.objects) = 0, 'and none of Wan''s files');
 
 -- Signed in, but not a member
@@ -98,10 +119,11 @@ end $$;
 reset role;
 set role anon;
 select set_config('request.jwt.claim.sub', '', false);
-select pg_temp.expect((select count(*) from public.sc_decks) = 0 and (select count(*) from public.sc_settings) = 0 and (select count(*) from public.sc_jobs) = 0, 'the public anon key reads nothing');
+select pg_temp.expect((select count(*) from public.sc_decks) = 0 and (select count(*) from public.sc_settings) = 0 and (select count(*) from public.sc_jobs) = 0 and (select count(*) from public.sc_outputs) = 0, 'the public anon key reads nothing');
 
 -- The worker (service_role) sees everything and wakes on a new job
 reset role;
+select pg_temp.expect((select count(*) from public.sc_outputs where id = 'o_wan') = 1, 'a teammate''s delete did not remove Wan''s output');
 select pg_temp.expect((select count(*) from net.calls where body->>'event_type' = 'slidecraft_job') = 1, 'the queued job fired one repository_dispatch');
 select pg_temp.expect((select body->'client_payload' ? 'id' and not (body->'client_payload' ? 'request') from net.calls limit 1), 'the dispatch carries only the job id, never its content');
 select pg_temp.expect((select url from net.calls limit 1) = 'https://api.github.com/repos/wanshah07/Wanshah-Test/dispatches', 'to the repository named in the vault');

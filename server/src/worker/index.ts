@@ -25,7 +25,8 @@ async function main(): Promise<void> {
   const { Supabase } = await import("./supabase.js");
   const { drain, log } = await import("./run.js");
   const app = await buildApp();
-  const n = await drain(app, new Supabase({ url, serviceKey: key }), Number(process.env.SC_RUN_BUDGET_MS || 35 * 60_000));
+  // Warm for 5 minutes after the last job (SC_IDLE_MS), so a run of clicks shares one start-up.
+  const n = await drain(app, new Supabase({ url, serviceKey: key }), Number(process.env.SC_RUN_BUDGET_MS || 35 * 60_000), Number(process.env.SC_IDLE_MS || 5 * 60_000));
   log("ran", n, "job(s)");
   await app.close();
 }

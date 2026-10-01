@@ -1,3 +1,4 @@
+import { parseModelList, pickModel, type ModelChoice } from "@slidecraft/shared";
 import { config } from "./config.js";
 import { decrypt, encrypt } from "./crypto.js";
 import { getDb, now } from "./db.js";
@@ -74,10 +75,21 @@ export function baseUrlFor(userId: string): string {
  * server's env second. A key saved against one endpoint is only ever sent to
  * the endpoint saved with it; the env key is only ever sent to the env endpoint.
  */
-export function resolveAuth(userId: string): LlmAuth | null {
+export function resolveAuth(userId: string, asked?: unknown): LlmAuth | null {
   const s = readSettings(userId);
   const own = userKey(userId);
-  if (own) return { apiKey: own, baseUrl: s.openai_base || config.openaiBase, model: s.openai_model || config.openaiModel, imageModel: s.openai_image_model || config.openaiImageModel };
+  // A person's own key may run any model; the server's key runs only the models the owner listed.
+  if (own) return { apiKey: own, baseUrl: s.openai_base || config.openaiBase, model: pickModel(asked, s.openai_model, config.openaiModel, []), imageModel: s.openai_image_model || config.openaiImageModel };
   if (!config.openaiKey) return null;
-  return { apiKey: config.openaiKey, baseUrl: config.openaiBase, model: s.openai_model || config.openaiModel, imageModel: s.openai_image_model || config.openaiImageModel };
+  return { apiKey: config.openaiKey, baseUrl: config.openaiBase, model: pickModel(asked, s.openai_model, config.openaiModel, modelChoices()), imageModel: s.openai_image_model || config.openaiImageModel };
+}
+
+/** The models the owner lets people pick, with the default first when it is not listed. */
+export function modelChoices(): ModelChoice[] {
+  return parseModelList(config.aiModels);
+}
+
+/** The same key and endpoint on the quicker model, for planning and condensing. */
+export function fastAuth(auth: LlmAuth): LlmAuth {
+  return config.fastModel ? { ...auth, model: config.fastModel } : auth;
 }

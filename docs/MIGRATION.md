@@ -47,14 +47,17 @@ So `server/src/llm`, `export`, `ingest`, `design`, `onedrive.ts` and
 ## Which requests go where
 
 **Straight to Supabase from the page** (instant, protected by RLS):
-list, open, rename, save and delete decks; list and delete sources and media;
+list, open, rename, save and delete decks; read, rename and delete Studio
+outputs and save a note (`sc_outputs`, `supabase/005_outputs.sql`); the
+notebook guide while its sources have not changed; list and delete sources and media;
 open a picture (a signed link); designs and prompts; Settings choices (model,
 theme, default folder, the Composio account picks, the house instructions);
 sign-in and sign-out.
 
 **Through the worker** (starts in roughly 20 to 60 seconds, then runs as long
 as the work takes):
-write a deck, design pass, rewrite or feedback on a slide, upload and read a
+write a deck, design pass, rewrite or feedback on a slide, answer a chat
+question, make a Studio output, write the notebook guide, upload and read a
 source file, read a Google Drive or Sheets link, OneDrive import and browse,
 find Composio accounts, analyse a design file, export PowerPoint and HTML,
 duplicate a deck.
@@ -64,8 +67,10 @@ Microsoft direct sign-in for OneDrive (it stores a refresh token per person;
 Composio covers OneDrive without one); `AUTH_MODE` and `npm run user:add`.
 
 The waiting is the one real cost. Writing a whole deck already takes minutes,
-so 30 seconds more is small. Rewriting one slide goes from a few seconds to
-about a minute.
+so 30 seconds more is small. The worker stays warm for five minutes after a
+job (`SC_IDLE_MS`) and keeps its installed packages between runs, so the
+first question in a sitting waits for a runner and the ones after it start
+at once.
 
 ## What a teammate sees
 
@@ -180,7 +185,8 @@ not needed.
 1. Create a Supabase project for Slidecraft (Free plan, region Singapore). A
    separate project keeps client decks apart from KPI data. The files also
    run in the KPI project if a second free project is not available.
-2. In the SQL editor, run `supabase/001` to `004` in order.
+2. In the SQL editor, run `supabase/001` to `005` in order (005 adds the
+   Studio's outputs; run it on its own when 001 to 004 are already in).
 3. Put the dispatch token and repo in Vault (the two lines at the top of
    `004_dispatch.sql`).
 4. In GitHub, Settings, Secrets and variables, Actions:
@@ -188,6 +194,9 @@ not needed.
      and `COMPOSIO_API_KEY` if Drive or OneDrive is used;
    - optionally variables `OPENAI_BASE_URL` and `OPENAI_MODEL` for another
      endpoint or model (each person's model choice in Settings still wins);
+   - optionally `AI_MODELS`, the models people may pick in the notebook
+     (`claude-opus-5.5=Claude Opus 5.5, gpt-6-luna=GPT-6 Luna`), and
+     `AI_FAST_MODEL`, a quicker model for reading long sources;
    - variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 5. In GitHub, Settings, Secrets and variables, Actions, **Variables** tab:
    `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Supabase, Project

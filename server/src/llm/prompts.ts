@@ -20,6 +20,8 @@ export interface GenerateParams {
   off?: string[];
   /** The person's own instructions for every deck, from Settings; the built-in house rules when absent. */
   houseRules?: string | null;
+  /** The writer model asked for on this request; the person's own or the default when not allowed. */
+  model?: string;
 }
 
 function houseLines(house: GenerateParams["house"], designNotes: string | undefined): string[] {
@@ -36,7 +38,7 @@ function houseLines(house: GenerateParams["house"], designNotes: string | undefi
   return out;
 }
 
-const LANG_RULES: Record<Lang, string> = {
+export const LANG_RULES: Record<Lang, string> = {
   en: "Write in English. Short sentences. No filler.",
   ms:
     "Tulis dalam Bahasa Malaysia (Malaysia, BUKAN Bahasa Indonesia). Gunakan: boleh (bukan bisa), ubat (bukan obat), syarikat (bukan perusahaan), kualiti (bukan kualitas), pembungkusan (bukan kemasan), kerana (bukan karena), perlu (bukan butuh), pihak berkuasa (bukan berwenang), kosmetik (bukan kosmetika). Istilah rasmi kekal dalam bentuk asal: Notifikasi Kosmetik, Garis Panduan, Borang, Sijil Halal. Ayat pendek.",

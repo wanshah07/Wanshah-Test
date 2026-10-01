@@ -50,12 +50,13 @@ export async function deckRoutes(app: FastifyInstance): Promise<void> {
     if (!cur) return reply.code(404).send({ error: "not_found" });
     const body = req.body;
     if (!validDeck(body) || body.id !== id) return reply.code(400).send({ error: "invalid_deck" });
-    // Sources, the OneDrive link and the stored brief are the server's: an editor tab opened
+    // Sources, the OneDrive link, the stored brief and the notebook guide are the server's: an editor tab opened
     // before an import must not wipe the link when it autosaves.
     // Saved in the shapes the renderer and exporter trust: a colour is a colour, a table is square.
-    const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief };
+    const next: Deck = { ...body, title: String(body.title).slice(0, 300), slides: body.slides.map((x) => sanitizeSlide(x)), theme: sanitizeTheme(body.theme), createdAt: cur.createdAt, sources: cur.sources, onedrive: cur.onedrive, brief: cur.brief, guide: cur.guide };
     if (!next.onedrive) delete next.onedrive;
     if (!next.brief) delete next.brief;
+    if (!next.guide) delete next.guide;
     saveDeck(req.user.id, next);
     return { deck: next, slop: scanDeck(next) };
   });

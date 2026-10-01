@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { checkSource, sanitizeSlide, sanitizeTheme, type Slide, type Deck, type SourceRef } from "@slidecraft/shared";
+import { checkSource, sanitizeOutput, sanitizeSlide, sanitizeTheme, type Deck, type Output, type OutputData, type OutputKind, type Slide, type SourceRef } from "@slidecraft/shared";
 import { getDb, now, uid } from "./db.js";
 import { config } from "./config.js";
 
@@ -141,4 +141,56 @@ export function mediaDataUrl(userId: string, id: string): string {
   const m = getMedia(userId, id);
   if (!m || !fs.existsSync(m.path)) return "";
   return `data:${m.mime};base64,${fs.readFileSync(m.path).toString("base64")}`;
+}
+
+// ---------------------------------------------------------------- Studio outputs
+
+interface OutputRow {
+  id: string;
+  deck_id: string;
+  kind: string;
+  title: string;
+  data: string;
+  model: string | null;
+  source_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function outputOf(r: OutputRow): Output | null {
+  let data: unknown = {};
+  try {
+    data = JSON.parse(r.data);
+  } catch {
+    /* an unreadable output shows as empty */
+  }
+  return sanitizeOutput({ id: r.id, deckId: r.deck_id, kind: r.kind, title: r.title, data, model: r.model ?? undefined, sourceCount: r.source_count ?? undefined, createdAt: r.created_at, updatedAt: r.updated_at });
+}
+
+export function listOutputs(userId: string, deckId: string): Output[] {
+  const rows = getDb().prepare("SELECT * FROM outputs WHERE deck_id = ? AND user_id = ? ORDER BY created_at DESC").all(deckId, userId) as unknown as OutputRow[];
+  return rows.map(outputOf).filter((o): o is Output => !!o);
+}
+
+export function getOutput(userId: string, id: string): Output | null {
+  const r = getDb().prepare("SELECT * FROM outputs WHERE id = ? AND user_id = ?").get(id, userId) as unknown as OutputRow | undefined;
+  return r ? outputOf(r) : null;
+}
+
+export function addOutput(userId: string, o: { deckId: string; kind: OutputKind; title: string; data: OutputData; model?: string; sourceCount?: number }): Output {
+  const id = uid("o");
+  const t = now();
+  getDb()
+    .prepare("INSERT INTO outputs (id, user_id, deck_id, kind, title, data, model, source_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(id, userId, o.deckId, o.kind, o.title.slice(0, 200), JSON.stringify(o.data), o.model ?? null, o.sourceCount ?? null, t, t);
+  return getOutput(userId, id)!;
+}
+
+export function renameOutput(userId: string, id: string, title: string): Output | null {
+  getDb().prepare("UPDATE outputs SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?").run(title.slice(0, 200), now(), id, userId);
+  return getOutput(userId, id);
+}
+
+export function deleteOutput(userId: string, id: string): boolean {
+  return Number(getDb().prepare("DELETE FROM outputs WHERE id = ? AND user_id = ?").run(id, userId).changes) > 0;
 }

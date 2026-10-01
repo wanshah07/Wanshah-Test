@@ -56,7 +56,7 @@ const LIMIT_MS = Number(process.env.SC_JOB_LIMIT_MS || 25 * 60_000);
 export const log = (...parts: (string | number)[]) => console.log(`[worker] ${parts.join(" ")}`);
 
 /** What a request is about, from its path: a deck, a picture or a source. */
-export function scopeOf(path: string): { deck?: string; media?: string; source?: string } {
+export function scopeOf(path: string): { deck?: string; media?: string; source?: string; output?: string } {
   const p = path.split("?")[0];
   const deck = /^\/api\/decks\/([^/]+)/.exec(p)?.[1];
   if (deck) return { deck };
@@ -64,6 +64,8 @@ export function scopeOf(path: string): { deck?: string; media?: string; source?:
   if (media) return { media };
   const source = /^\/api\/sources\/([^/]+)/.exec(p)?.[1];
   if (source) return { source };
+  const output = /^\/api\/outputs\/([^/]+)/.exec(p)?.[1];
+  if (output) return { output };
   return {};
 }
 
@@ -176,15 +178,25 @@ export async function sweepStale(sb: Supabase, olderThanMs = 45 * 60_000): Promi
   return rows.length;
 }
 
-/** Every pending job, oldest first, until none is left or the run's time is up. */
-export async function drain(app: FastifyInstance, sb: Supabase, budgetMs = 35 * 60_000): Promise<number> {
+/**
+ * Every pending job, oldest first, until none is left or the run's time is up. With idleMs, the run
+ * stays warm that long after its last job, checking every 2 seconds: the next question, Studio output
+ * or slide rewrite then starts at once instead of waiting for a new runner to install and build.
+ */
+export async function drain(app: FastifyInstance, sb: Supabase, budgetMs = 35 * 60_000, idleMs = 0): Promise<number> {
   const start = Date.now();
   let n = 0;
+  let lastWork = Date.now();
   const swept = await sweepStale(sb);
   if (swept) log("marked", swept, "stale job(s) as failed");
   while (Date.now() - start < budgetMs) {
     const [job] = (await sb.select("sc_jobs", { status: "eq.pending" }, { order: "created_at.asc", limit: 1 })) as unknown as JobRow[];
-    if (!job) break;
+    if (!job) {
+      if (Date.now() - lastWork >= idleMs) break;
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+    lastWork = Date.now();
     if (job.attempts >= 2) {
       await sb.update("sc_jobs", { id: eq(job.id) }, { status: "error", error: "The worker could not finish this. Try again." });
       continue;
@@ -192,6 +204,7 @@ export async function drain(app: FastifyInstance, sb: Supabase, budgetMs = 35 * 
     if (!(await claim(sb, job))) continue;
     log("job", job.id, "claimed", job.kind);
     await runJob(app, sb, job);
+    lastWork = Date.now();
     n++;
   }
   return n;

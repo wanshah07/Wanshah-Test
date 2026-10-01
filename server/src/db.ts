@@ -120,6 +120,19 @@ function migrate(d: DatabaseSync): void {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS outputs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      data TEXT NOT NULL,
+      model TEXT,
+      source_count INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS outputs_deck ON outputs(deck_id, created_at);
   `);
   // Columns added after the first release. SQLite has no ADD COLUMN IF NOT EXISTS.
   const cols = (d.prepare("PRAGMA table_info(settings)").all() as { name: string }[]).map((c) => c.name);

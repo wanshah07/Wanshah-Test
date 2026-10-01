@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs supabase/001..004 on a throwaway local Postgres with a stand-in for
+# Runs supabase/0*.sql in order on a throwaway local Postgres with a stand-in for
 # Supabase's own schemas, then checks the row level security from the side of
 # the owner, a teammate, a signed-in stranger and the public anon key.
 # Needs Postgres 15+ binaries (initdb, pg_ctl, psql) on PATH or in PG_BIN.

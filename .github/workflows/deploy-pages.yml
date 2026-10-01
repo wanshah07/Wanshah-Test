@@ -36,6 +36,9 @@ jobs:
     env:
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      # The model picker: the models people may choose and the default. Model names only, never a key.
+      VITE_AI_MODELS: ${{ vars.AI_MODELS }}
+      VITE_AI_DEFAULT: ${{ vars.OPENAI_MODEL }}
     steps:
       - uses: actions/checkout@v4
 

@@ -276,12 +276,23 @@ export interface Deck {
   sources: SourceRef[];
   /** OneDrive folder whose pictures are pulled in before each generation. Written by the server only. */
   onedrive?: OneDriveLink;
+  /** The notebook guide: a summary of the sources and questions worth asking. Written by the server only. */
+  guide?: NotebookGuide;
   /** The choices behind the last generation, so Regenerate starts from them. Written by the server only. */
   brief?: DeckBrief;
   /** The saved design the theme came from. Its notes guide the writer while it is set. */
   designId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface NotebookGuide {
+  summary: string;
+  topics: string[];
+  questions: string[];
+  /** Which sources it was written from, so a changed set of sources is noticed. */
+  sourceKey: string;
+  at: string;
 }
 
 export interface DeckBrief {

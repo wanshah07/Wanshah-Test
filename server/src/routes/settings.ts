@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { DEFAULT_THEME_ID } from "@slidecraft/shared";
+import { DEFAULT_THEME_ID, pickModel } from "@slidecraft/shared";
 import { HOUSE_DEFAULT, HOUSE_MAX, houseFor, saveHouse } from "../llm/house.js";
 import { config } from "../config.js";
 import { maskKey } from "../crypto.js";
 import { checkKey, hostOf, NOT_A_WRITER } from "../llm/client.js";
-import { baseUrlFor, normaliseBase, PROVIDERS, readSettings, resolveAuth, userKey, writeSettings } from "../settings.js";
+import { baseUrlFor, modelChoices, normaliseBase, PROVIDERS, readSettings, resolveAuth, userKey, writeSettings } from "../settings.js";
 import { knownVision, visionFor } from "../llm/vision.js";
 import { pictureAuth, readerSettings, saveReader } from "../reader.js";
 
@@ -40,6 +40,16 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       appTheme: s.app_theme || "system",
       defaultTheme: s.default_theme || DEFAULT_THEME_ID,
     };
+  });
+
+  // The models a person can pick for a deck, a Studio output or a chat, and the one in effect.
+  app.get("/api/models", async (req) => {
+    const s = readSettings(req.user.id);
+    const own = !!userKey(req.user.id);
+    const listed = own ? [] : modelChoices();
+    const current = pickModel(undefined, s.openai_model, config.openaiModel, listed);
+    const models = listed.some((m) => m.id === current) ? listed : [{ id: current, label: current }, ...listed];
+    return { current, models, fast: config.fastModel || null, open: !listed.length };
   });
 
   app.put("/api/settings", async (req, reply) => {

@@ -360,3 +360,24 @@ describe("the briefing design", () => {
     expect(renderSlideHtml({ id: "c", layout: "cards", title: "C", cards: Array.from({ length: 6 }, (_, i) => ({ heading: `h${i}` })) }, b, ctx)).not.toContain("sc-cards r1");
   });
 });
+
+describe("Studio outputs and model lists", () => {
+  it("keeps what a viewer can draw and drops the rest", async () => {
+    const { sanitizeOutputData, isEmptyOutput, outputToMarkdown, tableToCsv, parseModelList, pickModel, sanitizeAnswer } = await import("../src/index.js");
+    const q = sanitizeOutputData("quiz", { questions: [{ question: "Q", options: ["a", "b"], answer: "b", explanation: "e" }, { question: "bad", options: ["a"], answer: 0 }, { question: "out of range", options: ["a", "b"], answer: 5 }] }) as { questions: { answer: number }[] };
+    expect(q.questions.length).toBe(1);
+    expect(q.questions[0].answer).toBe(1);
+    const t = sanitizeOutputData("table", { columns: ["A", "B"], rows: [["1"], ["=cmd()", "x,y"], []] }) as { columns: string[]; rows: string[][] };
+    expect(t.rows).toEqual([["1", ""], ["=cmd()", "x,y"]]);
+    expect(tableToCsv(t)).toBe('A,B\r\n1,\r\n\'=cmd(),"x,y"\r\n');
+    expect(isEmptyOutput("flashcards", sanitizeOutputData("flashcards", { cards: [{ front: "x" }] }))).toBe(true);
+    expect(outputToMarkdown({ id: "o", deckId: "d", kind: "table", title: "T", data: t, createdAt: "", updatedAt: "" })).toContain("| A | B |");
+    expect(parseModelList("claude-opus-5.5=Claude Opus, gpt-6-luna, bad id, gpt-6-luna")).toEqual([{ id: "claude-opus-5.5", label: "Claude Opus" }, { id: "gpt-6-luna", label: "gpt-6-luna" }]);
+    const list = parseModelList("a,b");
+    expect(pickModel("b", "a", "d", list)).toBe("b");
+    expect(pickModel("zzz", "a", "d", list)).toBe("a");
+    expect(pickModel("zzz", "zzz", "d", list)).toBe("d");
+    expect(pickModel("anything", null, "d", [])).toBe("anything");
+    expect(sanitizeAnswer({ answer: "x", citations: [{ source: "s", quote: "" }, { source: "s", quote: "q" }], followUps: ["a", "b", "c", "d"] })).toEqual({ answer: "x", citations: [{ source: "s", quote: "q" }], followUps: ["a", "b", "c"] });
+  });
+});

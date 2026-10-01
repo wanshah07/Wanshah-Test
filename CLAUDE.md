@@ -41,6 +41,14 @@ apply:
 
 ## 2. One spec, three consumers
 
+The Studio follows the same rule: `shared/src/studio.ts` is every output's
+shape. The writer (`server/src/llm/studio.ts`), the store (`outputs` locally,
+`sc_outputs` in Supabase), the worker's mirror and the viewers
+(`web/src/components/OutputView.tsx`) all read it. A new output kind goes into
+`OUTPUT_KINDS`, `KIND_INFO`, `sanitizeOutputData`, `STUDIO_SCHEMAS`, the
+`sc_outputs` kind check and a viewer, or into none.
+
+
 `shared/src/deck.ts` is the deck. The editor edits it, the writer returns it
 (as strict JSON schema output, `server/src/llm/schema.ts`, where every field is
 required and optional ones are nullable), the HTML renderer draws it and the

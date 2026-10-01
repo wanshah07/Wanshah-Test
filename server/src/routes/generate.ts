@@ -15,7 +15,7 @@ function runningJob(deckId: string): string | null {
 }
 
 function runningJobKind(deckId: string): { id: string; kind: string } | null {
-  const r = getDb().prepare("SELECT id, kind FROM jobs WHERE deck_id = ? AND status IN ('queued','running')").get(deckId) as { id: string; kind: string } | undefined;
+  const r = getDb().prepare("SELECT id, kind FROM jobs WHERE deck_id = ? AND kind != 'studio' AND status IN ('queued','running')").get(deckId) as { id: string; kind: string } | undefined;
   return r ?? null;
 }
 
@@ -28,7 +28,7 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
     const typed = p.prompt;
     if (!p.prompt && p.auto) p.prompt = AUTO_PROMPT;
     if (!p.prompt) return reply.code(400).send({ error: "prompt_required" });
-    const running = getDb().prepare("SELECT id FROM jobs WHERE deck_id = ? AND status IN ('queued','running')").get(id);
+    const running = getDb().prepare("SELECT id FROM jobs WHERE deck_id = ? AND kind != 'studio' AND status IN ('queued','running')").get(id);
     if (running) return reply.code(409).send({ error: "already_running", jobId: (running as { id: string }).id });
     // Pictures uploaded as sources that the writer model cannot read would be
     // written around blind. Stop and say so, unless the user already chose to go on.
@@ -154,7 +154,7 @@ export async function generateRoutes(app: FastifyInstance): Promise<void> {
     const deck = loadDeck(req.user.id, id);
     if (!deck) return reply.code(404).send({ error: "not_found" });
     if (!deck.slides.some((s) => (s.review?.feedback ?? []).some((f) => !f.appliedAt))) return reply.code(400).send({ error: "empty", message: "No slide has feedback waiting." });
-    const running = getDb().prepare("SELECT id FROM jobs WHERE deck_id = ? AND status IN ('queued','running')").get(id);
+    const running = getDb().prepare("SELECT id FROM jobs WHERE deck_id = ? AND kind != 'studio' AND status IN ('queued','running')").get(id);
     if (running) return reply.code(409).send({ error: "already_running", jobId: (running as { id: string }).id });
     const jobId = uid("job");
     getDb().prepare("INSERT INTO jobs (id, user_id, deck_id, kind, status, progress, created_at, updated_at) VALUES (?, ?, ?, 'feedback', 'queued', '[]', ?, ?)").run(jobId, req.user.id, id, now(), now());

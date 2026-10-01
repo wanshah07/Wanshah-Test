@@ -24,6 +24,14 @@ export default function Decks() {
     toast("Deleted");
     load();
   };
+  const notebook = async () => {
+    try {
+      const d = await api.createDeck({ title: "Untitled notebook" });
+      nav(`/deck/${d.id}/notebook`);
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+  };
   const dup = async (d: DeckSummary) => {
     const c = await api.duplicateDeck(d.id);
     nav(`/deck/${c.id}`);
@@ -32,10 +40,13 @@ export default function Decks() {
     <main className="page">
       <div className="row between" style={{ marginBottom: 22 }}>
         <div>
-          <h1>Decks</h1>
-          <p className="muted">Every deck you have written or generated. Pictures and sources stay with the deck.</p>
+          <h1>Notebooks</h1>
+          <p className="muted">Each one keeps its sources, a chat that answers from them, its slide deck and everything made in its Studio.</p>
         </div>
-        <Link to="/new" className="btn btn-primary">New deck</Link>
+        <div className="row">
+          <button className="btn btn-ghost" onClick={notebook} data-testid="new-notebook">New notebook</button>
+          <Link to="/new" className="btn btn-primary">New deck</Link>
+        </div>
       </div>
       {decks === null && <p className="muted">Loading</p>}
       {decks && decks.length === 0 && (
@@ -51,17 +62,18 @@ export default function Decks() {
           const cover = d.cover ?? { ...blankSlide("title", d.lang), title: d.title, subtitle: ANGLES.find((a) => a.id === d.angle)?.name ?? "" };
           return (
             <div key={d.id} className="card deckcard">
-              <Link to={`/deck/${d.id}`}>
+              <Link to={d.slides ? `/deck/${d.id}` : `/deck/${d.id}/notebook`}>
                 <SlideFrame slide={cover} theme={theme} index={0} total={d.slides || 1} lang={d.lang} />
               </Link>
-              <h3><Link to={`/deck/${d.id}`} style={{ color: "inherit" }}>{d.title}</Link></h3>
+              <h3><Link to={d.slides ? `/deck/${d.id}` : `/deck/${d.id}/notebook`} style={{ color: "inherit" }}>{d.title}</Link></h3>
               <div className="row small muted">
-                <span className="pill">{d.slides} slides</span>
+                <span className="pill">{d.slides ? `${d.slides} slides` : "No slides yet"}</span>
                 <span className="pill">{d.lang === "ms" ? "BM" : "EN"}</span>
                 <span>{when(d.updatedAt)}</span>
               </div>
               <div className="row" style={{ marginTop: 12 }}>
-                <Link to={`/deck/${d.id}`} className="btn btn-ghost btn-sm">Open</Link>
+                <Link to={`/deck/${d.id}/notebook`} className="btn btn-ghost btn-sm">Notebook</Link>
+                <Link to={`/deck/${d.id}`} className="btn btn-ghost btn-sm">Slides</Link>
                 <a href={appHref(`/deck/${d.id}/present`)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">Present</a>
                 <button className="btn btn-quiet btn-sm" onClick={() => dup(d)}>Duplicate</button>
                 <ConfirmButton confirm="Click again to delete for good" onConfirm={() => del(d)}>Delete</ConfirmButton>

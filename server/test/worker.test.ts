@@ -22,9 +22,9 @@ const B = "00000000-0000-0000-0000-00000000000b";
 const MARK = "PRIVATE-MARKER-7f3a"; // content that must never reach a log line
 
 type Row = Record<string, unknown>;
-const db: Record<string, Row[]> = { sc_settings: [], sc_decks: [], sc_sources: [], sc_media: [], sc_designs: [], sc_prompts: [], sc_jobs: [] };
+const db: Record<string, Row[]> = { sc_settings: [], sc_decks: [], sc_sources: [], sc_media: [], sc_designs: [], sc_prompts: [], sc_outputs: [], sc_jobs: [] };
 const files = new Map<string, Buffer>(); // "bucket/path" -> bytes
-const TOUCH = new Set(["sc_settings", "sc_decks", "sc_designs", "sc_prompts", "sc_jobs"]);
+const TOUCH = new Set(["sc_settings", "sc_decks", "sc_designs", "sc_prompts", "sc_outputs", "sc_jobs"]);
 let clock = Date.parse("2026-09-28T00:00:00Z");
 const stamp = () => new Date((clock += 1000)).toISOString().replace("Z", "+00:00");
 let beforePatch: ((table: string, row: Row) => void) | null = null;
@@ -232,6 +232,24 @@ describe("the worker", () => {
     expect(f.path.startsWith(`${A}/${j.id}/`)).toBe(true);
     expect(f.name).toMatch(/\.pptx$/);
     expect(files.get(`sc-exports/${f.path}`)!.subarray(0, 2).toString()).toBe("PK");
+  });
+
+  it("makes a Studio output in the background and saves it as its owner; answers a question from the sources", async () => {
+    const j = await job(A, { method: "POST", path: `/api/decks/${deckId}/studio`, body: { kind: "quiz" } });
+    expect(result(j).work).toMatchObject({ kind: "studio", status: "done" });
+    const oid = result(j).work.result.outputId as string;
+    const row = db.sc_outputs.find((o) => o.id === oid)!;
+    expect(row).toMatchObject({ user_id: A, deck_id: deckId, kind: "quiz" });
+    expect((row.data as { questions: unknown[] }).questions.length).toBeGreaterThan(0);
+    const ask = await job(A, { method: "POST", path: `/api/decks/${deckId}/ask`, body: { question: `What is the limit? ${MARK}` } });
+    expect(result(ask).status).toBe(200);
+    expect(result(ask).body.answer).toMatch(/2%/);
+    // Someone else cannot ask another person's notebook, or delete its outputs.
+    expect(result(await job(B, { method: "POST", path: `/api/decks/${deckId}/ask`, body: { question: "x" } })).status).toBe(404);
+    expect(result(await job(B, { method: "DELETE", path: `/api/outputs/${oid}` })).status).toBe(404);
+    expect(db.sc_outputs.some((o) => o.id === oid)).toBe(true);
+    expect(result(await job(A, { method: "DELETE", path: `/api/outputs/${oid}` })).status).toBe(200);
+    expect(db.sc_outputs.some((o) => o.id === oid)).toBe(false);
   });
 
   it("cannot reach another person's deck or files", async () => {

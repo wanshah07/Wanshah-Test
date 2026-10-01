@@ -13,3 +13,5 @@ export * from "./brief.js";
 export * from "./map.js";
 export * from "./sources.js";
 export * from "./house.js";
+export * from "./studio.js";
+export * from "./models.js";

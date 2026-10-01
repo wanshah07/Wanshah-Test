@@ -10,6 +10,7 @@ import Present from "./pages/Present";
 import Settings from "./pages/Settings";
 import Designs from "./pages/Designs";
 import Prompts from "./pages/Prompts";
+import Notebook from "./pages/Notebook";
 
 export default function App() {
   const loc = useLocation();
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/" element={<Decks />} />
             <Route path="/new" element={<NewDeck />} />
             <Route path="/deck/:id" element={<Editor />} />
+            <Route path="/deck/:id/notebook" element={<Notebook />} />
             <Route path="/designs" element={<Designs />} />
             <Route path="/prompts" element={<Prompts />} />
             <Route path="/settings" element={<Settings />} />
