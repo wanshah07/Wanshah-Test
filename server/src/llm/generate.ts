@@ -638,8 +638,11 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     if (redrawn) log(jobId, `${redrawn} more text slide${redrawn === 1 ? "" : "s"} redrawn from their own words as figures, diagrams or cards`);
     // Written into the deck as it is now: a theme, design or brief changed while the writer worked is kept.
     const saved = updateDeck(userId, deckId, (d) => {
-      d.title = json.title || d.title;
-      if (json.subtitle) d.subtitle = json.subtitle;
+      // Only a string is a title: a number or an object from the writer would break every later save and export.
+      const title = typeof json.title === "string" ? json.title.trim().slice(0, 300) : "";
+      const subtitle = typeof json.subtitle === "string" ? json.subtitle.trim().slice(0, 300) : "";
+      d.title = title || d.title;
+      if (subtitle) d.subtitle = subtitle;
       d.lang = p.lang;
       d.angle = p.angle;
       d.audience = p.audience;

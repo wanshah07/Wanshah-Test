@@ -383,6 +383,30 @@ describe("Studio outputs and model lists", () => {
 });
 
 describe("bugs found in the review of 1 Oct 2026", () => {
+  it("rebuilds a slide's review and caps the lists a slide can carry", () => {
+    const s = sanitizeSlide({ id: "a", layout: "bullets", title: "T", review: { ok: "yes", feedback: 5 } });
+    expect(s.review).toEqual({ ok: false, feedback: [] });
+    const s2 = sanitizeSlide({ id: "a", layout: "bullets", title: "T", review: { ok: true, feedback: [{ text: "fix", at: "2026-10-01" }, { text: 7 }, "x"] } });
+    expect(s2.review?.feedback).toEqual([{ text: "fix", at: "2026-10-01" }]);
+    const big = Array.from({ length: 60 }, (_, i) => String(i));
+    const s3 = sanitizeSlide({ id: "a", layout: "table", title: "T", table: { header: big, rows: big.map(() => big) }, chart: { kind: "bar", categories: big, series: big.map((n) => ({ name: n, values: big.map(Number) })) }, diagram: { kind: "matrix", rows: big, cols: big }, map: { areas: ["MY", "SG", "TH", "ID", "PH", "VN", "BN", "KH", "LA", "MM"].map((code) => ({ code, status: "x" })) } });
+    expect(s3.table?.header.length).toBe(12);
+    expect(s3.table?.rows.length).toBe(20);
+    expect(s3.chart?.categories.length).toBe(24);
+    expect(s3.chart?.series.length).toBe(8);
+    expect(s3.diagram).toMatchObject({ kind: "matrix" });
+    expect((s3.diagram as { rows: string[]; cols: string[] }).rows.length).toBe(12);
+    expect((s3.diagram as { rows: string[]; cols: string[] }).cols.length).toBe(8);
+  });
+
+  it("keeps a negative bar's number clear of the category names", () => {
+    const svg = chartSvg({ kind: "bar", categories: ["Loss making unit", "B"], unit: "RM", series: [{ name: "n", values: [-500, 40] }] }, theme.colors);
+    // Category names end at x = 300 (anchored right); the number of the longest negative bar ends where it starts.
+    const neg = [...svg.matchAll(/<text x="([\d.]+)"[^>]*text-anchor="end"[^>]*font-size="28"[^>]*>([^<]*)</g)].map((m) => ({ x: Number(m[1]), t: m[2] }));
+    expect(neg.length).toBe(1);
+    expect(neg[0].x - neg[0].t.length * 17).toBeGreaterThanOrEqual(300);
+  });
+
   it("keeps a quiz answer on the right option when a blank option is dropped", async () => {
     const { sanitizeOutputData } = await import("../src/index.js");
     const q = sanitizeOutputData("quiz", { questions: [{ question: "Q", options: ["", "Right", "Wrong"], answer: 1, explanation: "e" }, { question: "Blank answer", options: ["A", "", "B"], answer: 1, explanation: "e" }] }) as { questions: { options: string[]; answer: number }[] };

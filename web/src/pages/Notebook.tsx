@@ -164,10 +164,21 @@ function Notebook({ id }: { id: string }) {
     }).catch((e) => toast((e as Error).message, true));
     reloadOutputs();
   }, [id]);
-  useEffect(() => store.set(`sc-chat-${id}`, msgs.slice(-60)), [msgs, id]);
-  useEffect(() => store.set(`sc-off-${id}`, [...off]), [off, id]);
-  useEffect(() => store.set("sc-model", model), [model]);
-  useEffect(() => chatEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [msgs.length, asking]);
+  // Block bodies, always: an effect's return value is its cleanup, and React calls it as a function. In new
+  // Chromium builds scrollIntoView returns a Promise, so `() => el.scrollIntoView()` crashed the page on the
+  // next question with "U is not a function".
+  useEffect(() => {
+    store.set(`sc-chat-${id}`, msgs.slice(-60));
+  }, [msgs, id]);
+  useEffect(() => {
+    store.set(`sc-off-${id}`, [...off]);
+  }, [off, id]);
+  useEffect(() => {
+    store.set("sc-model", model);
+  }, [model]);
+  useEffect(() => {
+    chatEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [msgs.length, asking]);
   // The guide is written once for each set of sources, the first time the notebook opens with them.
   const key = sources.map((s) => `${s.id}:${s.chars}`).join(",");
   useEffect(() => {

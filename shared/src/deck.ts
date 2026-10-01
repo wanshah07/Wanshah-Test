@@ -448,11 +448,13 @@ export function sanitizeSlide(raw: unknown): Slide {
       .filter((x): x is Record<string, unknown> => !!x)
       // A value that is not a number becomes 0 where it stands, so the values after it keep their categories.
       .map((x) => ({ name: txt(x.name) ?? "", values: (Array.isArray(x.values) ? x.values : []).map((v) => (v === null || v === "" ? NaN : Number(v))).map((v) => (Number.isFinite(v) ? v : 0)) }))
-      .filter((x) => x.values.length);
+      .filter((x) => x.values.length)
+      .slice(0, 8);
     if (series.length) {
       // One category per value and one value per category: a chart with fewer names than numbers draws off
       // its canvas, and with none PowerPoint will not open the file. Blank names keep their place.
-      const cats = Array.isArray(c.categories) ? c.categories.map((x) => txt(x) ?? "") : txtList(c.categories) ?? [];
+      const cats = (Array.isArray(c.categories) ? c.categories.map((x) => txt(x) ?? "") : txtList(c.categories) ?? []).slice(0, 24);
+      for (const x of series) x.values = x.values.slice(0, 24);
       const n = Math.max(cats.length, ...series.map((x) => x.values.length));
       const categories = cats.slice();
       while (categories.length < n) categories.push(String(categories.length + 1));
@@ -468,8 +470,9 @@ export function sanitizeSlide(raw: unknown): Slide {
   }
   const t = obj(r.table);
   if (t) {
-    const rows = (Array.isArray(t.rows) ? t.rows : []).map((row) => (Array.isArray(row) ? row.map((x) => txt(x) ?? "") : txt(row) ? [txt(row)!] : [])).filter((row) => row.length);
-    const header = Array.isArray(t.header) ? t.header.map((x) => txt(x) ?? "") : txtList(t.header) ?? [];
+    // 20 rows by 12 columns is the most a slide can show legibly; beyond that the text is unreadable in PowerPoint.
+    const rows = (Array.isArray(t.rows) ? t.rows : []).map((row) => (Array.isArray(row) ? row.map((x) => txt(x) ?? "").slice(0, 12) : txt(row) ? [txt(row)!] : [])).filter((row) => row.length).slice(0, 20);
+    const header = (Array.isArray(t.header) ? t.header.map((x) => txt(x) ?? "") : txtList(t.header) ?? []).slice(0, 12);
     // Every row as wide as the widest: a ragged table is a file PowerPoint has to repair.
     const cols = Math.max(header.length, ...rows.map((r) => r.length), 0);
     const pad = (r: string[]) => [...r, ...Array(Math.max(0, cols - r.length)).fill("")];
@@ -482,8 +485,8 @@ export function sanitizeSlide(raw: unknown): Slide {
       if (events.length) s.diagram = { kind: "timeline", events: events.slice(0, 12) };
     } else if (d.kind === "matrix") {
       // Blank names keep their place, so every row keeps its own cells.
-      const rows = Array.isArray(d.rows) ? d.rows.map((x) => txt(x) ?? "") : [];
-      const cols = Array.isArray(d.cols) ? d.cols.map((x) => txt(x) ?? "") : [];
+      const rows = (Array.isArray(d.rows) ? d.rows.map((x) => txt(x) ?? "") : []).slice(0, 12);
+      const cols = (Array.isArray(d.cols) ? d.cols.map((x) => txt(x) ?? "") : []).slice(0, 8);
       if (rows.some(Boolean) && cols.some(Boolean)) {
         const cells = rows.map((_, i) => {
           const row = Array.isArray(d.cells) && Array.isArray(d.cells[i]) ? (d.cells[i] as unknown[]).map((x) => txt(x) ?? "") : [];
@@ -559,7 +562,8 @@ export function sanitizeSlide(raw: unknown): Slide {
       .map((x) => obj(x))
       .filter((x): x is Record<string, unknown> => !!x)
       .map((x) => ({ code: mapCode(txt(x.code) ?? txt(x.country) ?? txt(x.name) ?? "") ?? "", status: txt(x.status) ?? txt(x.value) ?? "", ...(txt(x.note) ? { note: txt(x.note) } : {}) }))
-      .filter((x) => x.code && !seen.has(x.code) && seen.add(x.code));
+      .filter((x) => x.code && !seen.has(x.code) && seen.add(x.code))
+      .slice(0, 40);
     const region = (["asean", "asia", "world"].includes(String(m.region)) ? m.region : "asean") as MapSpec["region"];
     if (areas.length) s.map = { region, areas, ...(txt(m.legend) ? { legend: txt(m.legend) } : {}), ...(txt(m.source) ? { source: txt(m.source) } : {}) };
   }
@@ -577,7 +581,18 @@ export function sanitizeSlide(raw: unknown): Slide {
       .slice(0, 2);
     if (aside.length) s.aside = aside;
   }
-  if (obj(r.review)) s.review = r.review as unknown as SlideReview;
+  // Rebuilt field by field: the feedback list is iterated by the writer, so it has to be a list of texts.
+  const rv = obj(r.review);
+  if (rv) {
+    const feedback = (Array.isArray(rv.feedback) ? rv.feedback : [])
+      .map((f) => obj(f))
+      .filter((f): f is Record<string, unknown> => !!f && typeof f.text === "string" && !!f.text.trim())
+      .map((f) => ({ text: String(f.text).trim().slice(0, 2000), at: txt(f.at) ?? "", ...(txt(f.appliedAt) ? { appliedAt: txt(f.appliedAt) } : {}) }))
+      .slice(0, 50);
+    const review: SlideReview = { ok: rv.ok === true, feedback };
+    if (txt(rv.okAt)) review.okAt = txt(rv.okAt);
+    s.review = review;
+  }
   return s;
 }
 

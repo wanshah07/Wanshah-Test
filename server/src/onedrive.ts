@@ -3,7 +3,8 @@ import { config } from "./config.js";
 import { createHash } from "node:crypto";
 import { decrypt, encrypt, maskKey } from "./crypto.js";
 import { getDb, now } from "./db.js";
-import { addMedia, addSource, getMedia } from "./store.js";
+import { addMedia, addSource, deleteMedia, getMedia } from "./store.js";
+import { sniffPicture } from "./ingest/sniff.js";
 
 // Pictures from a OneDrive folder, read through Microsoft Graph.
 //
@@ -535,7 +536,7 @@ function composioRoute(userId: string): Route {
         throw new OneDriveError(`download failed: ${(e as Error).message}`, "download_failed");
       }
       if (!res.ok) throw new OneDriveError(`download answered ${res.status}`, "download_failed");
-      return Buffer.from(await res.arrayBuffer());
+      return capped(await res.arrayBuffer());
     },
   };
 }
@@ -572,7 +573,13 @@ async function download(userId: string, driveId: string, it: Item): Promise<Buff
     throw new OneDriveError(`download failed: ${(e as Error).message}`, "download_failed");
   }
   if (!res.ok) throw new OneDriveError(`download answered ${res.status}`, "download_failed");
-  return Buffer.from(await res.arrayBuffer());
+  return capped(await res.arrayBuffer());
+}
+
+/** A download no larger than an upload may be; the folder listing's size is not always given. */
+function capped(b: ArrayBuffer): Buffer {
+  if (b.byteLength > config.maxUploadBytes) throw new OneDriveError(`larger than ${Math.round(config.maxUploadBytes / 1048576)} MB`, "download_failed");
+  return Buffer.from(b);
 }
 
 /**
@@ -615,8 +622,8 @@ export async function importFolder(userId: string, deckId: string, folder: strin
       report.unchanged++;
       continue;
     }
-    const mime = IMAGE_MIME[extOf(item.name)];
-    if (!OK_MIME.has(mime)) continue;
+    const named = IMAGE_MIME[extOf(item.name)];
+    if (!OK_MIME.has(named)) continue;
     let buf: Buffer;
     try {
       if (log && n % 10 === 1) log(`OneDrive: downloading ${n} of ${found.length}`);
@@ -631,6 +638,12 @@ export async function importFolder(userId: string, deckId: string, folder: strin
       report.skipped.push({ name: rel, reason: "the download was damaged (checksum did not match); pull again" });
       continue;
     }
+    // What the bytes are, not what the name says: a HEIC called .jpg is a broken picture in PowerPoint.
+    const mime = sniffPicture(buf);
+    if (!mime || !OK_MIME.has(mime)) {
+      report.skipped.push({ name: rel, reason: `not a ${named.replace("image/", "")} picture inside` });
+      continue;
+    }
     const old = known?.media_id ? getMedia(userId, known.media_id) : null;
     if (known && old && old.mime === mime) {
       // Same media id, new bytes: every slide showing it updates.
@@ -639,6 +652,8 @@ export async function importFolder(userId: string, deckId: string, folder: strin
       db.prepare("UPDATE sources SET remote_etag = ?, bytes = ?, name = ?, rel_path = ? WHERE id = ?").run(item.eTag ?? null, buf.length, item.name, rel.includes("/") ? rel : null, known.id);
       report.updated++;
     } else if (known) {
+      // The type changed: the old file would otherwise stay on disk with no row pointing at it.
+      if (old) deleteMedia(userId, old.id);
       const m = addMedia(userId, deckId, item.name, mime, buf, "onedrive");
       db.prepare("UPDATE sources SET media_id = ?, remote_etag = ?, bytes = ?, name = ?, rel_path = ? WHERE id = ?").run(m.id, item.eTag ?? null, buf.length, item.name, rel.includes("/") ? rel : null, known.id);
       report.updated++;

@@ -3,8 +3,8 @@ import { renderDeckHtml } from "@slidecraft/shared";
 import { loadDeck, mediaDataUrl } from "../store.js";
 import { deckToPptx } from "../export/pptx.js";
 
-function safeName(s: string): string {
-  return (s.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 80) || "deck");
+function safeName(s: unknown): string {
+  return (String(s ?? "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 80) || "deck");
 }
 
 export async function exportRoutes(app: FastifyInstance): Promise<void> {

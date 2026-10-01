@@ -42,14 +42,15 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
   // Save a deck's current theme as a design.
   app.post("/api/designs", async (req, reply) => {
     const b = (req.body ?? {}) as { name?: string; theme?: unknown; notes?: string };
-    if (!b.name?.trim() || !validTheme(b.theme)) return reply.code(400).send({ error: "invalid", message: "A name and a theme are needed." });
+    if (typeof b.name !== "string" || !b.name.trim() || !validTheme(b.theme)) return reply.code(400).send({ error: "invalid", message: "A name and a theme are needed." });
     const { logoMediaId: _l, footer: _f, ...theme } = b.theme;
-    return createDesign(req.user.id, { name: b.name.trim(), theme: theme as Theme, notes: (b.notes ?? "").slice(0, 4000) });
+    return createDesign(req.user.id, { name: b.name.trim(), theme: theme as Theme, notes: String(b.notes ?? "").slice(0, 4000) });
   });
 
   app.put("/api/designs/:did", async (req, reply) => {
     const b = (req.body ?? {}) as { name?: string; notes?: string; theme?: unknown };
     if (b.theme !== undefined && !validTheme(b.theme)) return reply.code(400).send({ error: "invalid_theme" });
+    if ((b.name !== undefined && typeof b.name !== "string") || (b.notes !== undefined && typeof b.notes !== "string")) return reply.code(400).send({ error: "invalid" });
     const d = updateDesign(req.user.id, (req.params as { did: string }).did, { name: b.name, notes: b.notes?.slice(0, 4000), theme: b.theme as Theme | undefined });
     return d ?? reply.code(404).send({ error: "not_found" });
   });

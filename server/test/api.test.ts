@@ -219,6 +219,23 @@ describe("api", () => {
     expect(r.json().theme.footer).toBe("keep me");
   });
 
+  it("deleting a deck removes its pictures, except one a duplicate still shows", async () => {
+    const up = multipart([{ name: "keep.png", content: PNG, type: "image/png" }, { name: "drop.png", content: PNG, type: "image/png" }]);
+    const added = (await app.inject({ method: "POST", url: `/api/decks/${deckId}/media`, payload: up.payload, headers: up.headers })).json() as { id: string; name: string }[];
+    const keep = added.find((m) => m.name === "keep.png")!.id;
+    const drop = added.find((m) => m.name === "drop.png")!.id;
+    const d = (await app.inject({ method: "GET", url: `/api/decks/${deckId}` })).json().deck;
+    d.slides[0].image = { mediaId: keep };
+    await app.inject({ method: "PUT", url: `/api/decks/${deckId}`, payload: d });
+    const copy = (await app.inject({ method: "POST", url: `/api/decks/${deckId}/duplicate` })).json();
+    expect((await app.inject({ method: "DELETE", url: `/api/decks/${deckId}` })).json().ok).toBe(true);
+    expect((await app.inject({ method: "GET", url: `/api/media/${keep}` })).statusCode, "a picture the duplicate shows stays").toBe(200);
+    expect((await app.inject({ method: "GET", url: `/api/media/${drop}` })).statusCode, "a picture nothing shows goes").toBe(404);
+    expect((await app.inject({ method: "DELETE", url: `/api/decks/${copy.id}` })).json().ok).toBe(true);
+    expect((await app.inject({ method: "GET", url: `/api/media/${keep}` })).statusCode, "the last deck showing it takes it along").toBe(404);
+    deckId = (await app.inject({ method: "POST", url: "/api/decks", payload: { title: "again", lang: "ms", angle: "training" } })).json().id;
+  });
+
   it("duplicates and deletes", async () => {
     const c = await app.inject({ method: "POST", url: `/api/decks/${deckId}/duplicate` });
     expect(c.json().id).not.toBe(deckId);

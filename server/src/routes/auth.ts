@@ -10,7 +10,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/auth/login", async (req, reply) => {
     if (config.authMode === "off") return reply.code(400).send({ error: "auth_off" });
     const body = (req.body ?? {}) as { email?: string; password?: string };
-    if (!body.email || !body.password) return reply.code(400).send({ error: "missing" });
+    if (typeof body.email !== "string" || typeof body.password !== "string" || !body.email || !body.password) return reply.code(400).send({ error: "missing" });
     const u = authenticate(body.email, body.password);
     if (!u) {
       await new Promise((r) => setTimeout(r, 400));
