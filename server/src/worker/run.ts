@@ -113,7 +113,12 @@ export async function claim(sb: Supabase, job: JobRow): Promise<boolean> {
   return got.length === 1;
 }
 
-export async function runJob(app: FastifyInstance, sb: Supabase, job: JobRow): Promise<void> {
+/**
+ * Runs one job. "abandoned" means work the request started in the background is still going after the
+ * time limit: it holds the in-memory database, and the next job would load another person's rows into
+ * it, so the run must stop taking jobs.
+ */
+export async function runJob(app: FastifyInstance, sb: Supabase, job: JobRow): Promise<"ok" | "abandoned"> {
   const started = Date.now();
   const finish = (patch: Record<string, unknown>) => sb.update("sc_jobs", { id: eq(job.id), user_id: eq(job.user_id) }, patch);
   const req = job.request ?? {};
@@ -122,7 +127,7 @@ export async function runJob(app: FastifyInstance, sb: Supabase, job: JobRow): P
   if (!allowedPath(path, method) || !["GET", "POST", "PUT", "DELETE"].includes(method)) {
     await finish({ status: "error", error: "This request cannot run as a job." });
     log("job", job.id, "refused: not an allowed request");
-    return;
+    return "ok";
   }
   try {
     const loaded = await load(sb, job.user_id, scopeOf(path));
@@ -134,7 +139,7 @@ export async function runJob(app: FastifyInstance, sb: Supabase, job: JobRow): P
       const parts: Part[] = Object.entries(req.fields ?? {}).map(([field, value]) => ({ field, value: String(value) }));
       for (const f of req.files) {
         // A job may only hand over files from its owner's own inbox folder.
-        if (!f.path.startsWith(job.user_id + "/")) throw new Error("foreign_file");
+        if (!f.path.startsWith(job.user_id + "/") || f.path.split("/").some((s) => !s || s === "." || s === "..")) throw new Error("foreign_file");
         parts.push({ field: f.field || "file", value: await sb.download("sc-inbox", f.path), filename: f.name, type: f.type });
       }
       const mp = multipartBody(parts);
@@ -161,19 +166,27 @@ export async function runJob(app: FastifyInstance, sb: Supabase, job: JobRow): P
     if (req.files?.length) await sb.removeFiles("sc-inbox", req.files.map((f) => f.path)).catch(() => undefined);
     await finish({ status: "done", result, error: null });
     log("job", job.id, "done", `http=${res.statusCode}`, `work=${result.work?.status ?? "-"}`, `+${wrote.added}`, `~${wrote.changed}`, `-${wrote.removed}`, `files=${wrote.files}`, `merged=${wrote.merged}`, `${((Date.now() - started) / 1000).toFixed(1)}s`);
+    return "ok";
   } catch (e) {
+    // A failed job's uploads are someone's confidential sources: they do not wait in the inbox for ever.
+    const own = (req.files ?? []).map((f) => f.path).filter((p) => p.startsWith(job.user_id + "/") && !p.split("/").some((x) => !x || x === "." || x === ".."));
+    if (own.length) await sb.removeFiles("sc-inbox", own).catch(() => undefined);
     const code = (e as Error).message === "time_limit" ? "It took longer than the worker allows and was stopped. Try again, or with fewer sources." : "The worker could not finish this. Try again.";
     await finish({ status: "error", error: code }).catch(() => undefined);
     // The error's class only: its message may quote content.
-    log("job", job.id, "failed", (e as Error).name, (e as Error).message === "time_limit" || (e as Error).message === "foreign_file" ? (e as Error).message : "");
+    log("job", job.id, "failed", (e as Error).name, ["time_limit", "foreign_file", "unsafe_path", "deck_busy"].includes((e as Error).message) ? (e as Error).message : "");
+    return (e as Error).message === "time_limit" ? "abandoned" : "ok";
   } finally {
     clearDisk();
   }
 }
 
 /** Marks jobs a crashed or cancelled run left as running. */
-export async function sweepStale(sb: Supabase, olderThanMs = 45 * 60_000): Promise<number> {
+export async function sweepStale(sb: Supabase, olderThanMs = LIMIT_MS + 5 * 60_000): Promise<number> {
   const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+  // Finished jobs the page has long since read: their request bodies (a brief, a question) need not stay.
+  const day = new Date(Date.now() - 24 * 3600_000).toISOString();
+  await sb.remove("sc_jobs", { status: "in.(done,error)", updated_at: `lt.${encodeURIComponent(day)}` }).catch(() => undefined);
   const rows = await sb.update("sc_jobs", { status: "eq.running", started_at: `lt.${encodeURIComponent(cutoff)}` }, { status: "error", error: "The worker stopped before finishing. Try again." });
   return rows.length;
 }
@@ -203,9 +216,13 @@ export async function drain(app: FastifyInstance, sb: Supabase, budgetMs = 35 * 
     }
     if (!(await claim(sb, job))) continue;
     log("job", job.id, "claimed", job.kind);
-    await runJob(app, sb, job);
+    const outcome = await runJob(app, sb, job);
     lastWork = Date.now();
     n++;
+    if (outcome === "abandoned") {
+      log("stopping: a job's background work outlived its time limit");
+      break;
+    }
   }
   return n;
 }

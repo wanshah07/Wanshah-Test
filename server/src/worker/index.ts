@@ -29,6 +29,8 @@ async function main(): Promise<void> {
   const n = await drain(app, new Supabase({ url, serviceKey: key }), Number(process.env.SC_RUN_BUDGET_MS || 35 * 60_000), Number(process.env.SC_IDLE_MS || 5 * 60_000));
   log("ran", n, "job(s)");
   await app.close();
+  // Work a stopped job left running in the background must not carry on writing anywhere.
+  process.exit(0);
 }
 
 main().catch((e) => {

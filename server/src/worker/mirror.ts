@@ -7,6 +7,7 @@ import { ensureLocalUser, LOCAL_USER_ID } from "../auth.js";
 import { mediaPath } from "../store.js";
 import { eq, inList, type Supabase } from "./supabase.js";
 import { mergeDoc } from "./merge.js";
+import { deckMediaIds } from "@slidecraft/shared";
 
 // One job runs against a fresh in-memory copy of one person's data. The server
 // code sees a single local user (AUTH_MODE=off), so it can only ever touch what
@@ -192,9 +193,17 @@ export async function load(sb: Supabase, owner: string, scope: { deck?: string; 
     ...(await sb.select("sc_media", { ...own, deck_id: "is.null" })),
     ...(decks.length ? await sb.select("sc_media", { ...own, deck_id: eq(String(deckId)) }) : []),
     ...extraMedia,
+    // Pictures the deck shows that belong to another deck: a duplicate shares its original's.
+    ...(decks.length ? await (async () => {
+      const ids = decks.flatMap((d) => deckMediaIds((d.doc ?? {}) as Row));
+      return ids.length ? sb.select("sc_media", { ...own, id: inList(ids) }) : [];
+    })() : []),
   ])
     byId.set(String(r.id), r);
-  const media = [...byId.values()];
+  // A row's id and object_path are the person's own to write (RLS), so neither is trusted: a picture
+  // whose path is not exactly where this owner's copy would be stored is someone else's, and an id that
+  // is not a plain name would put a file outside the job's folder.
+  const media = [...byId.values()].filter((r) => /^[A-Za-z0-9_-]{1,80}$/.test(String(r.id)) && r.object_path === objectPathFor(owner, String(r.id), String(r.mime)));
   const srcIds = new Set(sources.map((r) => String(r.id)));
   sources = [...sources, ...extraSources.filter((r) => !srcIds.has(String(r.id)))];
   const designs = await sb.select("sc_designs", own);
@@ -268,15 +277,24 @@ export async function flush(sb: Supabase, l: Loaded): Promise<Flushed> {
     const seen = l.deckBase.get(id)!;
     let doc = parsed(r.doc, {}) as Row;
     let expect = seen.updatedAt;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    let settled = false;
+    for (let attempt = 0; attempt < 3 && !settled; attempt++) {
       const done = await sb.update("sc_decks", { ...own, id: eq(id), updated_at: eq(expect) }, { title: r.title, doc });
-      if (done.length) break;
+      if (done.length) {
+        settled = true;
+        break;
+      }
       const [cur] = await sb.select("sc_decks", { ...own, id: eq(id) });
-      if (!cur) break; // deleted meanwhile: the person's delete stands
+      if (!cur) {
+        settled = true; // deleted meanwhile: the person's delete stands
+        break;
+      }
       doc = mergeDoc(seen.doc, parsed(r.doc, {}) as Row, (cur.doc ?? {}) as Row);
       expect = String(cur.updated_at);
       out.merged++;
     }
+    // Three edits in a row beat the write: the job fails rather than reporting work it did not save.
+    if (!settled) throw new Error("deck_busy");
   }
 
   for (const t of [SOURCES, MEDIA, DESIGNS, PROMPTS, OUTPUTS]) {
@@ -302,7 +320,9 @@ export async function flush(sb: Supabase, l: Loaded): Promise<Flushed> {
   // Settings the job changed (a cached Composio user, the picture check).
   const s = localSettings();
   if (s && JSON.stringify(s) !== JSON.stringify(l.settings)) {
-    const patch = Object.fromEntries(SETTINGS_MAP.map(([r, lc]) => [r, s[lc] ?? null]));
+    // Only the columns the job changed: anything else the person saved while it ran stands.
+    const before = l.settings ?? {};
+    const patch = Object.fromEntries(SETTINGS_MAP.filter(([, lc]) => (s[lc] ?? null) !== (before[lc] ?? null)).map(([r, lc]) => [r, s[lc] ?? null]));
     const done = await sb.update("sc_settings", own, patch);
     if (!done.length) await sb.insert("sc_settings", [{ user_id: owner, ...patch }]);
     out.changed++;

@@ -433,6 +433,9 @@ export const FONT_CHOICES = [
   "system-ui",
 ];
 
+/** Text with the characters XML 1.0 forbids taken out: one of them in a footer makes a PowerPoint that will not open. */
+const cleanText = (s: string) => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, " ").trim();
+
 const COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const STYLES = ["clean", "panel", "gradient", "bloom", "briefing"];
 
@@ -454,7 +457,7 @@ export function sanitizeTheme(raw: unknown): Theme {
   const radius = Number(t.radius);
   const out: Theme = {
     id: typeof t.id === "string" && t.id ? t.id.slice(0, 60) : base.id,
-    name: typeof t.name === "string" && t.name.trim() ? t.name.trim().slice(0, 80) : base.name,
+    name: typeof t.name === "string" && cleanText(t.name) ? cleanText(t.name).slice(0, 80) : base.name,
     fontDisplay: font(t.fontDisplay, base.fontDisplay),
     fontBody: font(t.fontBody, base.fontBody),
     colors,
@@ -462,10 +465,10 @@ export function sanitizeTheme(raw: unknown): Theme {
     slideStyle: STYLES.includes(String(t.slideStyle)) ? (t.slideStyle as Theme["slideStyle"]) : base.slideStyle,
     slideNumbers: typeof t.slideNumbers === "boolean" ? t.slideNumbers : base.slideNumbers,
   };
-  if (typeof t.footer === "string" && t.footer.trim()) out.footer = t.footer.slice(0, 160);
+  if (typeof t.footer === "string" && cleanText(t.footer)) out.footer = cleanText(t.footer).slice(0, 160);
   if (typeof t.logoMediaId === "string" && /^[\w-]{1,80}$/.test(t.logoMediaId)) out.logoMediaId = t.logoMediaId;
   if (typeof t.logoUrl === "string" && /^https?:\/\//i.test(t.logoUrl)) out.logoUrl = t.logoUrl.slice(0, 2000);
-  if (typeof t.tag === "string" && t.tag.trim()) out.tag = t.tag.replace(/[<>]/g, "").trim().slice(0, 80);
+  if (typeof t.tag === "string" && cleanText(t.tag)) out.tag = cleanText(t.tag).replace(/[<>]/g, "").trim().slice(0, 80);
   // A preset's extras carry over when a saved theme does not say otherwise.
   const series = Array.isArray(t.series) ? t.series : base.series;
   if (Array.isArray(series)) {

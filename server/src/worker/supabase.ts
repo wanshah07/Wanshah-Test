@@ -11,6 +11,15 @@ export interface SupabaseConfig {
   serviceKey: string;
 }
 
+/**
+ * An object path the worker may touch: plain segments only. `fetch` collapses "." and ".." in a URL, so
+ * "<me>/../../sc-media/<someone>/x.png" would otherwise reach another person's file with the service key.
+ */
+export function safeObjectPath(p: string): string {
+  if (typeof p !== "string" || !p || p.length > 500 || /[\\\u0000-\u001f]/.test(p) || p.startsWith("/") || p.split("/").some((s) => !s || s === "." || s === "..")) throw new Error("unsafe_path");
+  return p;
+}
+
 export class SupabaseError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
@@ -78,11 +87,13 @@ export class Supabase {
   }
 
   async download(bucket: string, path: string): Promise<Buffer> {
+    safeObjectPath(path);
     const res = await this.call("GET", `/storage/v1/object/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`);
     return Buffer.from(await res.arrayBuffer());
   }
 
   async upload(bucket: string, path: string, body: Buffer, contentType: string): Promise<void> {
+    safeObjectPath(path);
     await this.call("POST", `/storage/v1/object/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`, {
       body: new Uint8Array(body),
       headers: { "Content-Type": contentType, "x-upsert": "true" },
@@ -91,6 +102,7 @@ export class Supabase {
 
   async removeFiles(bucket: string, paths: string[]): Promise<void> {
     if (!paths.length) return;
+    paths.forEach(safeObjectPath);
     await this.call("DELETE", `/storage/v1/object/${bucket}`, { body: JSON.stringify({ prefixes: paths }), headers: { "Content-Type": "application/json" } });
   }
 }

@@ -30,6 +30,10 @@ export default function Editor() {
   const [addOpen, setAddOpen] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const latest = useRef<Deck | null>(null);
+  // Polls stop when the page is left: a finished job must not pull the person back from wherever they went.
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
+
 
   const [missing, setMissing] = useState<string | null>(null);
   useEffect(() => {
@@ -51,14 +55,35 @@ export default function Editor() {
 
   const inFlight = useRef(false);
   const flushRef = useRef<(() => Promise<void>) | null>(null);
-  const flush = useCallback(async () => {
+  // One save at a time: a save that started earlier must never land after a later one and win.
+  const running = useRef<Promise<void> | null>(null);
+  const again = useRef(false);
+  const flush = useCallback(async (): Promise<void> => {
+    if (running.current) {
+      again.current = true;
+      return running.current;
+    }
+    const p = (async () => {
+      do {
+        again.current = false;
+        await saveOnce();
+      } while (again.current);
+    })();
+    running.current = p;
+    try {
+      await p;
+    } finally {
+      running.current = null;
+    }
+  }, []);
+  const saveOnce = async () => {
     const d = latest.current;
     if (!d) return;
     setSaving("saving");
     inFlight.current = true;
     try {
       await api.saveDeck(d);
-      setSaving("saved");
+      setSaving(again.current ? "saving" : "saved");
     } catch (e) {
       setSaving("error");
       toast("Save failed: " + (e as Error).message + ". Trying again in a few seconds.", true);
@@ -71,7 +96,7 @@ export default function Editor() {
     } finally {
       inFlight.current = false;
     }
-  }, []);
+  };
   flushRef.current = flush;
 
   const update = useCallback((next: Deck) => {
@@ -117,8 +142,13 @@ export default function Editor() {
   if (!deck) return <main className="page"><p className="muted">Loading</p></main>;
   const slide = deck.slides[sel];
 
-  const setSlide = (s: Slide) => update({ ...deck, slides: deck.slides.map((x, i) => (i === sel ? s : x)) });
-  const setTheme = (t: Theme) => update({ ...deck, theme: t });
+  // Built from the deck as it is now, not as it was when this render ran: an upload that returns a minute
+  // later must not put back slides and edits from before it started.
+  const setSlide = (s: Slide) => {
+    const cur = latest.current ?? deck;
+    update({ ...cur, slides: cur.slides.map((x) => (x.id === s.id ? s : x)) });
+  };
+  const setTheme = (t: Theme) => update({ ...(latest.current ?? deck), theme: t });
   const addSlide = (layout: Layout) => {
     const s = blankSlide(layout, deck.lang);
     const slides = [...deck.slides];
@@ -153,7 +183,7 @@ export default function Editor() {
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
       await flush();
-    }
+    } else if (running.current) await running.current;
   };
   /** Put a slide the server rewrote into the deck as it is now, keeping every edit made meanwhile. */
   const replaceSlide = (s: Slide, _hits?: SlopHit[]) => {
@@ -189,6 +219,7 @@ export default function Editor() {
       // What each slide looked like when the job began: a slide edited meanwhile keeps the edit.
       const before = new Map((latest.current ?? deck).slides.map((x) => [x.id, JSON.stringify(x)]));
       const tick = async () => {
+        if (!alive.current) return;
         try {
           const j = await api.job(jobId);
           if (j.status === "done" || j.status === "failed") {
@@ -356,6 +387,9 @@ function ExportPanel({ deck, slopCount, open, busy }: { deck: Deck; slopCount: n
 }
 
 function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void }) {
+  // Polls stop when the page is left: a finished job must not pull the person back from wherever they went.
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
   const stored = deck.brief;
   const [sources, setSources] = useState<SourceRef[]>(deck.sources);
   const [brief, setBrief] = useState<BriefValue>(stored ? { purposes: stored.purposes, include: stored.include, audiences: stored.audiences, text: stored.text, audienceText: "", prompts: stored.prompts ?? [] } : { ...EMPTY_BRIEF, audienceText: deck.audience ?? "" });
@@ -401,6 +435,7 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       const audience = composeAudience(brief.audiences, brief.audienceText) || deck.audience;
       const { jobId } = await api.generate(deck.id, { prompt, auto, title: deck.title, lang: deck.lang, angle, audience, slides, features: auto ? autoFeatures : features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
+        if (!alive.current) return;
         try {
           const j = await api.job(jobId);
           setJob(j);

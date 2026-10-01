@@ -176,14 +176,21 @@ function Notebook({ id }: { id: string }) {
     api.guide(id).then(setGuide).catch(() => undefined).finally(() => setGuideBusy(false));
   }, [key]);
 
-  // Background work, polled until it finishes.
+  // Background work, polled until it finishes. A tick never overlaps the one before it, and a finished
+  // job is handled once however many ticks see it.
+  const ticking = useRef(false);
+  const handled = useRef(new Set<string>());
   useEffect(() => {
     if (!running.some((r) => r.status === "queued" || r.status === "running")) return;
     const t = setInterval(async () => {
-      for (const r of running.filter((x) => x.status === "queued" || x.status === "running")) {
+      if (ticking.current) return;
+      ticking.current = true;
+      try {
+      for (const r of running.filter((x) => (x.status === "queued" || x.status === "running") && !handled.current.has(x.jobId))) {
         try {
           const j: Job = await api.job(r.jobId);
           setRunning((all) => all.map((x) => (x.jobId === r.jobId ? { ...x, status: j.status, progress: j.progress, error: j.error } : x)));
+          if (j.status === "done" || j.status === "failed") handled.current.add(r.jobId);
           if (j.status === "done") {
             if (r.slides) {
               const d = await api.deck(id);
@@ -198,6 +205,9 @@ function Notebook({ id }: { id: string }) {
         } catch {
           /* a dropped poll is retried on the next tick */
         }
+      }
+      } finally {
+        ticking.current = false;
       }
     }, 2000);
     return () => clearInterval(t);
@@ -311,7 +321,7 @@ function Notebook({ id }: { id: string }) {
                   <span className="k">{s.kind}</span>
                   <span className="n">{s.name}</span>
                 </label>
-                <ConfirmButton className="btn btn-quiet btn-xs" confirm="Remove?" onConfirm={() => api.deleteSource(s.id).then(reloadSources)}>✕</ConfirmButton>
+                <ConfirmButton className="btn btn-quiet btn-xs" confirm="Remove?" onConfirm={() => api.deleteSource(s.id).then(reloadSources, (e) => toast((e as Error).message, true))}>✕</ConfirmButton>
               </div>
             ))}
             {!sources.length && <p className="small muted">Add files, a Google Drive link or pasted text. Everything here answers from these sources only.</p>}
@@ -385,10 +395,10 @@ function Notebook({ id }: { id: string }) {
               <h2>{KIND_ICON[open.kind]} {open.title}</h2>
               <button className="btn btn-quiet btn-sm" onClick={() => setOpen(null)}>✕</button>
             </div>
-            <div className="nb-viewbody"><OutputBody o={open} /></div>
+            <div className="nb-viewbody"><OutputBody key={open.id} o={open} /></div>
             <div className="row between" style={{ marginTop: 14 }}>
               <OutputDownloads o={open} />
-              <ConfirmButton confirm="Click again to delete" onConfirm={async () => { await api.deleteOutput(open.id); setOpen(null); reloadOutputs(); }}>Delete</ConfirmButton>
+              <ConfirmButton confirm="Click again to delete" onConfirm={async () => { try { await api.deleteOutput(open.id); setOpen(null); reloadOutputs(); } catch (e) { toast((e as Error).message, true); } }}>Delete</ConfirmButton>
             </div>
           </div>
         </div>
