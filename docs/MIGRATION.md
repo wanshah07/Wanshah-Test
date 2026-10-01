@@ -185,8 +185,9 @@ not needed.
 1. Create a Supabase project for Slidecraft (Free plan, region Singapore). A
    separate project keeps client decks apart from KPI data. The files also
    run in the KPI project if a second free project is not available.
-2. In the SQL editor, run `supabase/001` to `005` in order (005 adds the
-   Studio's outputs; run it on its own when 001 to 004 are already in).
+2. In the SQL editor, run `supabase/001` to `006` in order (005 adds the
+   Studio's outputs, 006 tightens the picture and job rules; run each new
+   one on its own when the earlier ones are already in).
 3. Put the dispatch token and repo in Vault (the two lines at the top of
    `004_dispatch.sql`).
 4. In GitHub, Settings, Secrets and variables, Actions:

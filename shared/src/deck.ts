@@ -479,7 +479,7 @@ export function sanitizeSlide(raw: unknown): Slide {
   if (d) {
     if (d.kind === "timeline") {
       const events = (Array.isArray(d.events) ? d.events : []).map((e) => obj(e)).filter((e): e is Record<string, unknown> => !!e).map((e) => ({ when: txt(e.when) ?? "", label: txt(e.label) ?? "" })).filter((e) => e.when || e.label);
-      if (events.length) s.diagram = { kind: "timeline", events };
+      if (events.length) s.diagram = { kind: "timeline", events: events.slice(0, 12) };
     } else if (d.kind === "matrix") {
       // Blank names keep their place, so every row keeps its own cells.
       const rows = Array.isArray(d.rows) ? d.rows.map((x) => txt(x) ?? "") : [];
@@ -505,18 +505,21 @@ export function sanitizeSlide(raw: unknown): Slide {
     } else {
       const steps = (Array.isArray(d.steps) ? d.steps : [])
         .map((x) => (typeof x === "string" ? { label: x } : obj(x) ? { label: txt(obj(x)!.label) ?? "", ...(txt(obj(x)!.detail) ? { detail: txt(obj(x)!.detail) } : {}) } : null))
-        .filter((x): x is { label: string; detail?: string } => !!x && !!x.label);
+        .filter((x): x is { label: string; detail?: string } => !!x && !!x.label)
+        // A flow wider than this cannot be drawn: in PowerPoint each step's width goes below zero.
+        .slice(0, 12);
       if (steps.length) s.diagram = { kind: "flow", steps };
     }
   }
   if (Array.isArray(r.kpi)) {
     const kpi = r.kpi.map((x) => obj(x)).filter((x): x is Record<string, unknown> => !!x).map((x) => ({ label: txt(x.label) ?? "", value: txt(x.value) ?? "", ...(txt(x.note) ? { note: txt(x.note) } : {}) })).filter((x) => x.label || x.value);
-    if (kpi.length) s.kpi = kpi;
+    if (kpi.length) s.kpi = kpi.slice(0, 8);
   }
   if (Array.isArray(r.cards)) {
     const cards = r.cards
       .map((x) => (typeof x === "string" ? { heading: x } : obj(x) ? { heading: txt(obj(x)!.heading) ?? "", ...(txt(obj(x)!.detail) ? { detail: txt(obj(x)!.detail) } : {}), ...(txt(obj(x)!.tag) ? { tag: txt(obj(x)!.tag) } : {}) } : null))
-      .filter((x): x is CardItem => !!x && !!x.heading.trim());
+      .filter((x): x is CardItem => !!x && !!x.heading.trim())
+      .slice(0, 16);
     if (cards.length) s.cards = cards;
   }
   const im = obj(r.image);
@@ -640,4 +643,22 @@ export function blankSlide(layout: Layout, lang: Lang = "en"): Slide {
       break;
   }
   return s;
+}
+
+/**
+ * Every picture a deck's slides and theme point at. A duplicated deck points at its original's pictures,
+ * which carry the original's deck_id, so pictures are looked up by these ids and not only by deck.
+ */
+export function deckMediaIds(deck: { slides?: unknown; theme?: unknown }): string[] {
+  const ids = new Set<string>();
+  const add = (v: unknown) => {
+    if (typeof v === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(v)) ids.add(v);
+  };
+  const theme = deck.theme as { logoMediaId?: unknown } | undefined;
+  add(theme?.logoMediaId);
+  for (const s of Array.isArray(deck.slides) ? (deck.slides as Record<string, unknown>[]) : []) {
+    add((s?.image as { mediaId?: unknown } | undefined)?.mediaId);
+    for (const g of Array.isArray(s?.gallery) ? (s.gallery as { mediaId?: unknown }[]) : []) add(g?.mediaId);
+  }
+  return [...ids];
 }

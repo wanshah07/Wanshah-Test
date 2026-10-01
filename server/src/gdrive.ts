@@ -91,7 +91,14 @@ export function fetchSigned(address: string, max = MAX_LINK_BYTES, hops = 3): Pr
       const status = res.statusCode ?? 0;
       if (status >= 300 && status < 400 && res.headers.location && hops > 0) {
         res.resume();
-        fetchSigned(new URL(res.headers.location, url).toString(), max, hops - 1).then(resolve, reject);
+        // A malformed Location would throw here, inside the response callback, and take the process down.
+        let next: string;
+        try {
+          next = new URL(res.headers.location, url).toString();
+        } catch {
+          return reject(new GoogleLinkError("The download from Composio redirected to an address that is not valid.", "unreachable"));
+        }
+        fetchSigned(next, max, hops - 1).then(resolve, reject);
         return;
       }
       if (status !== 200) {

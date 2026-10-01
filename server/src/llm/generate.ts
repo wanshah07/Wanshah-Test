@@ -171,10 +171,17 @@ export async function condenseAll(named: { name: string; kind: string; text: str
   const results = new Map<string, string>();
   const quick = fastAuth(auth);
   let next = 0;
+  // One failed part fails the lot: the others stop taking parts rather than spend calls on a dead job.
+  let failed = false;
   const workers = Array.from({ length: Math.min(4, tasks.length) }, async () => {
-    while (next < tasks.length) {
+    while (next < tasks.length && !failed) {
       const t = tasks[next++];
-      results.set(`${t.si}:${t.ci}`, await chatText(quick, sys, `### ${t.name}\n${t.text}`));
+      try {
+        results.set(`${t.si}:${t.ci}`, await chatText(quick, sys, `### ${t.name}\n${t.text}`));
+      } catch (e) {
+        failed = true;
+        throw e;
+      }
     }
   });
   await Promise.all(workers);

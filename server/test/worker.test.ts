@@ -345,3 +345,37 @@ describe("mergeDoc", () => {
     expect((mergeDoc(base, ours, theirs).slides as { id: string }[]).map((s) => s.id)).toEqual(["a", "c", "n"]);
   });
 });
+
+describe("worker hardening (review of 1 Oct 2026)", () => {
+  it("refuses a storage path that climbs out of its folder", async () => {
+    const { safeObjectPath } = await import("../src/worker/supabase.js");
+    for (const bad of ["a/../b", "a/./b", "/a", "a//b", "..", "a\\b", ""]) expect(() => safeObjectPath(bad)).toThrow("unsafe_path");
+    expect(safeObjectPath("u1/job/file.pdf")).toBe("u1/job/file.pdf");
+    // A job naming an inbox path that climbs into another bucket is refused before anything is read.
+    const j = await job(A, { method: "POST", path: `/api/decks/${deckId}/sources`, files: [{ name: "x.png", path: `${A}/../../sc-media/${B}/m.png` }] });
+    expect(j.status).toBe("error");
+  });
+
+  it("does not load a picture row that points into another person's folder", async () => {
+    files.set(`sc-media/${B}/m_secret.png`, Buffer.from("secret"));
+    db.sc_media.push({ id: "m_steal", user_id: A, deck_id: null, name: "x.png", mime: "image/png", bytes: 6, origin: "upload", object_path: `${B}/m_secret.png`, created_at: stamp() });
+    const r = await job(A, { method: "GET", path: "/api/media/m_steal" });
+    expect(result(r).status).toBe(404);
+    db.sc_media = db.sc_media.filter((m) => m.id !== "m_steal");
+  });
+
+  it("writes back only the settings a job changed", async () => {
+    db.sc_settings = db.sc_settings.filter((x) => x.user_id !== A);
+    db.sc_settings.push({ user_id: A, model: "model-before", house_prompt: null, vision_ok: null, vision_for: null, updated_at: stamp() });
+    const { load, flush } = await import("../src/worker/mirror.js");
+    const { getDb } = await import("../src/db.js");
+    const loaded = await load(W.sb, A, {});
+    // The person changes their model while the job runs; the job records a picture check.
+    db.sc_settings.find((x) => x.user_id === A)!.model = "model-after";
+    getDb().prepare("UPDATE settings SET vision_ok = 'yes'").run();
+    await flush(W.sb, loaded);
+    const row = db.sc_settings.find((x) => x.user_id === A)!;
+    expect(row.vision_ok).toBe("yes");
+    expect(row.model).toBe("model-after");
+  });
+});

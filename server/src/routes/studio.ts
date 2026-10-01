@@ -21,7 +21,8 @@ function sourceKey(deckId: string): string {
 }
 
 function llmFailure(reply: { code: (n: number) => { send: (b: unknown) => unknown } }, e: unknown) {
-  if (e instanceof LlmError) return reply.code(e.status === 404 ? 404 : 502).send({ error: e.code, message: e.message });
+  // Only a missing notebook is a 404; an endpoint's own 404 (an unknown model) is the AI failing.
+  if (e instanceof LlmError) return reply.code(e.code === "not_found" ? 404 : 502).send({ error: e.code, message: e.message });
   throw e;
 }
 

@@ -88,6 +88,25 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'ok   cannot make an output in someone else''s name';
 end $$;
 
+-- Picture rows: only in the owner's own folder, under a plain id
+insert into public.sc_media (id, name, mime, bytes, origin, object_path) values ('m_wan', 'a.png', 'image/png', 1, 'upload', '00000000-0000-0000-0000-00000000000a/m_wan.png');
+select pg_temp.expect((select count(*) from public.sc_media where id = 'm_wan') = 1, 'a picture row in the owner''s own folder is allowed');
+do $$ begin
+  insert into public.sc_media (id, name, mime, bytes, origin, object_path) values ('m_steal', 'x.png', 'image/png', 1, 'upload', '00000000-0000-0000-0000-00000000000b/m_secret.png');
+  raise exception 'FAILED: a picture row pointing into another person''s folder';
+exception when insufficient_privilege then raise notice 'ok   a picture row cannot point into another person''s folder';
+end $$;
+do $$ begin
+  update public.sc_media set object_path = '00000000-0000-0000-0000-00000000000b/m_secret.png' where id = 'm_wan';
+  raise exception 'FAILED: moved a picture row into another person''s folder';
+exception when insufficient_privilege then raise notice 'ok   nor be moved there later';
+end $$;
+do $$ begin
+  insert into public.sc_media (id, name, mime, bytes, origin, object_path) values ('../../x', 'x.png', 'image/png', 1, 'upload', '00000000-0000-0000-0000-00000000000a/../../x.png');
+  raise exception 'FAILED: a picture id that climbs out of its folder';
+exception when insufficient_privilege then raise notice 'ok   a picture id or path cannot climb out of its folder';
+end $$;
+
 -- A teammate
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
 select pg_temp.expect((select count(*) from public.sc_decks) = 1 and (select title from public.sc_decks) = 'Mate deck', 'a teammate sees only their own deck');

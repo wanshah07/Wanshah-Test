@@ -59,6 +59,10 @@ export default function NewDeck() {
   // The deck row exists from step 2 so uploads have somewhere to go.
   // One deck however many uploads start at once: they all wait on the same creation.
   const creating = useRef<Promise<string> | null>(null);
+  // Polls stop when the page is left: a finished job must not pull the person back from wherever they went.
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
+
   const ensureDeck = async (): Promise<string> => {
     if (deckId) return deckId;
     if (!creating.current) {
@@ -120,6 +124,7 @@ export default function NewDeck() {
       }
       const { jobId } = await api.generate(id, { prompt, auto, title, lang, angle, audience, slides, features: auto ? autoFeatures : features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
       const tick = async () => {
+        if (!alive.current) return;
         try {
           const j = await api.job(jobId);
           setJob(j);

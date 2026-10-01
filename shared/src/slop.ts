@@ -106,7 +106,7 @@ const INDONESIAN: Rule[] = [
 
 const COMMON: Rule[] = [
   { re: /[—–]/, note: "dash: use a comma, colon or full stop" },
-  { re: /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u, note: "emoji" },
+  { re: /[\u{1F300}-\u{1FAFF}\u{2600}-\u{2712}\u{2719}-\u{27BF}]/u, note: "emoji" },
   { re: /!\s*$|!\s/, note: "exclamation mark" },
   { re: /\.{3}|…/, note: "ellipsis" },
 ];
@@ -170,8 +170,11 @@ export function scanDeck(deck: Deck): Record<string, SlopHit[]> {
 /** The three fixes that cannot change meaning. Everything else is flagged, not rewritten. */
 export function autoFix(text: string, isTitle = false): string {
   let t = text;
+  // A dash between two numbers is a range (SPF 30–50, 2024–2026): it becomes a hyphen, never a list.
+  t = t.replace(/(\d)\s*[—–]\s*(?=\d)/g, "$1-");
   t = t.replace(/\s*[—–]\s*/g, ", ");
-  t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}️]/gu, "");
+  // Emoji go; the tick and cross marks (✓ ✔ ✗ ✘) stay, because they carry a verdict.
+  t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{2712}\u{2719}-\u{27BF}️]/gu, "");
   t = t.replace(/!+/g, ".");
   t = t.replace(/\s+([.,;:])/g, "$1").replace(/,\s*\./g, ".").replace(/\s{2,}/g, " ").trim();
   if (isTitle) t = t.replace(/[.]+$/, "");

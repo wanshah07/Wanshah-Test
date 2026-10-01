@@ -28,7 +28,8 @@ jobs:
   work:
     if: github.repository == 'wanshah07/Wanshah-Test'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The run takes jobs for up to 35 minutes and each may run 25 more; the limit sits above both.
+    timeout-minutes: 70
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

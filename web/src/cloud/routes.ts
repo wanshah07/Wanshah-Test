@@ -4,6 +4,7 @@ import {
   HOUSE_DEFAULT,
   cleanModelId,
   DEFAULT_THEME_ID,
+  deckMediaIds,
   parseModelList,
   pickModel,
   sanitizeOutput,
@@ -87,7 +88,7 @@ async function loadDeck(id: string): Promise<Deck> {
   deck.slides = (Array.isArray(deck.slides) ? deck.slides : []).map((x) => sanitizeSlide(x));
   deck.theme = sanitizeTheme(deck.theme);
   deck.sources = await sourceRefs(id);
-  await signDeckMedia(id);
+  await signDeckMedia(id, deck);
   return deck;
 }
 
@@ -99,13 +100,22 @@ async function saveDoc(deck: Deck): Promise<Deck> {
   return deck;
 }
 
-async function signDeckMedia(deckId: string | null): Promise<Row[]> {
+async function signDeckMedia(deckId: string | null, doc?: { slides?: unknown; theme?: unknown }): Promise<Row[]> {
   // The id goes into a filter expression: only the characters an id is made of.
   if (deckId && !/^[A-Za-z0-9_-]+$/.test(deckId)) throw notFound();
   const q = sb().from("sc_media").select("id, name, mime, bytes, origin, deck_id, object_path").order("created_at");
   const rows = check(await (deckId ? q.or(`deck_id.eq.${deckId},deck_id.is.null`) : q.is("deck_id", null))) as Row[];
   await signMedia(rows as { id: string; object_path: string }[]);
+  // Pictures the deck uses that belong to another deck (a duplicate shares its original's).
+  if (doc) await signIds(deckMediaIds(doc).filter((id) => !rows.some((r) => r.id === id)));
   return rows;
+}
+
+/** Signs pictures by id, whatever deck they belong to. */
+async function signIds(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const rows = check(await sb().from("sc_media").select("id, object_path").in("id", ids.slice(0, 500))) as Row[];
+  await signMedia(rows as { id: string; object_path: string }[]);
 }
 
 function validDeck(raw: unknown): raw is Deck {
@@ -205,14 +215,15 @@ function asPageJob(j: JobRow) {
 }
 
 /**
- * Starts background work (writing a deck, applying feedback) and returns its
- * job id once the worker has taken it, or throws the refusal the server gave
- * (a deck already being written, pictures the writer cannot read).
+ * Starts background work (writing a deck, applying feedback, a Studio output)
+ * and returns its job id as soon as the job is queued.
  */
 async function startWork(path: string, body: unknown, kind: string): Promise<{ jobId: string }> {
+  // The job id comes back at once, so the page shows "waiting for the worker" straight away instead of a
+  // dead button for the minute a runner takes to start (which invites a second, paid, click). A refusal
+  // (a deck already being written, pictures the writer cannot read) then arrives as the job failing with
+  // the server's message, which the pages already explain and offer choices for.
   const id = await queueJob({ method: "POST", path, body }, kind, deckOf(path));
-  const j = await watchJob(id, (x) => finished(x) || !!x.progress?.status);
-  if (j.status === "error" || (j.status === "done" && j.result && j.result.status >= 400)) answer(j);
   return { jobId: id };
 }
 
@@ -278,6 +289,11 @@ const routes: [string, RegExp, Handler][] = [
     /^\/api\/decks$/,
     async () => {
       const rows = check(await sb().from("sc_decks").select("id, title, doc, created_at, updated_at").order("updated_at", { ascending: false })) as Row[];
+      // The cards draw each deck's first slide and logo: their pictures need signed links too.
+      await signIds([...new Set(rows.flatMap((r) => {
+        const d = (r.doc ?? {}) as Deck;
+        return deckMediaIds({ slides: Array.isArray(d.slides) ? d.slides.slice(0, 1) : [], theme: d.theme });
+      }))]).catch(() => undefined);
       return rows.map((r) => {
         const d = r.doc as Deck;
         const first = Array.isArray(d.slides) && d.slides[0] ? sanitizeSlide(d.slides[0]) : undefined;
@@ -334,8 +350,11 @@ const routes: [string, RegExp, Handler][] = [
     async (p) => {
       await deckRow(p[1]);
       const pics = check(await sb().from("sc_media").select("id, object_path").eq("deck_id", p[1])) as Row[];
+      // A picture a duplicate of this deck still shows is kept.
+      const others = check(await sb().from("sc_decks").select("doc").neq("id", p[1])) as Row[];
+      const used = new Set(others.flatMap((d) => deckMediaIds((d.doc ?? {}) as Deck)));
       check(await sb().from("sc_decks").delete().eq("id", p[1]));
-      await removeMedia(pics);
+      await removeMedia(pics.filter((r) => !used.has(String(r.id))));
       return { ok: true };
     },
   ],
@@ -606,7 +625,9 @@ const routes: [string, RegExp, Handler][] = [
       if (!b?.name?.trim() || !b.theme?.colors) throw new ApiError("A name and a theme are needed.", 400, "invalid");
       const id = uid("dz");
       const me = await userId();
-      const theme = sanitizeTheme({ ...b.theme, id: `design:${id}`, name: b.name.trim() });
+      // A design is a look, as on the server: the deck's own logo and footer (a client's name) stay with the deck.
+      const { logoMediaId: _l, footer: _f, ...look } = b.theme as Row;
+      const theme = sanitizeTheme({ ...look, id: `design:${id}`, name: b.name.trim() });
       const r = check(await sb().from("sc_designs").insert({ id, user_id: me, name: b.name.trim(), theme, notes: String(b.notes ?? "").slice(0, 4000), analysis: {} }).select("*").single());
       return toDesign(r as unknown as Row);
     },

@@ -743,10 +743,32 @@ function background(ps: PSlide, s: Slide, c: Ctx, dark: boolean, plainColour: st
   if (s.layout !== "section") bloomDots(ps, s, c);
 }
 
+/**
+ * Every box on the slide at least a sliver wide and tall. Content past what a slide can hold would give a
+ * negative or zero size, which PowerPoint reads as a damaged file and offers to repair.
+ */
+function sized(ps: PSlide): PSlide {
+  // A line is drawn with one side 0 on purpose: it only may not go below zero.
+  const fix = (o: unknown, least = 0.05) => {
+    if (o && typeof o === "object") {
+      const b = o as { w?: unknown; h?: unknown };
+      if (typeof b.w === "number") b.w = Number.isFinite(b.w) ? Math.max(least, b.w) : least;
+      if (typeof b.h === "number") b.h = Number.isFinite(b.h) ? Math.max(least, b.h) : least;
+    }
+    return o;
+  };
+  const text = ps.addText.bind(ps), shape = ps.addShape.bind(ps), image = ps.addImage.bind(ps), chart = ps.addChart.bind(ps);
+  ps.addText = ((t: Parameters<PSlide["addText"]>[0], o: Parameters<PSlide["addText"]>[1]) => text(t, fix(o) as typeof o)) as PSlide["addText"];
+  ps.addShape = ((k: Parameters<PSlide["addShape"]>[0], o: Parameters<PSlide["addShape"]>[1]) => shape(k, fix(o, String(k) === "line" ? 0 : 0.05) as typeof o)) as PSlide["addShape"];
+  ps.addImage = ((o: Parameters<PSlide["addImage"]>[0]) => image(fix(o) as typeof o)) as PSlide["addImage"];
+  ps.addChart = ((k: Parameters<PSlide["addChart"]>[0], d: Parameters<PSlide["addChart"]>[1], o: Parameters<PSlide["addChart"]>[2]) => chart(k, d, fix(o) as typeof o)) as PSlide["addChart"];
+  return ps;
+}
+
 function addSlide(deck: Deck, s: Slide, i: number, c: Ctx): void {
   const t = c.theme;
   const col = t.colors;
-  const ps = c.pres.addSlide();
+  const ps = sized(c.pres.addSlide());
   const contentX = px(120);
   let contentW = W - px(240);
   let bodyBottom = H - px(140);

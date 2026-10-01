@@ -221,10 +221,14 @@ export function sanitizeOutputData(kind: OutputKind, raw: unknown): OutputData {
         .map((q) => obj(q))
         .filter((q): q is Record<string, unknown> => !!q)
         .map((q) => {
-          const options = list(q.options ?? q.choices, 6, 400);
-          let answer = Number(q.answer ?? q.correct);
-          // A model that names the right option instead of numbering it.
-          if (!Number.isInteger(answer) && typeof (q.answer ?? q.correct) === "string") answer = options.findIndex((o) => o === txt(q.answer ?? q.correct, 400));
+          // The answer is an index into the options as the model wrote them, so it is found there first and
+          // only then moved to where it lands once blank options are dropped.
+          const rawOpts = (Array.isArray(q.options ?? q.choices) ? (q.options ?? q.choices) as unknown[] : []).slice(0, 6).map((o) => txt(o, 400));
+          const options = rawOpts.filter(Boolean);
+          const given = q.answer ?? q.correct;
+          let raw = typeof given === "string" && !/^\d+$/.test(given.trim()) ? rawOpts.findIndex((o) => o && o === txt(given, 400)) : Number(given);
+          if (!Number.isInteger(raw) || raw < 0 || raw >= rawOpts.length || !rawOpts[raw]) raw = -1;
+          const answer = raw < 0 ? -1 : rawOpts.slice(0, raw).filter(Boolean).length;
           return { question: txt(q.question, 600), options, answer, explanation: txt(q.explanation, 1200), ...(txt(q.source, 300) ? { source: txt(q.source, 300) } : {}) };
         })
         .filter((q) => q.question && q.options.length >= 2 && Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.options.length)
@@ -325,35 +329,37 @@ export function sanitizeAnswer(raw: unknown): ChatAnswer {
 
 // ---------------------------------------------------------------- downloads
 
-const mdEsc = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+const mdEsc = (s: string) => s.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+/** One line of text: a line break inside a heading, a list item or a label would break the Markdown around it. */
+const line = (s: string) => s.replace(/\s*\n\s*/g, " ");
 
 /** An output as Markdown: what the person downloads, pastes or emails. */
 export function outputToMarkdown(o: Output): string {
   const d = o.data;
-  const out: string[] = [`# ${o.title}`, ""];
+  const out: string[] = [`# ${line(o.title)}`, ""];
   switch (o.kind) {
     case "report": {
       const r = d as ReportData;
       if (r.summary) out.push(r.summary, "");
       for (const s of r.sections) {
-        if (s.heading) out.push(`## ${s.heading}`, "");
+        if (s.heading) out.push(`## ${line(s.heading)}`, "");
         for (const p of s.paragraphs) out.push(p, "");
-        if (s.points?.length) out.push(...s.points.map((p) => `- ${p}`), "");
+        if (s.points?.length) out.push(...s.points.map((p) => `- ${line(p)}`), "");
       }
-      if (r.citations.length) out.push("## Sources", "", ...r.citations.map((c) => `- ${c}`), "");
+      if (r.citations.length) out.push("## Sources", "", ...r.citations.map((c) => `- ${line(c)}`), "");
       break;
     }
     case "flashcards":
-      (d as FlashcardsData).cards.forEach((c, i) => out.push(`**${i + 1}. ${c.front}**`, "", c.back, ...(c.source ? ["", `_Source: ${c.source}_`] : []), ""));
+      (d as FlashcardsData).cards.forEach((c, i) => out.push(`**${i + 1}. ${line(c.front)}**`, "", c.back, ...(c.source ? ["", `_Source: ${c.source}_`] : []), ""));
       break;
     case "quiz":
       (d as QuizData).questions.forEach((q, i) => {
-        out.push(`**${i + 1}. ${q.question}**`, "", ...q.options.map((o2, j) => `${String.fromCharCode(65 + j)}. ${o2}`), "", `Answer: ${String.fromCharCode(65 + q.answer)}. ${q.explanation}`, "");
+        out.push(`**${i + 1}. ${line(q.question)}**`, "", ...q.options.map((o2, j) => `${String.fromCharCode(65 + j)}. ${line(o2)}`), "", `Answer: ${String.fromCharCode(65 + q.answer)}. ${q.explanation}`, "");
       });
       break;
     case "mindmap": {
       const walk = (n: MindNode, depth: number) => {
-        out.push(`${"  ".repeat(depth)}- ${n.label}${n.note ? `: ${n.note}` : ""}`);
+        out.push(`${"  ".repeat(depth)}- ${line(n.label)}${n.note ? `: ${line(n.note)}` : ""}`);
         for (const c of n.children ?? []) walk(c, depth + 1);
       };
       walk((d as MindMapData).root, 0);
@@ -369,17 +375,17 @@ export function outputToMarkdown(o: Output): string {
     }
     case "infographic": {
       const g = d as InfographicData;
-      out.push(`## ${g.headline}`, "", ...(g.subtitle ? [g.subtitle, ""] : []), ...g.stats.map((s) => `- **${s.value}** ${s.label}`), "");
-      for (const s of g.sections) out.push(`### ${s.heading}`, "", ...s.points.map((p) => `- ${p}`), "");
-      if (g.takeaway) out.push(`**${g.takeaway}**`, "");
+      out.push(`## ${line(g.headline)}`, "", ...(g.subtitle ? [g.subtitle, ""] : []), ...g.stats.map((s) => `- **${line(s.value)}** ${line(s.label)}`), "");
+      for (const s of g.sections) out.push(`### ${line(s.heading)}`, "", ...s.points.map((p) => `- ${line(p)}`), "");
+      if (g.takeaway) out.push(`**${line(g.takeaway)}**`, "");
       if (g.source) out.push(`_Source: ${g.source}_`, "");
       break;
     }
     default: {
       const n = d as NoteData;
-      if (n.question) out.push(`> ${n.question}`, "");
+      if (n.question) out.push(`> ${line(n.question)}`, "");
       out.push(n.text, "");
-      if (n.citations?.length) out.push("Sources:", ...n.citations.map((c) => `- ${c.source}: "${c.quote}"`), "");
+      if (n.citations?.length) out.push("Sources:", ...n.citations.map((c) => `- ${line(c.source)}: "${line(c.quote)}"`), "");
     }
   }
   return out.join("\n").replace(/\n{3,}/g, "\n\n");
@@ -387,7 +393,7 @@ export function outputToMarkdown(o: Output): string {
 
 /** A data table as CSV, quoted the way spreadsheets read it. */
 export function tableToCsv(t: TableData): string {
-  const q = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  const q = (s: string) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
   // A cell that starts like a formula is read as text, not run.
   const safe = (s: string) => (/^[=+\-@]/.test(s) ? `'${s}` : s);
   return [t.columns, ...t.rows].map((r) => r.map((c) => q(safe(c))).join(",")).join("\r\n") + "\r\n";

@@ -381,3 +381,47 @@ describe("Studio outputs and model lists", () => {
     expect(sanitizeAnswer({ answer: "x", citations: [{ source: "s", quote: "" }, { source: "s", quote: "q" }], followUps: ["a", "b", "c", "d"] })).toEqual({ answer: "x", citations: [{ source: "s", quote: "q" }], followUps: ["a", "b", "c"] });
   });
 });
+
+describe("bugs found in the review of 1 Oct 2026", () => {
+  it("keeps a quiz answer on the right option when a blank option is dropped", async () => {
+    const { sanitizeOutputData } = await import("../src/index.js");
+    const q = sanitizeOutputData("quiz", { questions: [{ question: "Q", options: ["", "Right", "Wrong"], answer: 1, explanation: "e" }, { question: "Blank answer", options: ["A", "", "B"], answer: 1, explanation: "e" }] }) as { questions: { options: string[]; answer: number }[] };
+    expect(q.questions.length).toBe(1);
+    expect(q.questions[0].options[q.questions[0].answer]).toBe("Right");
+  });
+
+  it("draws a pie whose one slice is the whole, and bars below zero", () => {
+    const pie = chartSvg({ kind: "pie", categories: ["A", "B"], series: [{ name: "n", values: [5, 0] }] }, theme.colors);
+    expect(pie).toMatch(/<circle cx="[\d.]+" cy="[\d.]+" r="[\d.]+" fill="/);
+    const ring = chartSvg({ kind: "doughnut", categories: ["A"], series: [{ name: "n", values: [5] }] }, theme.colors);
+    expect(ring).toMatch(/<circle[^>]*fill="none"[^>]*stroke-width/);
+    const bars = chartSvg({ kind: "bar", categories: ["Loss", "Gain"], series: [{ name: "n", values: [-5, 3] }] }, theme.colors);
+    const widths = [...bars.matchAll(/<rect x="[\d.-]+" y="[\d.-]+" width="([\d.]+)"/g)].map((m) => Number(m[1]));
+    expect(widths.every((w) => w > 0)).toBe(true);
+    expect(chartSvg({ kind: "column", categories: ["a", "b"], series: [{ name: "n", values: [0.25, 0.75] }] }, theme.colors)).toContain(">0.25<");
+  });
+
+  it("autoFix keeps number ranges and verdict marks", async () => {
+    const { autoFix } = await import("../src/index.js");
+    expect(autoFix("SPF 30–50 for 2024—2026 ✓ allowed ✗ banned 🎉")).toBe("SPF 30-50 for 2024-2026 ✓ allowed ✗ banned");
+    expect(autoFix("Notify first — sell second")).toBe("Notify first, sell second");
+  });
+
+  it("takes forbidden characters out of a theme's footer, tag and name", () => {
+    const t = sanitizeTheme({ ...theme, footer: "Acme\u000bLtd", tag: "HCP\u0001", name: "My\u0007look" });
+    expect(t.footer).toBe("Acme Ltd");
+    expect(t.tag).toBe("HCP");
+    expect(t.name).toBe("My look");
+  });
+
+  it("caps diagrams and cards at what a slide can hold, and writes CSV and Markdown that stay in shape", async () => {
+    const { tableToCsv, outputToMarkdown } = await import("../src/index.js");
+    const s = sanitizeSlide({ layout: "diagram", title: "T", diagram: { kind: "flow", steps: Array.from({ length: 40 }, (_, i) => ({ label: `s${i}` })) }, cards: Array.from({ length: 30 }, (_, i) => ({ heading: `c${i}` })) });
+    expect((s.diagram as { steps: unknown[] }).steps.length).toBe(12);
+    expect(s.cards!.length).toBe(16);
+    expect(tableToCsv({ columns: ["a"], rows: [["x\ry"]] })).toBe('a\r\n"x\ry"\r\n');
+    const md = outputToMarkdown({ id: "o", deckId: "d", kind: "mindmap", title: "T", data: { root: { label: "Root\nline", children: [{ label: "Kid\nline" }] } }, createdAt: "", updatedAt: "" });
+    expect(md).toContain("- Root line");
+    expect(md).toContain("  - Kid line");
+  });
+});

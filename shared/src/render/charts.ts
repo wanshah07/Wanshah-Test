@@ -27,7 +27,9 @@ function niceMax(v: number): number {
 function fmt(v: number): string {
   if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
   if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  if (Number.isInteger(v)) return String(v);
+  // Small values keep the digits that tell them apart: 0.25 and 0.75 are not 0.3 and 0.8.
+  return String(Number(v.toPrecision(Math.abs(v) < 1 ? 2 : 3)));
 }
 
 export function chartSvg(chart: ChartSpec, colors: ThemeColors, W = 1400, H = 640, fontName = "Inter", series?: string[], opts: { legend?: boolean } = {}): string {
@@ -114,6 +116,10 @@ function barSvgHorizontal(chart: ChartSpec, colors: ThemeColors, pal: string[], 
   const iw = W - padL - padR, ih = H - padT - padB;
   const all = chart.series.flatMap((s) => s.values);
   const max = niceMax(Math.max(...all, 0));
+  const minRaw = Math.min(...all, 0);
+  const min = minRaw < 0 ? -niceMax(-minRaw) : 0;
+  // Bars grow from zero, to the right for a positive value and to the left for a negative one.
+  const xOf = (v: number) => padL + ((v - min) / (max - min)) * iw;
   const n = chart.categories.length || 1;
   const slot = ih / n;
   const sCount = chart.series.length;
@@ -129,9 +135,10 @@ function barSvgHorizontal(chart: ChartSpec, colors: ThemeColors, pal: string[], 
   chart.series.forEach((s, si) => {
     s.values.forEach((v, i) => {
       const y = padT + slot * i + (slot - groupH) / 2 + bh * si;
-      const w = (Math.max(v, 0) / max) * iw;
-      g += `<rect x="${padL}" y="${y + 2}" width="${w}" height="${bh - 4}" rx="6" fill="${bars ? bars[i] : pal[si % pal.length]}"/>`;
-      g += `<text x="${padL + w + 14}" y="${y + bh / 2 + 8}" font-family="${font}" font-size="28" fill="${colors.ink}">${fmt(v)}${chart.unit && sCount === 1 ? " " + esc(chart.unit) : ""}</text>`;
+      const x0 = xOf(0), x1 = xOf(v);
+      const left = Math.min(x0, x1), w = Math.abs(x1 - x0);
+      g += `<rect x="${left}" y="${y + 2}" width="${w}" height="${bh - 4}" rx="6" fill="${bars ? bars[i] : pal[si % pal.length]}"/>`;
+      g += `<text x="${v < 0 ? left - 14 : left + w + 14}" y="${y + bh / 2 + 8}"${v < 0 ? ` text-anchor="end"` : ""} font-family="${font}" font-size="28" fill="${colors.ink}">${fmt(v)}${chart.unit && sCount === 1 ? " " + esc(chart.unit) : ""}</text>`;
     });
   });
   g += legend(chart, pal, colors, padL, H - 14, font);
@@ -148,6 +155,13 @@ function pieSvg(chart: ChartSpec, colors: ThemeColors, pal: string[], W: number,
   let g = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" role="img">`;
   s.values.forEach((v, i) => {
     const frac = Math.max(v, 0) / total;
+    // A slice that is the whole pie: an arc from a point back to the same point draws nothing.
+    if (frac >= 0.9999) {
+      g += inner
+        ? `<circle cx="${cx}" cy="${cy}" r="${(r + inner) / 2}" fill="none" stroke="${pal[i % pal.length]}" stroke-width="${r - inner}"/>`
+        : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${pal[i % pal.length]}"/>`;
+      return;
+    }
     const a1 = a0 + frac * Math.PI * 2;
     const large = a1 - a0 > Math.PI ? 1 : 0;
     const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);

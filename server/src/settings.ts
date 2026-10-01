@@ -81,7 +81,9 @@ export function resolveAuth(userId: string, asked?: unknown): LlmAuth | null {
   // A person's own key may run any model; the server's key runs only the models the owner listed.
   if (own) return { apiKey: own, baseUrl: s.openai_base || config.openaiBase, model: pickModel(asked, s.openai_model, config.openaiModel, []), imageModel: s.openai_image_model || config.openaiImageModel };
   if (!config.openaiKey) return null;
-  return { apiKey: config.openaiKey, baseUrl: config.openaiBase, model: pickModel(asked, s.openai_model, config.openaiModel, modelChoices()), imageModel: s.openai_image_model || config.openaiImageModel };
+  // On the server's key the image model is the owner's too, whenever the owner has listed the models.
+  const listed = modelChoices();
+  return { apiKey: config.openaiKey, baseUrl: config.openaiBase, model: pickModel(asked, s.openai_model, config.openaiModel, listed), imageModel: listed.length ? config.openaiImageModel : s.openai_image_model || config.openaiImageModel };
 }
 
 /** The models the owner lets people pick, with the default first when it is not listed. */
