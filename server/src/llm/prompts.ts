@@ -22,6 +22,16 @@ export interface GenerateParams {
   houseRules?: string | null;
   /** The writer model asked for on this request; the person's own or the default when not allowed. */
   model?: string;
+  /** The deck's arc in one sentence, from the Auto plan. */
+  arc?: string;
+  /** One entry per slide, in order, from the Auto plan: what the slide says, the one point it proves, its layout. */
+  storyline?: StoryBeat[];
+}
+
+export interface StoryBeat {
+  title: string;
+  point: string;
+  layout: string;
 }
 
 function houseLines(house: GenerateParams["house"], designNotes: string | undefined): string[] {
@@ -95,6 +105,10 @@ export function systemPrompt(p: GenerateParams): string {
   lines.push("- Every chart and table names its source.");
   lines.push("- If the evidence is thin, contested or from a single study, add one slide of caveats that says so plainly.");
   lines.push("- End on substance: a cards slide of the decisions or next steps (who, what, by when where the sources give it), then a references slide if there are citations, then the closing slide.");
+  lines.push("- Tell one story: situation, the problem or change, what it means, what to do. Each slide moves it one step, in an order a reader can follow without the speaker.");
+  lines.push("- Each slide carries a single idea. If a slide needs two titles, it is two slides; if two slides say the same thing, merge them.");
+  if (p.storyline?.length) lines.push("- A STORYLINE is given in the request: follow it, one slide per entry in that order, on the layout it names. Sharpen a title if the sources allow; merge or drop an entry only when the sources cannot carry it; add nothing it does not plan except the title and closing slides.");
+  lines.push("- Before you answer, read the deck once as the audience: cut any slide whose title does not state its idea, and move any sentence a slide does not need into its notes.");
   const visuals = allowed.filter((l) => ["chart", "diagram", "kpi", "image", "table", "facts", "map", "gallery"].includes(l));
   lines.push(`- BALANCE TEXT WITH VISUALS: a slide is looked at, not read. At least half of the content slides are visual (${visuals.join(", ") || "cards"}), and never more than two text-led slides (bullets, two-column, cards, quote) in a row. A process, pathway, mechanism or plan is a diagram (flow is a process map, timeline is dates, matrix is a comparison map, hub is a mechanism map, funnel is a drop-off, equation is terms adding up to a result), never bullets; figures in a series are a chart; headline numbers are kpi.`);
   if (allowed.includes("image")) lines.push(p.imageMode === "uploaded" ? "- Put the uploaded pictures to work: every picture that fits the story gets an image slide, with at most 3 short points beside it." : "- Use image slides where a photograph or illustration carries the point better than words (at most 3).");
@@ -154,6 +168,10 @@ export function userPrompt(p: GenerateParams, sources: { name: string; kind: str
   const parts: string[] = [];
   parts.push(`BRIEF:\n${p.prompt.trim()}`);
   if (p.title) parts.push(`DECK TITLE (use it): ${p.title}`);
+  if (p.storyline?.length) {
+    const beats = p.storyline.map((b, i) => `${i + 1}. [${b.layout}] ${b.title} :: ${b.point}`);
+    parts.push(`STORYLINE (the planned deck, one line per slide: layout, title, the one point it proves):${p.arc ? `\nArc: ${p.arc}` : ""}\n${beats.join("\n")}`);
+  }
   if (sources.length) {
     parts.push(`SOURCES (${sources.length}${condensed ? ", condensed to the facts relevant to the brief" : ""}):`);
     for (const s of sources) {

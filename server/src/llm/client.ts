@@ -244,6 +244,11 @@ export interface ChatJsonArgs {
   temperature?: number;
   /** Per-request wait before an endpoint counts as silent. */
   timeoutMs?: number;
+  /**
+   * Keys listed in the schema's `required` (strict mode needs every property there) that the
+   * caller can do without: a reply missing only these is accepted, not sent back for a correction.
+   */
+  optional?: string[];
 }
 
 export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
@@ -310,7 +315,10 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
     if (parsed !== undefined) {
       // Valid JSON in a shape of the model's own (a brief, an outline) is as unusable as prose,
       // and it happens most in plain JSON mode, where the schema is only in the instructions.
-      const missing = missingKeys(parsed, a.schema);
+      const check = a.optional?.length && Array.isArray(a.schema.required)
+        ? { ...a.schema, required: (a.schema.required as string[]).filter((k) => !a.optional!.includes(k)) }
+        : a.schema;
+      const missing = missingKeys(parsed, check);
       if (!missing.length) return parsed as T;
       if (corrections >= 1) {
         // Still the wrong shape after being asked again: an object is handed on for the caller to

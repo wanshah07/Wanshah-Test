@@ -21,7 +21,7 @@ process.env.NODE_ENV = "test";
 process.env.OPENAI_API_KEY = "sk-test-writer";
 process.env.OPENAI_MODEL = "writer-1";
 
-const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, cut: 0, planAndDeck: 0, deckMsgs: [] as { role: string; content: string }[], plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckAllText: 0, designs: 0, designFail: false, designReply: null as null | Record<string, unknown>, designUser: "", deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0 };
+const gw = { thinking: false, silent: false, imageBodies: [] as Record<string, unknown>[], vision: false, garbage: false, cut: 0, planAndDeck: 0, deckMsgs: [] as { role: string; content: string }[], plans: 0, planUser: "", planProse: 0, planLastMsgs: [] as { role: string; content: string }[], deckProse: 0, deckOwnShape: 0, deckLastMsgs: [] as { role: string; content: string }[], deckNested: 0, deckOwnFields: 0, deckBlank: 0, deckStray: 0, deckCards: 0, deckAllText: 0, designs: 0, designFail: false, designReply: null as null | Record<string, unknown>, designUser: "", deckTitlesOnly: 0, systems: [] as string[], formats: [] as string[], users: [] as string[], reads: 0, probes: 0, planStory: null as null | Record<string, unknown> };
 let server: http.Server;
 let app: App;
 type App = Awaited<ReturnType<typeof import("../src/index.js")["buildApp"]>>;
@@ -102,7 +102,7 @@ beforeAll(async () => {
           gw.planProse--;
           return reply("Here is a professional presentation deck built strictly from the provided source material. ### Deck Strategy: Purpose, Audience, and Core Conclusion");
         }
-        return reply(JSON.stringify({ title: "Salicylic acid: 2% cap needs 4 SKUs reformulated", angle: "medical-affairs", audience: "dermatologists", slides: 7, features: { charts: false, tables: true, diagrams: false, kpis: true, sections: false, summary: true, qa: true }, reason: "The sources are clinical and carry no series of numbers." }));
+        return reply(JSON.stringify({ title: "Salicylic acid: 2% cap needs 4 SKUs reformulated", angle: "medical-affairs", audience: "dermatologists", slides: 7, features: { charts: false, tables: true, diagrams: false, kpis: true, sections: false, summary: true, qa: true }, reason: "The sources are clinical and carry no series of numbers.", ...(gw.planStory ?? {}) }));
       }
       if (body.response_format?.json_schema?.name === "design" || /^You are the designer/.test(String(body.messages?.[0]?.content ?? ""))) {
         // The design pass: tests that do not set one get "nothing to redraw".
@@ -281,11 +281,45 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     expect(sys).toMatch(/exactly 7 slides/);
     expect(sys).toMatch(/SLIDE LAYOUTS you may use: title, bullets, two-column, cards, quote, closing, chart, table, diagram, kpi, facts, map\./);
     expect(gw.users.at(-1)).toMatch(/DECK TITLE \(use it\): Salicylic acid: 2% cap/);
+    // A plan with no storyline is accepted as it is (one plan call above), and the writer gets none.
+    expect(gw.users.at(-1)).not.toMatch(/STORYLINE/);
+    expect(sys).not.toMatch(/A STORYLINE is given/);
     const deck = J(await app.inject({ method: "GET", url: `/api/decks/${id}` })).deck;
     expect(deck.angle).toBe("medical-affairs");
     expect(deck.brief).toMatchObject({ auto: true, text: "", slides: 7 });
     // Diagrams and number tiles stay on whatever the plan says: they carry points without paragraphs.
     expect(deck.brief.features).toMatchObject({ charts: true, tables: true, diagrams: true, kpis: true, notes: true, citations: true });
+  });
+
+  it("plans a storyline in the same call and hands it to the writer", async () => {
+    gw.planStory = {
+      arc: "A 2% cap lands in 2027, four SKUs fail it, and reformulating now keeps them on shelf.",
+      storyline: [
+        { title: "Salicylic acid: 2% cap needs 4 SKUs reformulated", point: "The deck in one line.", layout: "title" },
+        { title: "Four SKUs sit above the new 2% cap", point: "The answer first.", layout: "kpi" },
+        { title: "The cap applies from 1 Jan 2027", point: "When it bites.", layout: "facts" },
+        { title: "Reformulate in two waves", point: "What to do.", layout: "cards" },
+        { title: "Wave one costs least", point: "The cheapest start.", layout: "table" },
+        { title: "  Next   step:\n sign off the plan ", point: "Close on the action.", layout: "CLOSING" },
+      ],
+    };
+    const before = gw.plans;
+    const id = await newDeck("auto-story");
+    const job = await waitJob(J(await app.inject({ method: "POST", url: `/api/decks/${id}/generate`, payload: { prompt: "", auto: true } })).jobId);
+    gw.planStory = null;
+    expect(job.status, job.error ?? "").toBe("done");
+    // One plan call: the storyline rides on the settings call, it does not cost a second one.
+    expect(gw.plans - before).toBe(1);
+    expect(job.progress.join("\n")).toMatch(/Auto: storyline planned, 6 slides: A 2% cap lands in 2027/);
+    const user = gw.users.at(-1)!;
+    expect(user).toMatch(/STORYLINE \(the planned deck/);
+    expect(user).toMatch(/Arc: A 2% cap lands in 2027/);
+    expect(user).toMatch(/2\. \[kpi\] Four SKUs sit above the new 2% cap :: The answer first\./);
+    expect(user).toMatch(/6\. \[closing\] Next step: sign off the plan :: Close on the action\./);
+    const sys = gw.systems.at(-1)!;
+    expect(sys).toMatch(/A STORYLINE is given in the request: follow it/);
+    // The length follows the storyline, not the settings' own count.
+    expect(sys).toMatch(/exactly 6 slides/);
   });
 
   it("writes the deck craft rules into every writer's instructions", () => {
@@ -313,7 +347,7 @@ describe("Auto: the AI chooses the angle, audience, length and layouts", () => {
     const job = await waitJob(jobId);
     expect(job.status, job.error ?? "").toBe("done");
     expect(gw.plans - before).toBe(2);
-    expect(gw.planLastMsgs[1].content).toMatch(/^TASK: choose the settings for a slide deck\. Do NOT write the deck/);
+    expect(gw.planLastMsgs[1].content).toMatch(/^TASK: choose the settings for a slide deck and plan its storyline\. Do NOT write the slides themselves/);
     expect(gw.planLastMsgs.at(-2)).toMatchObject({ role: "assistant" });
     expect(gw.planLastMsgs.at(-1)!.content).toMatch(/That answer is not JSON/);
   });
@@ -617,5 +651,17 @@ describe("a picture reader beside a writer that cannot see", () => {
     expect(J(await app.inject({ method: "GET", url: "/api/settings" })).reader).toMatchObject({ key: "", complete: false });
     await app.inject({ method: "DELETE", url: "/api/settings/reader" });
     expect(J(await app.inject({ method: "GET", url: "/api/settings" })).reader).toMatchObject({ baseUrl: "", model: "", complete: false });
+  });
+});
+
+describe("cleanStoryline", () => {
+  it("keeps titled entries, flattens the text and maps unknown layouts to cards", async () => {
+    const { cleanStoryline } = await import("../src/llm/generate.js");
+    expect(cleanStoryline("nope")).toEqual([]);
+    expect(cleanStoryline([null, 3, { point: "no title" }, { title: " A\n b ", point: "p", layout: "Pie-Chart" }, { title: "C", layout: "KPI" }])).toEqual([
+      { title: "A b", point: "p", layout: "cards" },
+      { title: "C", point: "", layout: "kpi" },
+    ]);
+    expect(cleanStoryline(Array.from({ length: 40 }, (_, i) => ({ title: `S${i}` }))).length).toBe(30);
   });
 });
