@@ -119,6 +119,12 @@ export const PLAN_SCHEMA = {
       required: ["charts", "tables", "diagrams", "kpis", "sections", "summary", "qa"],
     },
     reason: str,
+    // The storyline: the deck's arc in one sentence, then one entry per slide in order.
+    arc: str,
+    storyline: {
+      type: "array",
+      items: { type: "object", additionalProperties: false, properties: { title: str, point: str, layout: str }, required: ["title", "point", "layout"] },
+    },
   },
-  required: ["title", "angle", "audience", "slides", "features", "reason"],
+  required: ["title", "angle", "audience", "slides", "features", "reason", "arc", "storyline"],
 };

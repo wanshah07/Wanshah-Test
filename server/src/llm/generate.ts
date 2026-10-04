@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { chatJson, chatText, generateImage, LlmError, mapPool, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
 import { mockDeckJson, mockRewrite } from "./mock.js";
-import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams } from "./prompts.js";
+import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams, type StoryBeat } from "./prompts.js";
 import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
 import { fastAuth, resolveAuth } from "../settings.js";
 import { importFolder, summarise } from "../onedrive.js";
@@ -97,6 +97,7 @@ export function planSystem(): string {
     "ANGLES: " + ANGLES.map((a) => `${a.id} (${a.name}: ${a.summary})`).join("; ") + ".",
     "Choose: the angle that fits the material; the audience in a few words; the number of slides (6 to 30, about one slide per distinct point the sources can carry, never padding); a working title that states the conclusion; and which devices the material can fill: charts only if the sources carry numbers in series, tables if they carry comparisons, diagrams if they describe a process or dates, kpis if they carry headline figures, sections if the deck has more than 12 slides, summary and qa if the audience will decide or ask.",
     "reason: one sentence on why, for the user to read.",
+    "Then plan the story, in this order. The blueprint: who the audience is and what they must decide or remember. The arc: one sentence, situation, the problem or change, what it means, what to do. The storyline: one entry per slide in reading order, exactly as many as the slides you chose, each with a title (the slide's conclusion in under 12 words, carrying its number where the sources give one), a point (the one idea the slide proves, one short sentence) and a layout (the visual that carries it best: " + STORY_LAYOUTS.join(", ") + "). One idea per entry; an entry that needs two titles is two entries. Open with the title slide and close with the closing slide; put the answer on slide 2.",
     "Answer only with the JSON the schema asks for.",
   ].join("\n");
 }
@@ -108,6 +109,23 @@ export interface Plan {
   slides: number;
   features: Pick<Features, "charts" | "tables" | "diagrams" | "kpis" | "sections" | "summary" | "qa">;
   reason: string;
+  arc?: string;
+  storyline?: StoryBeat[];
+}
+
+/** The layouts a storyline entry may name. */
+export const STORY_LAYOUTS = ["title", "section", "kpi", "chart", "table", "diagram", "cards", "two-column", "facts", "map", "image", "gallery", "quote", "bullets", "closing"];
+
+/** A storyline as the model gave it, kept only where every field is text and the layout is one the writer knows. */
+export function cleanStoryline(raw: unknown, max = 30): StoryBeat[] {
+  if (!Array.isArray(raw)) return [];
+  const flat = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+  return raw
+    .map((b) => (b && typeof b === "object" ? (b as Record<string, unknown>) : {}))
+    .map((b) => ({ title: flat(b.title, 140), point: flat(b.point, 240), layout: flat(b.layout, 20).toLowerCase() }))
+    .filter((b) => b.title)
+    .map((b) => ({ ...b, layout: STORY_LAYOUTS.includes(b.layout) ? b.layout : "cards" }))
+    .slice(0, max);
 }
 
 /** Folds a plan into the params. Notes and citations stay on; pictures follow what the deck holds. */
@@ -124,12 +142,20 @@ export function applyPlan(p: GenerateParams, plan: Plan, hasPictures: boolean): 
   const visual = Object.fromEntries(VISUAL_FEATURES.map((k) => [k, !off.has(k)])) as Partial<Features>;
   p.features = { ...p.features, ...visual, sections: !!f.sections, summary: !!f.summary, qa: !!f.qa, notes: true, citations: true, images: hasPictures && !off.has("images") };
   p.imageMode = p.features.images ? "uploaded" : "none";
+  // The storyline sets the length when it is whole: the writer is told to follow it slide for slide.
+  const story = cleanStoryline(plan.storyline);
+  // Six is the deck's floor: a shorter storyline would contradict the slide count, so it is dropped.
+  if (story.length >= 6) {
+    p.storyline = story;
+    p.slides = Math.min(30, story.length);
+    if (typeof plan.arc === "string" && plan.arc.trim()) p.arc = plan.arc.replace(/\s+/g, " ").trim().slice(0, 300);
+  }
 }
 
 /** The planner's own message: the brief and a short look at each source, and a clear instruction not to write the deck. */
 export function planUser(p: GenerateParams, sources: { name: string; kind: string; text: string }[]): string {
   const parts = [
-    "TASK: choose the settings for a slide deck. Do NOT write the deck, its slides or any outline. Answer with the settings JSON only.",
+    "TASK: choose the settings for a slide deck and plan its storyline. Do NOT write the slides themselves: a title, a one-line point and a layout for each is the whole plan. Answer with the plan JSON only.",
     `BRIEF: ${p.prompt.trim()}`,
   ];
   if (p.title) parts.push(`DECK TITLE: ${p.title}`);
@@ -149,6 +175,8 @@ export function fallbackPlan(p: GenerateParams, hasNumbers: boolean, sourceCount
     slides: sourceCount >= 4 ? 14 : 10,
     features: { charts: hasNumbers, tables: true, diagrams: true, kpis: true, sections: sourceCount >= 4, summary: true, qa: false },
     reason: "Standard settings, because the model did not return a plan.",
+    arc: "",
+    storyline: [],
   };
 }
 
@@ -538,7 +566,8 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
         const quick = auth;
         planning = (async () => {
           try {
-            return await chatJson<Plan>({ auth: fastAuth(quick), system: planSystem(), user: planUser(p, peek), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 1200 });
+            // Room for a storyline of up to 30 entries as well as the settings.
+            return await chatJson<Plan>({ auth: fastAuth(quick), system: planSystem(), user: planUser(p, peek), schemaName: "plan", schema: PLAN_SCHEMA, maxTokens: 4000, optional: ["arc", "storyline"] });
           } catch (e) {
             // The plan only picks settings; a model that will not give one still gets to write the deck.
             if (!(e instanceof LlmError) || !["parse", "length", "unsupported"].includes(String(e.code))) throw e;
@@ -558,6 +587,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       applyPlan(p, plan, hasPictures);
       const on = (["charts", "tables", "diagrams", "kpis", "sections"] as const).filter((k) => p.features[k]);
       log(jobId, `Auto: ${angleById(p.angle).name} for ${p.audience}, ${p.slides} slides, using ${on.length ? on.join(", ") : "text layouts only"}${hasPictures ? ", with the deck's pictures" : ""}.${plan.reason ? " " + plan.reason : ""}`);
+      if (p.storyline?.length) log(jobId, `Auto: storyline planned, ${p.storyline.length} slides${p.arc ? `: ${p.arc}` : ""}`);
       const d = loadDeck(userId, deckId);
       if (d) {
         d.brief = { ...(d.brief ?? { text: "", purposes: [], include: [], audiences: [] }), slides: p.slides, imageMode: p.imageMode, features: { ...p.features }, auto: true };
