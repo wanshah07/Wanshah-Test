@@ -27,7 +27,7 @@ permissions:
 jobs:
   work:
     if: github.repository == 'wanshah07/Wanshah-Test'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The run takes jobs for up to 35 minutes and each may run 25 more; the limit sits above both.
     timeout-minutes: 70
     env:
