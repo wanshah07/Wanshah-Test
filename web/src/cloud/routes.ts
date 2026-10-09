@@ -31,6 +31,9 @@ import { uid } from "./ids";
 import { finished, queueJob, readJob, watchJob, type JobRequest, type JobRow } from "./jobs";
 import { signMedia } from "./media";
 
+/** The model choice that means: the default model first, then the worker's backups. */
+const AUTO_MODEL = "auto";
+
 // The Supabase side of every /api request the page makes. Reads and small
 // edits go straight to the tables (row level security keeps each person to
 // their own rows); everything else becomes a job for the worker, which runs
@@ -476,9 +479,13 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   ["GET", /^\/api\/models$/, async () => {
-    const listed = parseModelList(import.meta.env.VITE_AI_MODELS);
-    const current = pickModel(undefined, (await settingsRow()).model as string | null, cleanModelId(import.meta.env.VITE_AI_DEFAULT) || listed[0]?.id || "", listed);
-    const models = !current || listed.some((m) => m.id === current) ? listed : [{ id: current, label: current }, ...listed];
+    const listed = parseModelList(import.meta.env.VITE_AI_MODELS).filter((m) => m.id !== AUTO_MODEL);
+    // Auto: the worker starts on the default model and moves to its backups (Mireld, AfiqStore) when a call fails.
+    const auto = { id: AUTO_MODEL, label: "Auto (best available; switches model if one fails)" };
+    const saved = (await settingsRow()).model as string | null;
+    const current = saved === AUTO_MODEL ? AUTO_MODEL : pickModel(undefined, saved, cleanModelId(import.meta.env.VITE_AI_DEFAULT) || listed[0]?.id || "", listed);
+    const choices = [auto, ...listed];
+    const models = !current || choices.some((m) => m.id === current) ? choices : [auto, { id: current, label: current }, ...listed];
     return { current, models, fast: null, open: !listed.length };
   }],
   ["POST", /^\/api\/decks\/([^/]+)\/feedback\/apply$/, async (p) => startWork(`/api/decks/${p[1]}/feedback/apply`, {}, "feedback")],

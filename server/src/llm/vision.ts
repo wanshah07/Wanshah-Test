@@ -35,7 +35,8 @@ export async function probeVision(auth: LlmAuth): Promise<"yes" | "no"> {
   try {
     // Room to answer: a model that thinks before answering (Gemini 3, o-series) spends
     // tokens on the thinking, and a 20-token cap left it with nothing to say.
-    const answer = (await chatText(auth, "You answer questions about pictures in one word.", user, 2048, 90000)).trim();
+    // This model alone: a fallback answering would be remembered as this model's answer.
+    const answer = (await chatText({ ...auth, fallbacks: undefined }, "You answer questions about pictures in one word.", user, 2048, 90000)).trim();
     // Silence is not an answer: it says nothing about pictures, so it is not a "no".
     if (!answer) throw new LlmError("The model gave no answer to the picture check", 0, "empty");
     return /\bred\b|merah/i.test(answer) ? "yes" : "no";

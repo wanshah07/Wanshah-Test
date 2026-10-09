@@ -1,13 +1,16 @@
 import { getDb, now } from "../db.js";
-import { HOUSE_DEFAULT, HOUSE_HEADER, HOUSE_MAX, houseValue } from "@slidecraft/shared";
+import { deckSkillBlock, HOUSE_DEFAULT, HOUSE_HEADER, HOUSE_MAX, houseValue } from "@slidecraft/shared";
 
 // The rules themselves are in shared/src/house.ts, so the page can show them too.
 export { HOUSE_DEFAULT, HOUSE_DESIGN, HOUSE_HEADER, HOUSE_MAX } from "@slidecraft/shared";
 
-/** The house rules as one block for a system prompt: the person's own when they wrote some, the built-in ones when not. */
+/**
+ * The house rules as one block for a system prompt: the person's own when they wrote some, the
+ * built-in ones when not, then the built-in deck skill, which every deck follows.
+ */
 export function houseDesign(custom?: string | null): string {
   const body = custom?.trim() ? custom.trim().slice(0, HOUSE_MAX) : HOUSE_DEFAULT;
-  return `${HOUSE_HEADER}\n${body}`;
+  return `${HOUSE_HEADER}\n${body}\n\n${deckSkillBlock()}`;
 }
 
 /** The person's own instructions for every deck, or null for the built-in ones. */

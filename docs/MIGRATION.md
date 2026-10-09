@@ -199,6 +199,12 @@ not needed.
    - optionally `AI_MODELS`, the models people may pick in the notebook
      (`claude-opus-5.5=Claude Opus 5.5, gpt-6-luna=GPT-6 Luna`), and
      `AI_FAST_MODEL`, a quicker model for reading long sources;
+   - optionally the backups every call falls back to when the main endpoint
+     fails: secrets `MIRELD_API_KEY` and `AFIQ_API_KEY`, and variables
+     `AFIQ_BASE_URL` (AfiqStore's Docs page, ending in `/v1`),
+     `MIRELD_MODELS` (default `deepseek-v4-pro`), `AFIQ_MODELS` (default
+     `kimi-k3, kimi-k2.7+vision`; `+vision` marks the model that reads
+     uploaded pictures) and `AI_ROUTE_ORDER` (default `mireld, afiq`);
    - variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 5. In GitHub, Settings, Secrets and variables, Actions, **Variables** tab:
    `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Supabase, Project

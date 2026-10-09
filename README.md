@@ -255,6 +255,26 @@ writer, so a writer that cannot see still writes from a poster or a table
 screenshot: for example Gemini Flash reads, Mireld writes. It has its own key,
 sent only to its own endpoint. Turned off, the writer reads pictures itself.
 
+**Backups and Auto.** The server owner can set up Mireld and AfiqStore as
+backups (`MIRELD_API_KEY`, `AFIQ_API_KEY` and `AFIQ_BASE_URL`; see
+`.env.example`). Every call then starts on the chosen model and, when it
+fails (the endpoint is down or out of quota, refuses the key or the model,
+times out, or sends an answer that cannot be used), moves to the next
+backup; the job log names each switch. **Auto** in the model list starts on
+the default model; a backup's model picked from the list starts on that
+backup. A model written with `+vision` (AfiqStore's `kimi-k2.7` by
+default) reads the uploaded pictures when no picture reader is set up, with
+only other seeing models behind it. Each backup's key is sent only to its own
+address.
+
+**Deck skill.** Every deck also follows Wan's deck-builder skill, built in
+(`shared/src/skill.ts`, shown in Settings under the instructions): the slide
+archetypes, footnotes with report ID, n, design and duration, published
+sources only in the references list, the claims guardrail, the cosmetic and
+drug border check, and no safety verdict written for the presenter. The
+instructions in Settings outrank it, and **Import skill file** there adds a
+skill file of your own (its front matter dropped) to them.
+
 The key is sent only to the endpoint it was saved with. The server-wide
 `OPENAI_API_KEY` is only ever sent to `OPENAI_BASE_URL`, never to an endpoint
 a user picks in Settings.

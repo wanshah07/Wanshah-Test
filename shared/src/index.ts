@@ -16,3 +16,4 @@ export * from "./house.js";
 export * from "./studio.js";
 export * from "./models.js";
 export * from "./merge.js";
+export * from "./skill.js";

@@ -9,6 +9,62 @@ export interface LlmAuth {
   imageModel: string;
   /** OpenAI-compatible endpoint, ending in /v1. */
   baseUrl: string;
+  /** How the job log names this endpoint (Mireld, AfiqStore); its host when unset. */
+  label?: string;
+  /**
+   * Where a call goes next when this endpoint fails: down, out of quota, refusing the model, or
+   * answering with something unusable. Each carries its own key, sent only to its own address.
+   */
+  fallbacks?: LlmAuth[];
+  /** Told each time a call moves to the next endpoint, so the job log can say so. */
+  onSwitch?: (note: string) => void;
+}
+
+/** "Mireld deepseek-v4-pro": how a log line names an endpoint and model. */
+export function routeName(auth: LlmAuth): string {
+  return `${auth.label || hostOf(auth.baseUrl)} ${auth.model}`;
+}
+
+/**
+ * Runs one call on the endpoint and, when it fails with an endpoint or model error, on each
+ * fallback in turn. A failure in our own code is not the endpoint's and is thrown straight away.
+ * When every route fails, the last error is thrown, naming every model tried.
+ */
+export async function viaRoutes<T>(auth: LlmAuth, run: (auth: LlmAuth) => Promise<T>): Promise<T> {
+  const chain = [auth, ...(auth.fallbacks ?? [])];
+  const tried: string[] = [];
+  for (let i = 0; i < chain.length; i++) {
+    const cur = chain[i];
+    try {
+      return await run({ ...cur, fallbacks: undefined, onSwitch: undefined });
+    } catch (e) {
+      if (!(e instanceof LlmError) || chain.length === 1) throw e;
+      tried.push(routeName(cur));
+      const next = chain[i + 1];
+      if (!next) {
+        const all = new LlmError(`${e.message} (every model was tried: ${tried.join(", ")})`, e.status, e.code);
+        all.raw = e.raw;
+        throw all;
+      }
+      auth.onSwitch?.(`${routeName(cur)} failed (${shortReason(e)}); switching to ${routeName(next)}`);
+    }
+  }
+  throw new LlmError("No endpoint to call");
+}
+
+/** The reason a call failed in a few words, for the job log. */
+function shortReason(e: LlmError): string {
+  if (e.code === "timeout") return "no answer in time";
+  if (e.code === "network") return "could not be reached";
+  if (e.code === "parse") return "the answer was not usable";
+  if (e.code === "length") return "the answer was cut off";
+  if (e.code === "refusal") return "the model declined";
+  if (e.status === 401 || e.status === 403) return `the key was refused, ${e.status}`;
+  if (e.status === 404) return "the model is not offered there, 404";
+  if (e.status === 413) return "the request was too large, 413";
+  if (e.status === 429) return "rate limit or quota, 429";
+  if (e.status >= 500) return `the gateway failed, ${e.status}`;
+  return e.status ? `answered ${e.status}` : e.code;
 }
 
 export class LlmError extends Error {
@@ -252,6 +308,10 @@ export interface ChatJsonArgs {
 }
 
 export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
+  return viaRoutes(a.auth, (auth) => chatJsonOn<T>({ ...a, auth }));
+}
+
+async function chatJsonOn<T>(a: ChatJsonArgs): Promise<T> {
   let mode: "schema" | "object" = "schema";
   let tokenKey: "max_completion_tokens" | "max_tokens" = "max_completion_tokens";
   let sendTemperature = !/^(o\d|gpt-5)/.test(a.auth.model);
@@ -362,6 +422,10 @@ export async function chatJson<T>(a: ChatJsonArgs): Promise<T> {
 }
 
 export async function chatText(auth: LlmAuth, system: string, user: string | ContentPart[], maxTokens = 4000, timeoutMs = 240000): Promise<string> {
+  return viaRoutes(auth, (a) => chatTextOn(a, system, user, maxTokens, timeoutMs));
+}
+
+async function chatTextOn(auth: LlmAuth, system: string, user: string | ContentPart[], maxTokens: number, timeoutMs: number): Promise<string> {
   const body: Record<string, unknown> = {
     model: auth.model,
     messages: [
