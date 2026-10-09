@@ -78,6 +78,15 @@ jobs:
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           AI_MODELS: ${{ vars.AI_MODELS }}
           AI_FAST_MODEL: ${{ vars.AI_FAST_MODEL }}
+          # Backups each call falls back to when the main endpoint fails (server/src/llm/routes.ts).
+          # Each key goes only to its own address. Unset ones are simply skipped.
+          MIRELD_API_KEY: ${{ secrets.MIRELD_API_KEY }}
+          MIRELD_BASE_URL: ${{ vars.MIRELD_BASE_URL }}
+          MIRELD_MODELS: ${{ vars.MIRELD_MODELS }}
+          AFIQ_API_KEY: ${{ secrets.AFIQ_API_KEY }}
+          AFIQ_BASE_URL: ${{ vars.AFIQ_BASE_URL }}
+          AFIQ_MODELS: ${{ vars.AFIQ_MODELS }}
+          AI_ROUTE_ORDER: ${{ vars.AI_ROUTE_ORDER }}
           SC_IDLE_MS: ${{ vars.SC_IDLE_MS }}
           COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
         run: node server/dist/worker/index.js

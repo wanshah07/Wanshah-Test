@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { decrypt, encrypt } from "./crypto.js";
 import { getDb, now } from "./db.js";
 import type { LlmAuth } from "./llm/client.js";
+import { AUTO_MODEL, authOf, envRoutes, routeServing, withFallbacks } from "./llm/routes.js";
 
 export interface SettingsRow {
   openai_key_enc: string | null;
@@ -74,21 +75,51 @@ export function baseUrlFor(userId: string): string {
  * The key, endpoint and models this user's calls use: their own first, the
  * server's env second. A key saved against one endpoint is only ever sent to
  * the endpoint saved with it; the env key is only ever sent to the env endpoint.
+ * The backups the server owner set up (Mireld, AfiqStore) follow as fallbacks, so a
+ * call that fails on one endpoint is tried on the next. Asked for "auto", or for
+ * nothing, the call starts on the default model; asked for a model a backup serves,
+ * it starts on that backup.
  */
 export function resolveAuth(userId: string, asked?: unknown): LlmAuth | null {
   const s = readSettings(userId);
   const own = userKey(userId);
-  // A person's own key may run any model; the server's key runs only the models the owner listed.
-  if (own) return { apiKey: own, baseUrl: s.openai_base || config.openaiBase, model: pickModel(asked, s.openai_model, config.openaiModel, []), imageModel: s.openai_image_model || config.openaiImageModel };
-  if (!config.openaiKey) return null;
-  // On the server's key the image model is the owner's too, whenever the owner has listed the models.
+  const routes = envRoutes();
+  const want = asked === AUTO_MODEL ? undefined : asked;
+  const saved = s.openai_model === AUTO_MODEL ? null : s.openai_model;
+  const backups = routes.map((r) => authOf(r, config.openaiImageModel));
+  // The person's own key, or else the server's, on a given model. A person's own key may run any
+  // model; the server's key runs only the models the owner listed.
   const listed = modelChoices();
-  return { apiKey: config.openaiKey, baseUrl: config.openaiBase, model: pickModel(asked, s.openai_model, config.openaiModel, listed), imageModel: listed.length ? config.openaiImageModel : s.openai_image_model || config.openaiImageModel };
+  const main = (m: unknown): LlmAuth | null =>
+    own
+      ? { apiKey: own, baseUrl: s.openai_base || config.openaiBase, model: pickModel(m, saved, config.openaiModel, []), imageModel: s.openai_image_model || config.openaiImageModel }
+      : config.openaiKey
+        // On the server's key the image model is the owner's too, whenever the owner has listed the models.
+        ? { apiKey: config.openaiKey, baseUrl: config.openaiBase, model: pickModel(m, saved, config.openaiModel, listed), imageModel: listed.length ? config.openaiImageModel : s.openai_image_model || config.openaiImageModel }
+        : null;
+  // A model a backup serves (picked in the list, or saved as the default) starts on that backup with
+  // its own key; the main endpoint, on its default model, is the first thing it falls back to.
+  const served = routeServing(want, routes) ?? (want === undefined ? routeServing(saved, routes) : undefined);
+  if (served) {
+    const home = main(undefined);
+    const usable = home && !routeServing(home.model, routes) ? [home] : [];
+    return withFallbacks(authOf(served, home?.imageModel || config.openaiImageModel), [...usable, ...backups]);
+  }
+  const first = main(want);
+  if (first) return withFallbacks(first, backups);
+  return backups.length ? withFallbacks(backups[0], backups) : null;
 }
 
 /** The models the owner lets people pick, with the default first when it is not listed. */
 export function modelChoices(): ModelChoice[] {
   return parseModelList(config.aiModels);
+}
+
+/** "Auto" first, then the listed models, then each backup model the list does not already hold. */
+export function pickerChoices(listed: ModelChoice[]): ModelChoice[] {
+  const out: ModelChoice[] = [{ id: AUTO_MODEL, label: "Auto (best available; switches model if one fails)" }, ...listed.filter((m) => m.id !== AUTO_MODEL)];
+  for (const r of envRoutes()) if (!out.some((m) => m.id === r.model)) out.push({ id: r.model, label: `${r.model} (${r.label})` });
+  return out;
 }
 
 /** The same key and endpoint on the quicker model, for planning and condensing. */

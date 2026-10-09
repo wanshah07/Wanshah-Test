@@ -1,6 +1,7 @@
 import { decrypt, encrypt } from "./crypto.js";
 import { getDb, now } from "./db.js";
 import type { LlmAuth } from "./llm/client.js";
+import { authOf, envRoutes, withFallbacks } from "./llm/routes.js";
 import { normaliseBase, resolveAuth } from "./settings.js";
 
 // An optional second endpoint that only reads pictures, so a writer that
@@ -50,9 +51,16 @@ export function saveReader(userId: string, b: { key?: string | null; baseUrl?: s
   db.prepare("UPDATE settings SET rd_base = ?, rd_key_enc = ?, rd_model = ?, updated_at = ? WHERE user_id = ?").run(next.rd_base, next.rd_key_enc, next.rd_model, now(), userId);
 }
 
-/** Who reads uploaded pictures: the picture reader when one is set up, otherwise the writer. */
+/**
+ * Who reads uploaded pictures: the picture reader when one is set up, else a backup model marked
+ * as reading pictures (AfiqStore's kimi-k2.7), else the writer. Only models that read pictures
+ * stand behind it: a writer that cannot see would answer about a picture it never saw.
+ */
 export function pictureAuth(userId: string): LlmAuth | null {
   const r = readerSettings(userId);
-  if (r.complete) return { apiKey: r.key, baseUrl: r.baseUrl, model: r.model, imageModel: "" };
-  return resolveAuth(userId);
+  const seeing = envRoutes().filter((x) => x.vision).map((x) => authOf(x));
+  if (r.complete) return withFallbacks({ apiKey: r.key, baseUrl: r.baseUrl, model: r.model, imageModel: "" }, seeing);
+  if (seeing.length) return withFallbacks(seeing[0], seeing);
+  const w = resolveAuth(userId);
+  return w ? { ...w, fallbacks: undefined } : null;
 }

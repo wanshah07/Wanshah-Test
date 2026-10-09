@@ -4,8 +4,9 @@ import { HOUSE_DEFAULT, HOUSE_MAX, houseFor, saveHouse } from "../llm/house.js";
 import { config } from "../config.js";
 import { maskKey } from "../crypto.js";
 import { checkKey, hostOf, NOT_A_WRITER } from "../llm/client.js";
-import { baseUrlFor, modelChoices, normaliseBase, PROVIDERS, readSettings, resolveAuth, userKey, writeSettings } from "../settings.js";
+import { baseUrlFor, modelChoices, normaliseBase, pickerChoices, PROVIDERS, readSettings, resolveAuth, userKey, writeSettings } from "../settings.js";
 import { knownVision, visionFor } from "../llm/vision.js";
+import { AUTO_MODEL } from "../llm/routes.js";
 import { pictureAuth, readerSettings, saveReader } from "../reader.js";
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
@@ -47,8 +48,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     const s = readSettings(req.user.id);
     const own = !!userKey(req.user.id);
     const listed = own ? [] : modelChoices();
-    const current = pickModel(undefined, s.openai_model, config.openaiModel, listed);
-    const models = listed.some((m) => m.id === current) ? listed : [{ id: current, label: current }, ...listed];
+    const choices = pickerChoices(listed);
+    const current = s.openai_model === AUTO_MODEL ? AUTO_MODEL : pickModel(undefined, s.openai_model, config.openaiModel, listed);
+    const models = choices.some((m) => m.id === current) ? choices : [choices[0], { id: current, label: current }, ...choices.slice(1)];
     return { current, models, fast: config.fastModel || null, open: !listed.length };
   });
 

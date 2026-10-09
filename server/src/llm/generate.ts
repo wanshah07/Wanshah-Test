@@ -6,7 +6,7 @@ import { NOTHING, readPicture, visionFor } from "./vision.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { chatJson, chatText, generateImage, LlmError, mapPool, RAW_KEEP, rawSnippet, type LlmAuth } from "./client.js";
+import { chatJson, chatText, generateImage, LlmError, mapPool, RAW_KEEP, rawSnippet, routeName, type LlmAuth } from "./client.js";
 import { mockDeckJson, mockRewrite } from "./mock.js";
 import { condensePrompt, rewriteSystem, systemPrompt, userPrompt, type GenerateParams, type StoryBeat } from "./prompts.js";
 import { DECK_SCHEMA, PLAN_SCHEMA, SLIDE_SCHEMA } from "./schema.js";
@@ -531,7 +531,12 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
     if (!deck) throw new Error("deck not found");
     const auth = config.mockLlm ? null : resolveAuth(userId, p.model);
     if (!config.mockLlm && !auth) throw new LlmError("No OpenAI key. Add one in Settings.", 0, "no_key");
-    if (auth) log(jobId, `Writer model: ${auth.model}${fastAuth(auth).model !== auth.model ? `; reading and planning on ${fastAuth(auth).model}` : ""}`);
+    if (auth) {
+      // Every call made with this auth (or a copy of it) says in the log when it moves to a backup.
+      auth.onSwitch = (note) => log(jobId, note);
+      log(jobId, `Writer model: ${auth.model}${fastAuth(auth).model !== auth.model ? `; reading and planning on ${fastAuth(auth).model}` : ""}`);
+      if (auth.fallbacks?.length) log(jobId, `Backups if a call fails: ${auth.fallbacks.map(routeName).join(", ")}`);
+    }
     p.house = promptTexts(userId, deck.brief?.prompts);
     p.houseRules = houseFor(userId);
     p.designNotes = deck.designId ? getDesign(userId, deck.designId)?.notes : themeGuide(deck.theme?.id);
@@ -551,6 +556,7 @@ export async function runGenerate(jobId: string, userId: string, deckId: string,
       }
     }
     const reader = config.mockLlm ? null : pictureAuth(userId);
+    if (reader) reader.onSwitch = (note) => log(jobId, `Picture reader: ${note}`);
     if (reader) await readUploadedPictures(jobId, userId, deckId, reader);
     const rows = listSources(deckId);
     // The planner reads only the start of each source, so it runs while the long ones are being
