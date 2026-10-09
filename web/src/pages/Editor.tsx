@@ -17,6 +17,7 @@ import { OneDriveBox } from "../components/OneDriveBox";
 import { LinkSourceBox, NotRead, SourceReview, sourcesBlocker, sourcesSummary } from "../components/SourceReview";
 import type { PathedFile } from "../lib/files";
 import { explainFailure } from "../lib/errors";
+import { attachJob, liveJobFor, trackJob } from "../lib/jobs";
 
 type Tab = "slide" | "theme" | "export" | "sources";
 const TAB_LABEL: Record<Tab, string> = { slide: "Slide", theme: "Theme", export: "Export", sources: "Files & regenerate" };
@@ -412,9 +413,6 @@ function ExportPanel({ deck, slopCount, open, busy }: { deck: Deck; slopCount: n
 }
 
 function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void }) {
-  // Polls stop when the page is left: a finished job must not pull the person back from wherever they went.
-  const alive = useRef(true);
-  useEffect(() => () => void (alive.current = false), []);
   const stored = deck.brief;
   const [sources, setSources] = useState<SourceRef[]>(deck.sources);
   const [brief, setBrief] = useState<BriefValue>(stored ? { purposes: stored.purposes, include: stored.include, audiences: stored.audiences, text: stored.text, audienceText: "", prompts: stored.prompts ?? [] } : { ...EMPTY_BRIEF, audienceText: deck.audience ?? "" });
@@ -451,6 +449,29 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       setBusy(false);
     }
   };
+  // This panel stops watching its job when it is left; the job and the tracker carry on.
+  const release = useRef<(() => void) | null>(null);
+  useEffect(() => () => release.current?.(), []);
+  const watcher = () => ({
+    onUpdate: setJob,
+    onDone: async () => {
+      const r = await api.deck(deck.id);
+      onDeck(r.deck);
+      toast("Deck regenerated");
+    },
+    onFailed: (j: Job) => {
+      setJob(j);
+      toast(j.error || "Failed", true);
+    },
+  });
+  // Back on a deck that is still being written: show where it is and keep following it.
+  useEffect(() => {
+    const live = liveJobFor(deck.id);
+    if (live) {
+      release.current?.();
+      release.current = attachJob(live.jobId, watcher());
+    }
+  }, [deck.id]);
   const run = async (allowUnreadPictures = false) => {
     if (!auto && prompt.trim().length < 10) {
       toast("Tick what the deck is for, or type a few words", true);
@@ -459,23 +480,10 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
     try {
       const audience = composeAudience(brief.audiences, brief.audienceText) || deck.audience;
       const { jobId } = await api.generate(deck.id, { prompt, auto, title: deck.title, lang: deck.lang, angle, audience, slides, features: auto ? autoFeatures : features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
-      const tick = async () => {
-        if (!alive.current) return;
-        try {
-          const j = await api.job(jobId);
-          setJob(j);
-          if (j.status === "done") {
-            const r = await api.deck(deck.id);
-            onDeck(r.deck);
-            toast("Deck regenerated");
-          } else if (j.status === "failed") toast(j.error || "Failed", true);
-          else setTimeout(tick, 1500);
-        } catch (e) {
-          // A lost connection must not leave the spinner running for ever.
-          setJob({ id: jobId, deckId: deck.id, status: "failed", progress: [], error: `Lost track of the job: ${(e as Error).message}. Reload to see whether it finished.`, result: null });
-        }
-      };
-      tick();
+      // The tracker follows the job whichever page is open, so leaving the editor does not stop the
+      // deck being written. While this panel is open it shows the progress and swaps in the new deck.
+      release.current?.();
+      release.current = trackJob({ jobId, deckId: deck.id, title: deck.title }, watcher());
     } catch (e) {
       // A refusal before the job starts (pictures the model cannot read, no key)
       // is shown in the same panel as a failed job, with its choices.

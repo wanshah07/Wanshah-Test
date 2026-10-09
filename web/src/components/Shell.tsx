@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api, type Settings } from "../api";
 import { framed } from "../lib/files";
 import { hardReload, newerBuildExists } from "../lib/build";
+import { JobTray } from "./JobTray";
 
 export function Shell() {
   const [me, setMe] = useState<Settings["user"] | null>(null);
@@ -89,6 +90,7 @@ export function Shell() {
         </div>
       )}
       <Outlet />
+      <JobTray />
     </>
   );
 }

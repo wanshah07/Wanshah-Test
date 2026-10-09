@@ -7,6 +7,7 @@ import { LinkSourceBox, NotRead } from "../components/SourceReview";
 import { OutputBody, OutputDownloads } from "../components/OutputView";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { toast } from "../components/Toast";
+import { trackJob } from "../lib/jobs";
 
 // The notebook: a deck's sources on the left, a chat that answers from them in
 // the middle, and the Studio on the right, where the same sources become a
@@ -189,15 +190,19 @@ function Notebook({ id }: { id: string }) {
 
   // Background work, polled until it finishes. A tick never overlaps the one before it, and a finished
   // job is handled once however many ticks see it.
+  // This page stops watching its slide deck jobs when it is left; the jobs and the tracker carry on.
+  const releases = useRef<(() => void)[]>([]);
+  useEffect(() => () => releases.current.forEach((r) => r()), []);
   const ticking = useRef(false);
   const handled = useRef(new Set<string>());
   useEffect(() => {
-    if (!running.some((r) => r.status === "queued" || r.status === "running")) return;
+    if (!running.some((r) => !r.slides && (r.status === "queued" || r.status === "running"))) return;
     const t = setInterval(async () => {
       if (ticking.current) return;
       ticking.current = true;
       try {
-      for (const r of running.filter((x) => (x.status === "queued" || x.status === "running") && !handled.current.has(x.jobId))) {
+      // A slide deck job is followed by the tracker, which also outlives this page.
+      for (const r of running.filter((x) => !x.slides && (x.status === "queued" || x.status === "running") && !handled.current.has(x.jobId))) {
         try {
           const j: Job = await api.job(r.jobId);
           setRunning((all) => all.map((x) => (x.jobId === r.jobId ? { ...x, status: j.status, progress: j.progress, error: j.error } : x)));
@@ -231,6 +236,16 @@ function Notebook({ id }: { id: string }) {
         const prompt = o.prompt.trim() || "Build the strongest professional deck the sources support. Work out the purpose, the audience and the one conclusion from the material itself.";
         const { jobId } = await api.generate(id, { prompt, auto: !o.count, slides: o.count ?? undefined, title: deck?.title, lang: o.lang, angle: deck?.angle, model: model || undefined, allowUnreadPictures: true });
         setRunning((r) => [{ jobId, label: "Slide deck", progress: [], status: "queued", slides: true }, ...r]);
+        // The tracker follows it whichever page is open: leaving the notebook does not stop the deck being written.
+        releases.current.push(trackJob({ jobId, deckId: id, title: deck?.title || "Slide deck" }, {
+          onUpdate: (j) => setRunning((all) => all.map((x) => (x.jobId === jobId ? { ...x, status: j.status, progress: j.progress, error: j.error } : x))),
+          onDone: async () => {
+            const d = await api.deck(id);
+            setDeck(d.deck);
+            toast("The slide deck is ready");
+          },
+          onFailed: (j) => toast(j.error || "It could not be made", true),
+        }));
       } else {
         const { jobId } = await api.studio(id, { ...o, model: model || undefined, sourceIds });
         setRunning((r) => [{ jobId, label: KIND_INFO.find((k) => k.kind === o.kind)!.name, progress: [], status: "queued" }, ...r]);
