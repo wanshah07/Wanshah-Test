@@ -22,6 +22,7 @@
     "check:fit": "node scripts/fit-check.mjs",
     "check:pptx-fit": "node scripts/pptx-fit-check.mjs",
     "check:web": "node scripts/web-check.mjs",
+    "check:background": "node scripts/bg-check.mjs",
     "check:cloud": "node scripts/cloud-check.mjs",
     "check:sql": "bash scripts/sql-check.sh"
   },

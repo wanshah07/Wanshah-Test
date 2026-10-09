@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { trackJob } from "../lib/jobs";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ANGLES, DEFAULT_THEME_ID, composeAudience, composeBrief, DEFAULT_FEATURES, LENGTH_CHOICES, THEME_PRESETS, type Features, type OneDriveLink, type SourceRef } from "@slidecraft/shared";
 import { api, type Design, type Job } from "../api";
@@ -71,9 +72,9 @@ export default function NewDeck() {
   // The deck row exists from step 2 so uploads have somewhere to go.
   // One deck however many uploads start at once: they all wait on the same creation.
   const creating = useRef<Promise<string> | null>(null);
-  // Polls stop when the page is left: a finished job must not pull the person back from wherever they went.
-  const alive = useRef(true);
-  useEffect(() => () => void (alive.current = false), []);
+  // This page stops watching its job when it is left; the job itself and the tracker carry on.
+  const release = useRef<(() => void) | null>(null);
+  useEffect(() => () => release.current?.(), []);
 
   const ensureDeck = async (): Promise<string> => {
     if (deckId) return deckId;
@@ -139,24 +140,18 @@ export default function NewDeck() {
         else await api.applyPreset(id, themeId);
       }
       const { jobId } = await api.generate(id, { prompt, auto, title, lang, angle, audience, slides, features: auto ? autoFeatures : features, imageMode, allowUnreadPictures, brief: { text: brief.text, purposes: brief.purposes, include: brief.include, audiences: brief.audiences, prompts: brief.prompts } });
-      let misses = 0;
-      const tick = async () => {
-        if (!alive.current) return;
-        try {
-          const j = await api.job(jobId);
-          misses = 0;
-          setJob(j);
-          if (j.status === "done") {
-            toast("Deck ready");
-            nav(`/deck/${id}`);
-          } else if (j.status !== "failed") setTimeout(tick, 1500);
-        } catch (e) {
-          // One dropped poll is not a failed job: the writer is still at work. Ask again a few times first.
-          if (++misses < 5) return void setTimeout(tick, 3000);
-          setStartError(`Lost track of the job: ${(e as Error).message}. Reload to see whether it finished.`);
-        }
-      };
-      tick();
+      // The tracker follows the job whichever page is open: leaving this one does not stop the deck being
+      // written, and does not pull the person back when it is done. While this page is open it shows the
+      // progress and opens the deck when it is ready.
+      release.current?.();
+      release.current = trackJob({ jobId, deckId: id, title: title.trim() || "New deck" }, {
+        onUpdate: setJob,
+        onDone: () => {
+          toast("Deck ready");
+          nav(`/deck/${id}`);
+        },
+        onFailed: (j) => setJob(j),
+      });
     } catch (e) {
       setStartError((e as Error).message);
     }
