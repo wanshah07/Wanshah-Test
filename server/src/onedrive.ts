@@ -5,7 +5,7 @@ import { decrypt, encrypt, maskKey } from "./crypto.js";
 import { getDb, now } from "./db.js";
 import { addMedia, addSource, deleteMedia, getMedia } from "./store.js";
 import { sniffPicture } from "./ingest/sniff.js";
-import { accountAllowed } from "./tenant.js";
+import { accountAllowed, cloudMember } from "./tenant.js";
 
 // Pictures from a OneDrive folder, read through Microsoft Graph.
 //
@@ -460,11 +460,14 @@ async function composioTool(userId: string, slug: string, args: Record<string, u
   const r = row(userId);
   const account = r.cz_account;
   if (!key || !account) throw new OneDriveError("Composio is not set up. Add the API key and pick the OneDrive account in Settings.", "not_connected");
-  let owner = r.cz_user;
-  if (!owner) {
-    owner = await composioOwner(key, account);
-    write(userId, { cz_user: owner });
-  }
+  // cz_user is written through the member-writable anon key (see sc_settings), so in cloud mode it
+  // cannot be trusted to say who owns the connected account: a member could point it at a teammate's
+  // id to pass accountAllowed() below and act under that teammate's connected account. Resolve the
+  // owner straight from Composio whenever a team member is making the call; only fall back to the
+  // cached value in single-user (non-cloud) mode, where there is no other user to impersonate.
+  let owner = cloudMember() ? await composioOwner(key, account) : r.cz_user;
+  if (!owner) owner = await composioOwner(key, account);
+  write(userId, { cz_user: owner });
   if (!accountAllowed(owner)) throw new OneDriveError("That OneDrive account is connected for someone else on the team. Pick one of your own in Settings.", "not_connected");
   const call = (version: string | null) => composioFetch(key, "POST", `/tools/execute/${slug}`, { connected_account_id: account, user_id: owner, arguments: args, ...(version ? { version } : {}) });
   let j: Record<string, unknown>;

@@ -100,16 +100,31 @@ export class Supabase {
     });
   }
 
-  /** Files in a bucket's folders (one level: <user>/<file>) created before `iso`. */
+  /**
+   * Files created before `iso`, wherever they actually sit. Objects live two folders deep
+   * (sc-exports: `<user_id>/<job_id>/<name>`, sc-inbox: `<me>/<uuid>/<n>`), so this recurses
+   * into every subfolder down to that depth rather than stopping after one level — otherwise
+   * every job folder (which itself has `id: null`, like a folder) is skipped entirely and
+   * nothing is ever cleaned up.
+   */
   async listOlderThan(bucket: string, iso: string): Promise<string[]> {
     const list = async (prefix: string) => {
       const res = await this.call("POST", `/storage/v1/object/list/${bucket}`, { body: JSON.stringify({ prefix, limit: 1000, offset: 0, sortBy: { column: "created_at", order: "asc" } }), headers: { "Content-Type": "application/json" } });
       return (await res.json()) as { name: string; id: string | null; created_at?: string }[];
     };
     const out: string[] = [];
-    for (const folder of await list("")) {
-      if (folder.id) continue; // a file at the root: not ours
-      for (const f of await list(folder.name)) if (f.id && f.created_at && f.created_at < iso) out.push(`${folder.name}/${f.name}`);
+    for (const top of await list("")) {
+      if (top.id) continue; // a file at the root: not ours
+      for (const sub of await list(top.name)) {
+        if (sub.id) {
+          // a file one level deep (e.g. a legacy or already-flat layout)
+          if (sub.created_at && sub.created_at < iso) out.push(`${top.name}/${sub.name}`);
+          continue;
+        }
+        // a job/uuid folder: the actual files are one level further down
+        const path = `${top.name}/${sub.name}`;
+        for (const f of await list(path)) if (f.id && f.created_at && f.created_at < iso) out.push(`${path}/${f.name}`);
+      }
     }
     return out;
   }
