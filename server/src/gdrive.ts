@@ -3,7 +3,7 @@ import { getDb, now } from "./db.js";
 import { guardedLookup } from "./export/fetchPicture.js";
 import { composioFetch, composioKey, composioOwner, OneDriveError } from "./onedrive.js";
 import { GoogleLinkError, MAX_LINK_BYTES, type GoogleLink, type LinkFile } from "./ingest/google.js";
-import { accountAllowed } from "./tenant.js";
+import { accountAllowed, cloudMember } from "./tenant.js";
 
 // Private Google Drive files through the Google Drive account the person has
 // connected in Composio. The same Composio API key as OneDrive, and a Google
@@ -56,7 +56,12 @@ async function gdTool(userId: string, slug: string, args: Record<string, unknown
   const key = composioKey(userId);
   const r = row(userId);
   if (!key || !r.gd_account) throw new GoogleLinkError("Google Drive is not connected. Add the Composio key and pick the Google Drive account in Settings.", "not_shared");
-  let owner = r.gd_user;
+  // gd_user is written through the member-writable anon key (see sc_settings), so in cloud mode it
+  // cannot be trusted to say who owns the connected account: a member could point it at a teammate's
+  // id to pass accountAllowed() below and act under that teammate's connected account. Resolve the
+  // owner straight from Composio whenever a team member is making the call; only fall back to the
+  // cached value in single-user (non-cloud) mode, where there is no other user to impersonate.
+  let owner = cloudMember() ? null : r.gd_user;
   try {
     if (!owner) {
       owner = await composioOwner(key, r.gd_account, "googledrive");
