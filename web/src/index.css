@@ -2,9 +2,10 @@
    brand #4898D8 on ink #1D344E, 20px radius, pill buttons. Dark mode is the
    same page's dark set. Slides carry their own tokens (shared/render/css). */
 :root{
-  /* --muted reads 4.7:1 on --bg and 5.1:1 on white (AA for small text); the old #8299AD read 2.7:1. */
+  /* --brand-deep is the link, chip and banner ink: #266AA6 reads 5.7:1 on white and 4.6:1 on --brand-soft (the old #2E7CBE read 3.6:1 on a chip).
+     --muted reads 4.7:1 on --bg and 5.1:1 on white (AA for small text); the old #8299AD read 2.7:1. */
   --bg:#EFF5FA;--surface:#FFFFFF;--surface-2:#E9F2FA;--ink:#1D344E;--ink-2:#52697F;--muted:#5A7087;--line:#D9E5F1;
-  --brand:#4898D8;--brand-deep:#2E7CBE;--brand-soft:#D9EAF8;--navy:#16324F;--teal:#0E9AA3;--teal-deep:#0A7278;--gold:#C9A24B;
+  --brand:#4898D8;--brand-deep:#266AA6;--brand-soft:#D9EAF8;--navy:#16324F;--teal:#0E9AA3;--teal-deep:#0A7278;--gold:#C9A24B;
   --danger:#E85B5B;--warn:#E8A13B;--ok:#1B7F4B;
   --radius:20px;--radius-sm:12px;--maxw:1280px;
   --shadow-sm:0 1px 2px rgba(23,50,79,.06),0 4px 14px rgba(23,50,79,.05);

@@ -53,7 +53,7 @@ export function ReviewBar({ deckId, slide, index, beforeCall, onSlide }: { deckI
       </div>
       {showForm && (
         <>
-          <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Title too long. Add the 2026 effective date. Make this a table. Simpler words for a brand owner." />
+          <textarea rows={2} aria-label="What should change on this slide" value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Title too long. Add the 2026 effective date. Make this a table. Simpler words for a brand owner." />
           <div className="row" style={{ gap: 6 }}>
             <button className="btn btn-ghost btn-xs" disabled={!!busy || (!text.trim() && !waiting.length)} onClick={() => call("apply", () => api.feedback(deckId, slide.id, text, true), "Feedback applied. Check the slide, then OK it.")}>
               {busy === "apply" ? <span className="spin" /> : waiting.length && !text.trim() ? `Apply the ${waiting.length} saved` : "Apply now"}
