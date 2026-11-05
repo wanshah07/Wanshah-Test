@@ -32,7 +32,7 @@ export function LinkSourceBox({ getDeckId, onAdded, onNotRead, onBusy, compact }
     <div className="card tight stack" data-testid="link-source">
       <div className="row between"><b className="small">Google Drive or Sheets link</b>{!compact && <span className="small muted">A Sheet (every tab), a Doc, Slides, any Drive file, or a shared folder.</span>}</div>
       <div className="row" style={{ flexWrap: "nowrap" }}>
-        <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" onKeyDown={(e) => e.key === "Enter" && !busy && read()} />
+        <input type="url" aria-label="Google Drive or Sheets link" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" onKeyDown={(e) => e.key === "Enter" && !busy && read()} />
         <button className="btn btn-ghost btn-sm" onClick={read} disabled={busy || !url.trim()}>{busy ? <><span className="spin" /> Reading</> : "Read link"}</button>
       </div>
       {!compact && <span className="small muted">Shared as "Anyone with the link" (Viewer), or private to the Google account connected in Settings. It is read now, and what was read is shown below before you go on.</span>}

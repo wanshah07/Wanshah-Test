@@ -68,7 +68,7 @@ export function BriefPicker({ value, onChange, compact }: { value: BriefValue; o
       <div>
         <b className="small">Who is in the room?</b> <span className="small muted">Optional.</span>
         <Chips list={BRIEF_AUDIENCES} value={value.audiences} onChange={(audiences) => set({ audiences })} />
-        <input type="text" value={value.audienceText} onChange={(e) => set({ audienceText: e.target.value })} placeholder="Anyone else? e.g. KOL dermatologists in Klang Valley" style={{ marginTop: 8 }} />
+        <input type="text" aria-label="Other audience" value={value.audienceText} onChange={(e) => set({ audienceText: e.target.value })} placeholder="Anyone else? e.g. KOL dermatologists in Klang Valley" style={{ marginTop: 8 }} />
       </div>
       <label className="f">
         Anything to add <span className="h">Optional. Name the product, the instrument, numbers you already know. The more concrete, the more precise the deck.</span>

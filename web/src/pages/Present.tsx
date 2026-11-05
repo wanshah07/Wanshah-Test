@@ -29,7 +29,7 @@ export default function Present() {
   if (cloud) {
     if (err) return <div style={{ ...style, color: "#dce6f0", display: "grid", placeItems: "center", font: "18px system-ui" }}>{err}</div>;
     if (doc === null) return <div style={{ ...style, color: "#dce6f0", display: "grid", placeItems: "center", font: "18px system-ui" }}>Opening the deck</div>;
-    return <iframe title="Presentation" srcDoc={doc} onLoad={onLoad} style={style} allowFullScreen />;
+    return <><h1 className="sr-only">Presentation</h1><iframe title="Presentation" srcDoc={doc} onLoad={onLoad} style={style} allowFullScreen /></>;
   }
-  return <iframe title="Presentation" src={`/api/decks/${id}/present${location.hash}`} onLoad={onLoad} style={style} allowFullScreen />;
+  return <><h1 className="sr-only">Presentation</h1><iframe title="Presentation" src={`/api/decks/${id}/present${location.hash}`} onLoad={onLoad} style={style} allowFullScreen /></>;
 }

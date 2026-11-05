@@ -333,8 +333,8 @@ function Notebook({ id }: { id: string }) {
           <LinkSourceBox compact getDeckId={async () => id} onAdded={() => reloadSources()} onNotRead={(x) => setNotRead((n) => [...n, ...x])} />
           {paste ? (
             <div className="card tight stack">
-              <input type="text" placeholder="Name" value={pasteName} onChange={(e) => setPasteName(e.target.value)} />
-              <textarea placeholder="Paste text, notes or a transcript" value={pasteText} onChange={(e) => setPasteText(e.target.value)} />
+              <input type="text" aria-label="Source name" placeholder="Name" value={pasteName} onChange={(e) => setPasteName(e.target.value)} />
+              <textarea aria-label="Pasted text" placeholder="Paste text, notes or a transcript" value={pasteText} onChange={(e) => setPasteText(e.target.value)} />
               <div className="row"><button className="btn btn-ghost btn-sm" disabled={busy || !pasteText.trim()} onClick={addPaste}>Add</button><button className="btn btn-quiet btn-sm" onClick={() => setPaste(false)}>Cancel</button></div>
             </div>
           ) : <button className="btn btn-quiet btn-sm" onClick={() => setPaste(true)}>+ Paste text</button>}
@@ -378,7 +378,7 @@ function Notebook({ id }: { id: string }) {
           <div className="nb-ask">
             {msgs.length > 0 && <button className="btn btn-quiet btn-xs" onClick={() => setMsgs([])}>Clear chat</button>}
             <div className="row" style={{ flexWrap: "nowrap" }}>
-              <input type="text" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask(q)} placeholder={sources.length ? "Ask a question about the sources" : "Add a source to start"} disabled={!sources.length} data-testid="nb-question" />
+              <input type="text" aria-label="Question about the sources" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask(q)} placeholder={sources.length ? "Ask a question about the sources" : "Add a source to start"} disabled={!sources.length} data-testid="nb-question" />
               <span className="small muted" style={{ whiteSpace: "nowrap" }}>{chosen.length} source{chosen.length === 1 ? "" : "s"}</span>
               <button className="btn btn-primary btn-sm" disabled={!q.trim() || asking || !sources.length} onClick={() => ask(q)} data-testid="nb-ask">Ask</button>
             </div>

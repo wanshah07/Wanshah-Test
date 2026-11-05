@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { MAP_REGIONS, MAP_TILES, type AsidePanel, type CardItem, type ChartSpec, type DiagramSpec, type FactItem, type ImageRef, type Layout, type MapSpec, type Slide, type SlopHit, type TableSpec, type Theme } from "@slidecraft/shared";
 import { fillFor, LAYOUT_NAMES, LayoutPicker } from "./LayoutPicker";
 import { api, mediaUrl, type MediaItem } from "../api";
@@ -32,10 +32,12 @@ const splitLines = (s: string) => s.split("\n").filter((l) => l.trim());
 
 function Lines({ label, value, onChange, help, rows = 4 }: { label: string; value: string[] | undefined; onChange: (v: string[]) => void; help?: string; rows?: number }) {
   const [draft, setDraft] = useDraft(value ?? [], (v) => v.join("\n"), splitLines);
+  const id = useId();
   return (
     <div className="field">
-      <label>{label}<span className="help">{help ?? "One per line"}</span></label>
+      <label htmlFor={id}>{label}<span className="help">{help ?? "One per line"}</span></label>
       <textarea
+        id={id}
         rows={rows}
         value={draft}
         onChange={(e) => {
@@ -52,10 +54,12 @@ const parseNumbers = (v: string) => v.split(",").map((x) => x.trim()).filter(Boo
 /** Numbers as typed: "1." and "-" stay in the box until they are numbers. */
 function Numbers({ label, value, onChange }: { label: string; value: number[]; onChange: (v: number[]) => void }) {
   const [draft, setDraft] = useDraft(value, (v) => v.join(", "), parseNumbers);
+  const id = useId();
   return (
     <div className="field">
-      <label>{label}<span className="help">Comma separated numbers</span></label>
+      <label htmlFor={id}>{label}<span className="help">Comma separated numbers</span></label>
       <input
+        id={id}
         type="text"
         inputMode="decimal"
         value={draft}
@@ -69,10 +73,11 @@ function Numbers({ label, value, onChange }: { label: string; value: number[]; o
 }
 
 function Text({ label, value, onChange, help, rows }: { label: string; value: string | undefined; onChange: (v: string) => void; help?: string; rows?: number }) {
+  const id = useId();
   return (
     <div className="field">
-      <label>{label}{help && <span className="help">{help}</span>}</label>
-      {rows ? <textarea rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} /> : <input type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}
+      <label htmlFor={id}>{label}{help && <span className="help">{help}</span>}</label>
+      {rows ? <textarea id={id} rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} /> : <input id={id} type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}
     </div>
   );
 }
@@ -92,10 +97,12 @@ const parseCards = (text: string): CardItem[] =>
 function CardsEditor({ cards, onChange }: { cards: CardItem[]; onChange: (c: CardItem[]) => void }) {
   // Follows the slide when a rewrite changes its cards, so a keystroke never writes stale cards back.
   const [text, setText] = useDraft(cards, (c) => c.map(cardLine).join("\n"), parseCards);
+  const cardsId = useId();
   return (
     <div className="field">
-      <label>Cards<span className="help">One per line: heading | detail | tag. Tags like YES, PARTLY, NO or HIGH, MEDIUM, LOW are coloured.</span></label>
+      <label htmlFor={cardsId}>Cards<span className="help">One per line: heading | detail | tag. Tags like YES, PARTLY, NO or HIGH, MEDIUM, LOW are coloured.</span></label>
       <textarea
+        id={cardsId}
         rows={6}
         value={text}
         onChange={(e) => {
@@ -108,12 +115,13 @@ function CardsEditor({ cards, onChange }: { cards: CardItem[]; onChange: (c: Car
 }
 
 function ChartEditor({ chart, onChange }: { chart: ChartSpec; onChange: (c: ChartSpec) => void }) {
+  const kindId = useId();
   const setSeries = (i: number, patch: Partial<{ name: string; values: number[] }>) => onChange({ ...chart, series: chart.series.map((s, k) => (k === i ? { ...s, ...patch } : s)) });
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="grid c2" style={{ gap: 8 }}>
-        <div className="field"><label>Kind</label>
-          <select value={chart.kind} onChange={(e) => onChange({ ...chart, kind: e.target.value as ChartSpec["kind"] })}>
+        <div className="field"><label htmlFor={kindId}>Kind</label>
+          <select id={kindId} value={chart.kind} onChange={(e) => onChange({ ...chart, kind: e.target.value as ChartSpec["kind"] })}>
             {["column", "bar", "line", "area", "pie", "doughnut"].map((k) => <option key={k}>{k}</option>)}
           </select>
         </div>
@@ -122,7 +130,7 @@ function ChartEditor({ chart, onChange }: { chart: ChartSpec; onChange: (c: Char
       <Text label="Categories" help="Comma separated" value={chart.categories.join(", ")} onChange={(v) => onChange({ ...chart, categories: v.split(",").map((s) => s.trim()) })} />
       {chart.series.length === 1 && (chart.kind === "bar" || chart.kind === "column") && (
         <div className="field"><label>Highlight<span className="help">Draws one category in the brand colour and the rest in grey, e.g. our product against competitors</span></label>
-          <select value={chart.highlight ?? ""} onChange={(e) => onChange({ ...chart, highlight: e.target.value || undefined })}>
+          <select aria-label="Highlight" value={chart.highlight ?? ""} onChange={(e) => onChange({ ...chart, highlight: e.target.value || undefined })}>
             <option value="">None</option>
             {chart.categories.filter(Boolean).map((c) => <option key={c}>{c}</option>)}
           </select>
@@ -150,12 +158,12 @@ function TableEditor({ table, onChange }: { table: TableSpec; onChange: (t: Tabl
     <div className="stack" style={{ gap: 8 }}>
       <table className="edit">
         <thead>
-          <tr>{table.header.map((h, j) => <td key={j}><input type="text" value={h} style={{ fontWeight: 600 }} onChange={(e) => onChange({ ...table, header: table.header.map((x, k) => (k === j ? e.target.value : x)) })} /></td>)}<td /></tr>
+          <tr>{table.header.map((h, j) => <td key={j}><input type="text" aria-label={`Header ${j + 1}`} value={h} style={{ fontWeight: 600 }} onChange={(e) => onChange({ ...table, header: table.header.map((x, k) => (k === j ? e.target.value : x)) })} /></td>)}<td /></tr>
         </thead>
         <tbody>
           {table.rows.map((row, i) => (
             <tr key={i}>
-              {Array.from({ length: cols }).map((_, j) => <td key={j}><input type="text" value={row[j] ?? ""} onChange={(e) => setCell(i, j, e.target.value)} /></td>)}
+              {Array.from({ length: cols }).map((_, j) => <td key={j}><input type="text" aria-label={`Row ${i + 1}, column ${j + 1}`} value={row[j] ?? ""} onChange={(e) => setCell(i, j, e.target.value)} /></td>)}
               <td><button className="btn btn-quiet btn-xs" onClick={() => onChange({ ...table, rows: table.rows.filter((_, k) => k !== i) })}>✕</button></td>
             </tr>
           ))}
@@ -255,7 +263,7 @@ function DiagramEditor({ d, onChange }: { d: DiagramSpec; onChange: (d: DiagramS
           <table className="edit">
             <tbody>
               {d.rows.map((r, i) => (
-                <tr key={i}><td className="small" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r}</td>{d.cols.map((_, j) => <td key={j}><input type="text" value={d.cells[i]?.[j] ?? ""} placeholder="yes / no / text" onChange={(e) => onChange({ ...d, cells: d.rows.map((_, ri) => d.cols.map((_, cj) => (ri === i && cj === j ? e.target.value : d.cells[ri]?.[cj] ?? ""))) })} /></td>)}</tr>
+                <tr key={i}><td className="small" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r}</td>{d.cols.map((_, j) => <td key={j}><input type="text" aria-label={`${r}, ${d.cols[j]}`} value={d.cells[i]?.[j] ?? ""} placeholder="yes / no / text" onChange={(e) => onChange({ ...d, cells: d.rows.map((_, ri) => d.cols.map((_, cj) => (ri === i && cj === j ? e.target.value : d.cells[ri]?.[cj] ?? ""))) })} /></td>)}</tr>
               ))}
             </tbody>
           </table>
@@ -354,7 +362,7 @@ function GalleryEditor({ deckId, items, onChange }: { deckId: string; items: Ima
       {items.map((g, i) => (
         <div key={i} className="grid" style={{ gridTemplateColumns: "64px 1fr auto auto", gap: 6, alignItems: "center" }}>
           {g.mediaId ? <img src={mediaUrl(g.mediaId)} alt="" style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }} /> : <span className="small muted" style={{ width: 64 }}>empty</span>}
-          <input type="text" value={g.caption ?? ""} placeholder="Caption" onChange={(e) => setItem(i, { caption: e.target.value || undefined })} />
+          <input type="text" aria-label={`Caption ${i + 1}`} value={g.caption ?? ""} placeholder="Caption" onChange={(e) => setItem(i, { caption: e.target.value || undefined })} />
           <button className="btn btn-ghost btn-xs" onClick={() => setPick(pick === i ? null : i)}>{pick === i ? "Close" : "Pick"}</button>
           <button className="btn btn-quiet btn-xs" onClick={() => onChange(items.filter((_, j) => j !== i))} disabled={items.length < 3}>✕</button>
           {pick === i && (
@@ -492,6 +500,7 @@ function ImagePicker({ deckId, slide, onChange }: { deckId: string; slide: Slide
 
 export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onRewrite }: Props) {
   const [instr, setInstr] = useState("");
+  const kpiId = useId();
   const [pickLayout, setPickLayout] = useState(false);
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<Slide>) => onChange({ ...slide, ...patch });
@@ -525,7 +534,7 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
       <div className="field">
         <label>Rewrite with the writer <span className="help">Sends this slide only</span></label>
         <div className="row" style={{ flexWrap: "nowrap" }}>
-          <input type="text" value={instr} onChange={(e) => setInstr(e.target.value)} placeholder={hits.length ? "Remove the flagged wording, keep the facts" : "e.g. shorter, add the 2024 figure, make it a table"} onKeyDown={(e) => e.key === "Enter" && !busy && rewrite()} />
+          <input type="text" aria-label="Instruction for the writer" value={instr} onChange={(e) => setInstr(e.target.value)} placeholder={hits.length ? "Remove the flagged wording, keep the facts" : "e.g. shorter, add the 2024 figure, make it a table"} onKeyDown={(e) => e.key === "Enter" && !busy && rewrite()} />
           <button className="btn btn-primary btn-sm" onClick={rewrite} disabled={busy}>{busy ? <span className="spin" /> : "Rewrite"}</button>
         </div>
       </div>
@@ -561,8 +570,8 @@ export function SlideInspector({ deckId, slide, hits, lang, theme, onChange, onR
       {L === "diagram" && <DiagramEditor d={slide.diagram ?? { kind: "flow", steps: [{ label: "Step 1" }, { label: "Step 2" }] }} onChange={(d) => set({ diagram: d })} />}
       {L === "kpi" && (
         <div className="field">
-          <label>Draw figures as</label>
-          <select value={slide.kpiStyle ?? ""} onChange={(e) => set({ kpiStyle: (e.target.value || undefined) as Slide["kpiStyle"] })}>
+          <label htmlFor={kpiId}>Draw figures as</label>
+          <select id={kpiId} value={slide.kpiStyle ?? ""} onChange={(e) => set({ kpiStyle: (e.target.value || undefined) as Slide["kpiStyle"] })}>
             <option value="">As the design says{theme.kpiStyle === "rings" ? " (ring gauges)" : " (tiles)"}</option>
             <option value="tiles">Tiles</option>
             <option value="rings">Ring gauges (percentages fill the ring)</option>

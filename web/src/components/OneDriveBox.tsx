@@ -81,7 +81,7 @@ export function OneDriveBox({ getDeckId, link, onImported }: { getDeckId: () => 
         <span className="small muted">{st.account}{st.provider === "composio" ? " · via Composio" : ""}</span>
       </div>
       <div className="row" style={{ gap: 8 }}>
-        <input type="text" value={folder} onChange={(e) => setFolder(e.target.value)} placeholder={st.provider === "composio" ? "Folder path, e.g. 40. HERMES/photos" : "Folder path, e.g. 40. HERMES/photos, or a share link"} style={{ flex: 1 }} />
+        <input type="text" aria-label="OneDrive folder" value={folder} onChange={(e) => setFolder(e.target.value)} placeholder={st.provider === "composio" ? "Folder path, e.g. 40. HERMES/photos" : "Folder path, e.g. 40. HERMES/photos, or a share link"} style={{ flex: 1 }} />
         <button className="btn btn-ghost btn-sm" onClick={() => browse(folder)} disabled={busy}>Browse</button>
       </div>
       {kids && (

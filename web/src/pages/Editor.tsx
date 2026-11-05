@@ -291,7 +291,8 @@ export default function Editor() {
       <div className="row between" style={{ marginBottom: 10 }}>
         <div className="row">
           <Link to="/" className="btn btn-quiet btn-sm">← Decks</Link>
-          <input type="text" value={deck.title} onChange={(e) => update({ ...deck, title: e.target.value })} className="ed-title" style={{ width: 420, maxWidth: "100%", fontWeight: 600, fontFamily: "var(--font-display)", fontSize: 18 }} />
+          <h1 className="sr-only">{deck.title || "Untitled deck"}</h1>
+          <input type="text" aria-label="Deck title" value={deck.title} onChange={(e) => update({ ...deck, title: e.target.value })} className="ed-title" style={{ width: 420, maxWidth: "100%", fontWeight: 600, fontFamily: "var(--font-display)", fontSize: 18 }} />
           <span className="pill">{deck.lang === "ms" ? "BM" : "EN"}</span>
           <span className="pill">{ANGLES.find((a) => a.id === deck.angle)?.name ?? deck.angle}</span>
         </div>
@@ -514,12 +515,12 @@ function SourcesPanel({ deck, onDeck }: { deck: Deck; onDeck: (d: Deck) => void 
       {auto && <FeatureChoices features={autoFeatures} onChange={setAutoFeatures} auto compact />}
       {!auto && <>
       <div className="grid c2" style={{ gap: 8 }}>
-        <select value={slides} onChange={(e) => setSlides(Number(e.target.value))}>{LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}</select>
-        <select value={angle} onChange={(e) => setAngle(e.target.value)}>{ANGLES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+        <select aria-label="Number of slides" value={slides} onChange={(e) => setSlides(Number(e.target.value))}>{LENGTH_CHOICES.map((c) => <option key={c.slides} value={c.slides}>{c.label}</option>)}</select>
+        <select aria-label="Angle" value={angle} onChange={(e) => setAngle(e.target.value)}>{ANGLES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
       </div>
       <FeatureChoices features={features} onChange={setFeatures} auto={false} compact />
       {features.images && (
-        <select value={imageMode} onChange={(e) => setImageMode(e.target.value as typeof imageMode)}>
+        <select aria-label="Where pictures come from" value={imageMode} onChange={(e) => setImageMode(e.target.value as typeof imageMode)}>
           <option value="uploaded">Pictures from sources (uploads and OneDrive)</option>
           <option value="generate">Pictures from the image model</option>
           <option value="none">Placeholders only</option>

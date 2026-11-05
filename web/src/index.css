@@ -2,8 +2,10 @@
    brand #4898D8 on ink #1D344E, 20px radius, pill buttons. Dark mode is the
    same page's dark set. Slides carry their own tokens (shared/render/css). */
 :root{
-  --bg:#EFF5FA;--surface:#FFFFFF;--surface-2:#E9F2FA;--ink:#1D344E;--ink-2:#52697F;--muted:#8299AD;--line:#D9E5F1;
-  --brand:#4898D8;--brand-deep:#2E7CBE;--brand-soft:#D9EAF8;--navy:#16324F;--teal:#0E9AA3;--teal-deep:#0A7278;--gold:#C9A24B;
+  /* --brand-deep is the link, chip and banner ink: #266AA6 reads 5.7:1 on white and 4.6:1 on --brand-soft (the old #2E7CBE read 3.6:1 on a chip).
+     --muted reads 4.7:1 on --bg and 5.1:1 on white (AA for small text); the old #8299AD read 2.7:1. */
+  --bg:#EFF5FA;--surface:#FFFFFF;--surface-2:#E9F2FA;--ink:#1D344E;--ink-2:#52697F;--muted:#5A7087;--line:#D9E5F1;
+  --brand:#4898D8;--brand-deep:#266AA6;--brand-soft:#D9EAF8;--navy:#16324F;--teal:#0E9AA3;--teal-deep:#0A7278;--gold:#C9A24B;
   --danger:#E85B5B;--warn:#E8A13B;--ok:#1B7F4B;
   --radius:20px;--radius-sm:12px;--maxw:1280px;
   --shadow-sm:0 1px 2px rgba(23,50,79,.06),0 4px 14px rgba(23,50,79,.05);
@@ -27,6 +29,8 @@ a:hover{text-decoration:underline}
 h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em;margin:0;color:var(--ink);line-height:1.15}
 h1{font-size:34px}h2{font-size:24px}h3{font-size:18px}h4{font-size:14px;font-family:var(--font-body);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 p{margin:0}
+/* Read by screen readers and outlines, drawn nowhere: the page name on screens whose heading is a control. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 code{font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:.9em;background:var(--surface-2);padding:1px 6px;border-radius:6px}
 button,input,select,textarea{font:inherit;color:inherit}
 input[type=text],input[type=password],input[type=email],input[type=number],input[type=url],select,textarea{
@@ -85,7 +89,7 @@ hr{border:0;border-top:1px solid var(--line);margin:8px 0}
 .nav .links{display:flex;gap:4px;margin-left:8px}
 .nav .links a{padding:7px 14px;border-radius:999px;font-weight:600;font-size:14px;color:var(--ink-2)}
 .nav .links a:hover{background:var(--surface-2);text-decoration:none}
-.nav .links a.on{background:var(--brand-soft);color:var(--brand-deep)}
+.nav .links a.on{background:var(--brand-soft);color:var(--ink)}
 .nav .sp{flex:1}
 .page{max-width:var(--maxw);margin:0 auto;padding:28px 20px 60px}
 .page.wide{max-width:none;padding:16px 16px 30px}
