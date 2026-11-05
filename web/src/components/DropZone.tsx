@@ -29,8 +29,8 @@ export function DropZone({ onFiles, busy, compact }: { onFiles: (files: PathedFi
         <button className="btn btn-ghost btn-sm" onClick={() => dirRef.current?.click()} disabled={busy}>Choose a folder</button>
         {busy && <span className="spin" />}
       </div>
-      <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) take(fromList(e.target.files)); e.target.value = ""; }} />
-      <input ref={dirRef} type="file" multiple hidden {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => { if (e.target.files) take(fromList(e.target.files)); e.target.value = ""; }} />
+      <input ref={fileRef} type="file" aria-label="Choose files" multiple hidden onChange={(e) => { if (e.target.files) take(fromList(e.target.files)); e.target.value = ""; }} />
+      <input ref={dirRef} type="file" aria-label="Choose a folder" multiple hidden {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => { if (e.target.files) take(fromList(e.target.files)); e.target.value = ""; }} />
     </div>
   );
 }

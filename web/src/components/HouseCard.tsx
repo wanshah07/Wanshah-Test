@@ -63,7 +63,7 @@ export function HouseCard() {
       <div className="row">
         <button className="btn btn-primary" onClick={() => save(text)} disabled={busy || over || !changed}>Save</button>
         <button className="btn btn-ghost" onClick={() => file.current?.click()} disabled={busy} title="Load a skill file (.md or .txt) into the box. Its front matter is dropped.">Import skill file</button>
-        <input ref={file} type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden data-testid="skill-file" onChange={(e) => { void importSkill(e.target.files?.[0]); e.target.value = ""; }} />
+        <input ref={file} type="file" aria-label="Import skill file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden data-testid="skill-file" onChange={(e) => { void importSkill(e.target.files?.[0]); e.target.value = ""; }} />
         {changed && <button className="btn btn-quiet" onClick={() => setText(h.text)} disabled={busy}>Undo changes</button>}
         {h.custom && <button className="btn btn-ghost" onClick={() => save(null)} disabled={busy}>Reset to the built-in rules</button>}
       </div>

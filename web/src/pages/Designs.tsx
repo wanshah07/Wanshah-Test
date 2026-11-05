@@ -96,7 +96,7 @@ function DesignCard({ d, onChange, onDelete }: { d: Design; onChange: (d: Design
           )}
         </div>
         <div className="stack">
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ fontWeight: 600 }} />
+          <input type="text" aria-label="Design name" value={name} onChange={(e) => setName(e.target.value)} style={{ fontWeight: 600 }} />
           <div className="row small" style={{ gap: 6 }}>
             {(["bg", "ink", "brand", "brandDeep", "accent", "gold"] as const).map((k) => <span key={k} className="sw" style={{ background: d.theme.colors[k] }} title={`${k} ${d.theme.colors[k]}`} />)}
             <span className="muted">{d.theme.fontDisplay} / {d.theme.fontBody}</span>

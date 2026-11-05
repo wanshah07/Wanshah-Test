@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FONT_CHOICES, THEME_PRESETS, themePreset, type Theme, type ThemeColors } from "@slidecraft/shared";
 import { api, mediaUrl, type Design, type MediaItem } from "../api";
@@ -10,6 +10,7 @@ const COLOR_LABELS: Record<keyof ThemeColors, string> = {
 };
 
 export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { deckId: string; theme: Theme; designId?: string; onChange: (t: Theme) => void; onDesign: (t: Theme, designId: string | undefined) => void }) {
+  const ids = useId();
   const logoRef = useRef<HTMLInputElement>(null);
   const [designs, setDesigns] = useState<Design[]>([]);
   const [saveName, setSaveName] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
           <button className="btn btn-quiet btn-xs" style={{ alignSelf: "flex-start" }} onClick={() => setSaveName(theme.name.startsWith("design") ? "" : `${theme.name} (mine)`)}>Save this look as a design</button>
         ) : (
           <div className="row" style={{ gap: 6 }}>
-            <input type="text" value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Design name" style={{ flex: 1 }} />
+            <input type="text" aria-label="Design name" value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Design name" style={{ flex: 1 }} />
             <button className="btn btn-ghost btn-xs" onClick={saveAsDesign} disabled={!saveName.trim()}>Save</button>
             <button className="btn btn-quiet btn-xs" onClick={() => setSaveName(null)}>Cancel</button>
           </div>
@@ -87,17 +88,17 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
       </div>
       <div className="grid c2" style={{ gap: 10 }}>
         <div className="field">
-          <label>Display font</label>
-          <select value={theme.fontDisplay} onChange={(e) => set({ fontDisplay: e.target.value })}>{FONT_CHOICES.map((f) => <option key={f}>{f}</option>)}</select>
+          <label htmlFor={ids + "-fd"}>Display font</label>
+          <select id={ids + "-fd"} value={theme.fontDisplay} onChange={(e) => set({ fontDisplay: e.target.value })}>{FONT_CHOICES.map((f) => <option key={f}>{f}</option>)}</select>
         </div>
         <div className="field">
-          <label>Body font</label>
-          <select value={theme.fontBody} onChange={(e) => set({ fontBody: e.target.value })}>{FONT_CHOICES.map((f) => <option key={f}>{f}</option>)}</select>
+          <label htmlFor={ids + "-fb"}>Body font</label>
+          <select id={ids + "-fb"} value={theme.fontBody} onChange={(e) => set({ fontBody: e.target.value })}>{FONT_CHOICES.map((f) => <option key={f}>{f}</option>)}</select>
         </div>
       </div>
       <div className="field">
-        <label>Corner radius <span>{theme.radius}px</span></label>
-        <input type="range" min={0} max={60} value={theme.radius} onChange={(e) => set({ radius: Number(e.target.value) })} />
+        <label htmlFor={ids + "-r"}>Corner radius <span>{theme.radius}px</span></label>
+        <input id={ids + "-r"} type="range" min={0} max={60} value={theme.radius} onChange={(e) => set({ radius: Number(e.target.value) })} />
       </div>
       <div className="field">
         <label>Slide style</label>
@@ -132,12 +133,12 @@ export function ThemePanel({ deckId, theme, designId, onChange, onDesign }: { de
       <label className="row small"><input type="checkbox" checked={!!theme.upperTitles} onChange={(e) => set({ upperTitles: e.target.checked })} /> Titles in capitals</label>
       <label className="row small"><input type="checkbox" checked={!!theme.darkTitle} onChange={(e) => set({ darkTitle: e.target.checked })} /> Dark title and closing slides</label>
       <div className="field">
-        <label>Tag on every slide <span className="help">Top right, e.g. HCP VERSION, INTERNAL, CONFIDENTIAL</span></label>
-        <input type="text" value={theme.tag ?? ""} maxLength={80} onChange={(e) => set({ tag: e.target.value || undefined })} placeholder="e.g. For healthcare professionals only" />
+        <label htmlFor={ids + "-tag"}>Tag on every slide <span className="help">Top right, e.g. HCP VERSION, INTERNAL, CONFIDENTIAL</span></label>
+        <input id={ids + "-tag"} type="text" value={theme.tag ?? ""} maxLength={80} onChange={(e) => set({ tag: e.target.value || undefined })} placeholder="e.g. For healthcare professionals only" />
       </div>
       <div className="field">
-        <label>Footer text</label>
-        <input type="text" value={theme.footer ?? ""} onChange={(e) => set({ footer: e.target.value || undefined })} placeholder="e.g. ws.regulab · Confidential" />
+        <label htmlFor={ids + "-ft"}>Footer text</label>
+        <input id={ids + "-ft"} type="text" value={theme.footer ?? ""} onChange={(e) => set({ footer: e.target.value || undefined })} placeholder="e.g. ws.regulab · Confidential" />
       </div>
       <div className="field">
         <label>Logo</label>

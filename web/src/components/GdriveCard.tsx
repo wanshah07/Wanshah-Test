@@ -53,7 +53,7 @@ export function GdriveCard({ onKeyChanged }: { onKeyChanged?: () => void }) {
         <>
           {!cloud && <label className="f">
             Composio API key <span className="h">{gd.hasKey ? "Saved, shared with OneDrive. Paste a new one to replace it; both drives are then picked again." : "From a Composio project that has Google Drive connected. The same key serves OneDrive."}</span>
-            <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste the key" autoComplete="off" />
+            <input type="password" aria-label="Google API key" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste the key" autoComplete="off" />
           </label>}
           <div className="row">
             <button className="btn btn-ghost" onClick={find} disabled={busy || (!key.trim() && !gd.hasKey)}>{busy ? <span className="spin" /> : "Find my Google Drive accounts"}</button>

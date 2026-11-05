@@ -222,8 +222,8 @@ export default function NewDeck() {
           <OneDriveBox getDeckId={ensureDeck} link={link} onImported={(src, l) => { setSources(src.length ? src : sources); setLink(l); }} />
           <div className="card tight stack">
             <div className="row between"><b className="small">Paste text</b><span className="small muted">Notes, an email, a clause you copied.</span></div>
-            <input type="text" value={pasteName} onChange={(e) => setPasteName(e.target.value)} placeholder="Name this source" />
-            <textarea value={pasteText} onChange={(e) => setPasteText(e.target.value)} rows={4} placeholder="Paste here" />
+            <input type="text" aria-label="Source name" value={pasteName} onChange={(e) => setPasteName(e.target.value)} placeholder="Name this source" />
+            <textarea aria-label="Pasted text" value={pasteText} onChange={(e) => setPasteText(e.target.value)} rows={4} placeholder="Paste here" />
             <div className="row"><button className="btn btn-ghost btn-sm" onClick={addPaste} disabled={!pasteText.trim()}>Add text</button></div>
           </div>
           <NotRead items={notRead} onDismiss={() => setNotRead([])} />
