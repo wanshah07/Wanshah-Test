@@ -157,7 +157,16 @@ async function pdfText(buf: Buffer): Promise<string> {
   // Non-literal specifier keeps TypeScript from demanding a declaration file.
   const spec = "pdfjs-dist/legacy/build/pdf.mjs";
   const pdfjs = await import(spec);
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true }).promise;
+  const task = pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true });
+  try {
+    return await pdfPages(await task.promise);
+  } finally {
+    // pdfjs 6 has no PDFDocumentProxy.destroy(); the loading task owns the worker and the document.
+    await task.destroy();
+  }
+}
+
+async function pdfPages(doc: any): Promise<string> {
   const pages: string[] = [];
   let total = 0;
   for (let p = 1; p <= doc.numPages; p++) {
@@ -185,7 +194,6 @@ async function pdfText(buf: Buffer): Promise<string> {
     total += text.length;
     pages.push(text);
   }
-  await doc.destroy();
   return pages.join("\n\n");
 }
 
@@ -203,10 +211,11 @@ export async function pdfFigures(buf: Buffer): Promise<{ page: number; jpg: Buff
   const pdfjs = await import(spec);
   const jpeg = (await import("jpeg-js")).default;
   // maxImageSize: pdfjs does not even decode a picture bigger than a slide could ever need.
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false, maxImageSize: FIG_MAX_PIXELS }).promise;
+  const task = pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false, maxImageSize: FIG_MAX_PIXELS });
   const out: { page: number; jpg: Buffer; width: number; height: number }[] = [];
   const seen = new Set<string>();
   try {
+    const doc = await task.promise;
     for (let p = 1; p <= Math.min(doc.numPages, FIG_PAGES) && out.length < FIG_MAX; p++) {
       const page = await doc.getPage(p);
       const ops = await page.getOperatorList();
@@ -250,7 +259,7 @@ export async function pdfFigures(buf: Buffer): Promise<{ page: number; jpg: Buff
       page.cleanup();
     }
   } finally {
-    await doc.destroy();
+    await task.destroy();
   }
   return out;
 }
