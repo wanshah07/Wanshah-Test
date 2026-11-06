@@ -279,13 +279,25 @@ function statsOf(slides: number, titleLens: number[], lineCounts: number[], char
 async function readPdf(name: string, buf: Buffer): Promise<{ picked: Picked; fonts: DesignAnalysis["fonts"]; stats: DesignStats; colours: DesignAnalysis["colours"]; warnings: string[] }> {
   const spec = "pdfjs-dist/legacy/build/pdf.mjs";
   const pdfjs = await import(spec);
+  // fontExtraProperties: since pdfjs 6 a loaded font carries its PDF name (the /BaseFont, e.g.
+  // "ABCDEF+Montserrat-Bold") only when this is set; without it the reader sees "g_d0_f1".
+  const task = pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true, fontExtraProperties: true });
   let doc;
   try {
-    doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0, isEvalSupported: false, useSystemFonts: true }).promise;
+    doc = await task.promise;
   } catch {
+    await task.destroy();
     throw new DesignError(`${name} is not a readable PDF.`);
   }
-  const OPS = pdfjs.OPS as Record<string, number>;
+  try {
+    return await readPdfPages(doc, pdfjs.OPS as Record<string, number>);
+  } finally {
+    // pdfjs 6 has no PDFDocumentProxy.destroy(); the loading task owns the worker and the document.
+    await task.destroy();
+  }
+}
+
+async function readPdfPages(doc: any, OPS: Record<string, number>): Promise<{ picked: Picked; fonts: DesignAnalysis["fonts"]; stats: DesignStats; colours: DesignAnalysis["colours"]; warnings: string[] }> {
   const FILLS = new Set([OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
   const fillWeight = new Map<string, number>();
   const textColour = new Map<string, number>();

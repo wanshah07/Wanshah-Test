@@ -72,7 +72,7 @@ if (out && process.env.ONLY) {
 }
 if (out) fs.copyFileSync(pdfPath, path.join(out, `pptx-fit-${tag}.pdf`));
 
-const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(pdfPath)), useSystemFonts: true }).promise;
+const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(pdfPath)), isEvalSupported: false, useSystemFonts: true }).promise;
 for (let p = 1; p <= doc.numPages; p++) {
   const page = await doc.getPage(p);
   const [, , pw, ph] = page.view;
